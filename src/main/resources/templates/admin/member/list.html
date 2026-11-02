@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<!--/* SCR-A-023 회원 관리
+  state: (기본) 목록 · search(검색창 열림) · empty(검색 결과 없음)
+         detail(A 회원 상세) · register(B 회원 등록) · edit(C 권한 변경) · delete(D 삭제 확인)
+  필터·검색(이름/아이디/초성)·페이지(4명씩)·등록·권한 변경·삭제는 member.js 에서 시뮬레이션 */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='회원 관리', active='', fixed=false, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div id="memberPage" class="space-y-5 px-4 pb-28 pt-6">
+    <h2 class="px-1 text-[24px] font-extrabold tracking-[-0.04em] text-[#346538]">회원 관리</h2>
+
+    <section class="overflow-visible rounded-[20px] bg-white shadow-[0_5px_18px_rgba(36,58,39,.06)]">
+      <div class="p-4">
+        <h3 class="text-[16px] font-extrabold text-[#29312b]">회원 관리 목록</h3>
+        <div class="relative mt-3 flex items-center gap-2">
+          <!--/* ① 분류 필터 */-->
+          <select id="memberFilter" aria-label="분류 필터"
+                  class="h-9 rounded-lg border border-[#dfe4df] bg-white px-2 text-[10px] font-semibold outline-none focus:border-[#346538]">
+            <option>전체</option><option>고객</option><option>관리자</option>
+          </select>
+          <div class="ml-auto flex items-center gap-1">
+            <!--/* ② 등록 · ③ 검색 */-->
+            <button type="button" data-member-open="register"
+                    class="h-9 rounded-lg bg-[#346538] px-3 text-[10px] font-bold text-white">+ 등록</button>
+            <button type="button" id="memberSearchToggle" aria-label="회원 검색" aria-expanded="false"
+                    class="grid h-9 w-9 place-items-center rounded-lg border border-[#dfe4df] text-[#59625b]">
+              <svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+            </button>
+          </div>
+          <div id="memberSearch" hidden
+               class="absolute bottom-11 right-0 z-10 flex items-center gap-2 rounded-xl border border-[#e1e5e1] bg-white p-3 shadow-[0_10px_28px_rgba(36,58,39,.15)]">
+            <input id="memberQuery" type="search" placeholder="이름을 입력하세요" aria-label="회원 이름 검색"
+                   class="h-9 w-44 rounded-lg border border-[#dfe4df] px-3 text-[10px] outline-none focus:border-[#346538]">
+            <button type="button" id="memberReset" aria-label="검색 및 필터 초기화"
+                    class="flex h-9 shrink-0 items-center gap-1 rounded-lg bg-[#edf3ed] px-2.5 text-[9px] font-bold text-[#346538]">
+              <svg class="icon" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-refresh'"/></svg> 초기화
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-[32px_64px_1fr_55px] bg-[#f7f8f7] px-3 py-2.5 text-center text-[9px] font-bold text-[#89908b]">
+        <span>번호</span><span>분류</span><span>이름</span><span>수정/삭제</span>
+      </div>
+
+      <!--/* ④ 행 클릭 → 상세 · ⑤ 연필 → 권한 변경 · ⑥ 휴지통 → 삭제 확인 */-->
+      <div id="memberRows" class="px-3">
+        <div th:each="m, st : ${ {
+              '1|홍길동|luxury|고객|010-1234-5678|2023.02.14',
+              '2|김명품|luxury2|관리자|010-2244-8811|',
+              '3|박철수|park789|고객|010-7788-2200|2023.06.02',
+              '4|최지우|choi00|고객|010-3377-9021|2024.01.17',
+              '5|이서준|seojun82|고객|010-5892-1144|2023.09.10',
+              '6|정하윤|hayoon5|고객|010-9834-1420|2024.02.22',
+              '7|강민준|minjun77|고객|010-4471-3302|2024.04.03',
+              '8|윤서아|seoa11|고객|010-8842-3199|2024.08.19',
+              '9|송지호|jiho90|고객|010-1166-4201|2026.09.21',
+              '10|한유진|yujin26|고객|010-6673-9920|2026.09.22',
+              '11|오도현|dohyun3|고객|010-2207-6134|2026.09.24',
+              '12|문지안|jian8|고객|010-7318-4490|2026.09.26',
+              '13|임지수|jisoo19|고객|010-9901-7722|2022.05.01',
+              '14|김도윤|doyun24|고객|010-3142-6678|2024.09.12',
+              '15|이지민|jimin31|고객|010-5521-9034|2024.11.03',
+              '16|박서연|seoyeon6|고객|010-7713-2088|2025.01.18',
+              '17|최현우|hyunwoo88|고객|010-4055-7291|2025.03.24',
+              '18|정수빈|subin12|고객|010-6320-1847|2025.06.11',
+              '19|강준호|junho75|고객|010-9081-3362|2026.09.20',
+              '20|윤채원|chaewon4|고객|010-2466-8103|2026.09.21',
+              '21|송민재|minjae21|고객|010-8642-5179|2026.09.23',
+              '22|한예린|yerin09|고객|010-1937-6405|2026.09.25',
+              '23|오승민|seungmin5|고객|010-7254-3916|2026.09.27'} }"
+             th:with="t=${#strings.arraySplit(m + '|', '|')}"
+             th:attr="data-id=${t[0]},data-name=${t[1]},data-user-id=${t[2]},data-type=${t[3]},data-phone=${t[4]},data-joined=${t.length > 5 ? t[5] : ''}"
+             th:hidden="${st.index >= 4}"
+             data-member
+             class="grid cursor-pointer grid-cols-[32px_64px_1fr_55px] items-center border-b border-[#edf0ed] py-3.5 text-[10px] last:border-none hover:bg-[#fafbfa]">
+          <span data-no class="text-center text-[#8b928d]" th:text="${st.count}">1</span>
+          <span data-type-badge class="justify-self-center rounded-full px-2 py-1 text-[9px] font-bold"
+                th:classappend="${t[3] == '관리자'} ? 'bg-[#fff1e8] text-[#ba6a35]' : 'bg-[#edf3f8] text-[#4d7599]'"
+                th:text="${t[3]}">고객</span>
+          <span data-name-text class="truncate px-1 font-semibold text-[#424a44]" th:text="${t[1]}">홍길동</span>
+          <div class="flex justify-end">
+            <button type="button" data-member-open="edit" class="grid h-7 w-7 place-items-center text-[#4f80ac]"
+                    th:attr="aria-label=|${t[1]} 권한 수정|">
+              <svg class="icon" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-edit'"/></svg>
+            </button>
+            <button type="button" data-member-open="delete" class="grid h-7 w-7 place-items-center text-[#c7635a]"
+                    th:attr="aria-label=|${t[1]} 삭제|">
+              <svg class="icon" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-trash'"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!--/* 결과없음 */-->
+      <div id="memberEmpty" hidden class="grid place-items-center px-4 py-12 text-center">
+        <span class="mb-3 grid h-11 w-11 place-items-center rounded-full bg-[#f3f5f3] text-[#9aa29c]">
+          <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        </span>
+        <p class="text-[12px] font-semibold text-[#656d67]">일치하는 회원이 없습니다</p>
+        <p class="mt-1 text-[10px] text-[#979d98]">이름을 다시 확인하거나 [초기화]를 눌러 주세요.</p>
+      </div>
+
+      <!--/* ⑦ 페이지 번호 (4명씩) */-->
+      <div id="memberPager" class="flex justify-center gap-1 border-t border-[#edf0ed] p-4">
+        <button th:each="n : ${#numbers.sequence(1, 6)}" type="button" th:attr="data-page=${n}" th:text="${n}"
+                class="grid h-8 w-8 place-items-center rounded-lg text-[10px] font-bold"
+                th:classappend="${n == 1} ? 'bg-[#346538] text-white' : 'bg-[#f3f5f3] text-[#717972]'">1</button>
+      </div>
+    </section>
+
+    <!--/* 팝업 공통 스크림: 헤더·하단 탭 사이 영역 (#adminFrame 기준) */-->
+    <!--/* A 회원 상세 정보 */-->
+    <div id="memberDetail" data-layer hidden
+         class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 !m-0 grid place-items-center overflow-y-auto bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
+      <div class="my-auto w-full rounded-[20px] bg-white p-5 shadow-2xl">
+        <div class="flex items-center justify-between">
+          <h3 class="text-[17px] font-extrabold">회원 상세 정보</h3>
+          <button type="button" data-close aria-label="닫기"><svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg></button>
+        </div>
+        <div class="mt-5 text-center">
+          <span data-f="initial" class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#edf3ed] text-[18px] font-extrabold text-[#346538]">홍</span>
+          <p data-f="name" class="mt-2 text-[15px] font-extrabold">홍길동</p>
+        </div>
+        <div class="mt-5 divide-y divide-[#edf0ed] rounded-xl bg-[#f8f9f8] px-4">
+          <div class="flex justify-between py-2.5 text-[10px]"><span class="font-bold text-[#737b75]">이름</span><span data-f="name" class="text-[#444c46]">홍길동</span></div>
+          <div class="flex justify-between py-2.5 text-[10px]"><span class="font-bold text-[#737b75]">연락처</span><span data-f="phone" class="text-[#444c46]">010-1234-5678</span></div>
+          <div class="flex justify-between py-2.5 text-[10px]"><span class="font-bold text-[#737b75]">가입일</span><span data-f="joined" class="text-[#444c46]">2023.02.14</span></div>
+          <div class="flex justify-between py-2.5 text-[10px]"><span class="font-bold text-[#737b75]">분류</span><span data-f="type" class="text-[#444c46]">고객</span></div>
+        </div>
+        <button type="button" data-close class="mt-5 h-11 w-full rounded-xl bg-[#346538] text-[11px] font-bold text-white">닫기</button>
+      </div>
+    </div>
+
+    <!--/* B 회원 등록 */-->
+    <div id="memberRegister" data-layer hidden
+         class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 !m-0 grid place-items-center overflow-y-auto bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
+      <form id="memberRegisterForm" class="my-auto w-full rounded-[20px] bg-white p-5 shadow-2xl" novalidate>
+        <div class="flex items-center justify-between">
+          <h3 class="text-[17px] font-extrabold">회원 등록</h3>
+          <button type="button" data-close aria-label="닫기"><svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg></button>
+        </div>
+        <div class="mt-4 space-y-3">
+          <label class="block"><span class="mb-1 block text-[9px] font-bold text-[#6b736d]">이름</span>
+            <input name="name" type="text" class="h-10 w-full rounded-lg border border-[#dfe4df] px-3 text-[11px] outline-none focus:border-[#346538]"></label>
+          <label class="block"><span class="mb-1 block text-[9px] font-bold text-[#6b736d]">연락처</span>
+            <input name="phone" type="tel" inputmode="numeric" class="h-10 w-full rounded-lg border border-[#dfe4df] px-3 text-[11px] outline-none focus:border-[#346538]"></label>
+          <label class="block"><span class="mb-1 block text-[9px] font-bold text-[#6b736d]">가입일</span>
+            <input name="joined" type="text" inputmode="numeric" placeholder="YYYY.MM.DD" class="h-10 w-full rounded-lg border border-[#dfe4df] px-3 text-[11px] outline-none focus:border-[#346538]"></label>
+          <div class="block">
+            <span class="mb-1 block text-[9px] font-bold text-[#6b736d]">분류</span>
+            <div class="relative" id="memberTypeSelect">
+              <input type="hidden" name="type" value="고객">
+              <button type="button" data-select-toggle aria-expanded="false"
+                      class="flex h-10 w-full items-center justify-between rounded-lg border border-[#dfe4df] bg-white px-3 text-[11px] outline-none aria-expanded:border-[#346538]">
+                <span data-select-label>고객</span>
+                <svg class="icon text-[#737b75] transition" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-chevron'"/></svg>
+              </button>
+              <div data-select-list hidden class="mt-1 overflow-hidden rounded-lg border border-[#dfe4df] bg-white p-1 shadow-[0_8px_20px_rgba(36,58,39,.1)]">
+                <button type="button" data-select-option="고객" class="block w-full rounded-md bg-[#edf3ed] px-3 py-2 text-left text-[11px] font-semibold text-[#346538]">고객</button>
+                <button type="button" data-select-option="관리자" class="block w-full rounded-md px-3 py-2 text-left text-[11px] font-semibold text-[#4d554f]">관리자</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" data-close class="h-11 rounded-xl border border-[#d9ded9] text-[11px] font-bold">취소</button>
+          <button type="submit" disabled class="h-11 rounded-xl bg-[#346538] text-[11px] font-bold text-white disabled:opacity-40">등록</button>
+        </div>
+      </form>
+    </div>
+
+    <!--/* C 회원 권한 변경 */-->
+    <div id="memberEdit" data-layer hidden
+         class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 !m-0 grid place-items-center overflow-y-auto bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
+      <div class="my-auto w-full rounded-[20px] bg-white p-5 shadow-2xl">
+        <div class="flex items-center justify-between">
+          <h3 class="text-[17px] font-extrabold">회원 권한 변경</h3>
+          <button type="button" data-close aria-label="닫기"><svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg></button>
+        </div>
+        <div class="mt-4 rounded-xl bg-[#f5f7f5] p-4 text-[11px]">
+          <strong data-f="name">홍길동</strong>
+          <p class="mt-1 text-[#7b837d]"><span data-f="userId">luxury</span> · <span data-f="phone">010-1234-5678</span></p>
+        </div>
+        <p class="mt-5 text-[10px] font-bold">분류 (권한)</p>
+        <div class="mt-3 flex gap-5">
+          <label class="flex items-center gap-2 text-[11px] font-semibold"><input type="radio" name="memberType" value="고객" class="accent-[#346538]" checked>고객</label>
+          <label class="flex items-center gap-2 text-[11px] font-semibold"><input type="radio" name="memberType" value="관리자" class="accent-[#346538]">관리자</label>
+        </div>
+        <div class="mt-6 grid grid-cols-2 gap-2">
+          <button type="button" data-close class="h-11 rounded-xl border border-[#d9ded9] text-[11px] font-bold">취소</button>
+          <button type="button" id="memberEditSave" class="h-11 rounded-xl bg-[#346538] text-[11px] font-bold text-white">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!--/* D 삭제 확인 */-->
+    <div id="memberDelete" data-layer hidden
+         class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 !m-0 grid place-items-center overflow-y-auto bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
+      <div class="my-auto w-full rounded-[20px] bg-white p-5 shadow-2xl">
+        <h3 class="text-center text-[17px] font-extrabold">정말 삭제하시겠습니까?</h3>
+        <p class="mt-2 text-center text-[10px] text-[#8b928d]">삭제된 데이터는 복구할 수 없습니다.</p>
+        <div class="mt-6 grid grid-cols-2 gap-2">
+          <button type="button" data-close class="h-11 rounded-xl border border-[#d9ded9] text-[11px] font-bold">취소</button>
+          <button type="button" id="memberDeleteConfirm" class="h-11 rounded-xl bg-[#c75f56] text-[11px] font-bold text-white">삭제</button>
+        </div>
+      </div>
+    </div>
+
+    <!--/* 처리 결과 토스트 (등록 시 신규 가입 알림 발송 등) */-->
+    <div id="memberToast" hidden role="status"
+         class="absolute inset-x-4 bottom-[96px] z-[60] !m-0 rounded-xl bg-[#27372a]/95 px-4 py-3 text-center text-[11px] font-semibold text-white shadow-lg [animation:slideUp_.2s_ease-out]"></div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/member.js}"></script></th:block>
+</body>
+</html>

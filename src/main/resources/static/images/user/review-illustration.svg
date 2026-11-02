@@ -1,0 +1,22 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Review illustration">
+<g id="Review card" filter="url(#review-shadow)">
+<rect x="6" y="8" width="32" height="29" rx="7" fill="#FFD54A"/>
+</g>
+<rect id="Review sheet" x="10" y="12" width="24" height="21" rx="4" fill="#FFFDF4"/>
+<rect id="Clipboard tab" x="15" y="5" width="14" height="8" rx="4" fill="#8B7CF6"/>
+<path id="Review star" d="M22 15.5L23.62 18.78L27.24 19.31L24.62 21.86L25.24 25.47L22 23.77L18.76 25.47L19.38 21.86L16.76 19.31L20.38 18.78L22 15.5Z" fill="#FFB52E"/>
+<rect id="Review line 1" x="15" y="28" width="14" height="2" rx="1" fill="#62CFC5"/>
+</g>
+<defs>
+<filter id="review-shadow" x="3" y="7" width="38" height="35" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="2"/>
+<feGaussianBlur stdDeviation="1.5"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.168627 0 0 0 0 0.227451 0 0 0 0 0.333333 0 0 0 0.16 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+</filter>
+</defs>
+</svg>

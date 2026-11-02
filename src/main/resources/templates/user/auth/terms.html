@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U 개인정보 수집 안내 (G-A08)
+  state 없음. '내용을 확인했어요' → /signup?terms=agreed
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='개인정보 수집 안내', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/auth.css}">
+</head>
+<body>
+<div class="app-shell auth-shell">
+  <div class="screen form-page auth-form-page">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/signup})}"></a>
+      <div class="form-title">개인정보 수집 안내</div>
+    </div>
+    <div class="form-content">
+      <div class="terms-content">
+        <div class="terms-heading">본인인증을 위한 개인정보 수집 및 이용</div>
+        <p>명품익스프레스는 회원가입과 본인인증을 위해 아래와 같이 개인정보를 수집하고 이용합니다.</p>
+        <div class="terms-block">
+          <strong>수집하는 개인정보 항목</strong>
+          <p>이름, 휴대폰 번호, 본인인증 결과값</p>
+        </div>
+        <div class="terms-block">
+          <strong>개인정보의 수집 및 이용 목적</strong>
+          <p>회원 식별, 본인인증, 서비스 가입 및 고객 상담</p>
+        </div>
+        <div class="terms-block">
+          <strong>보유 및 이용 기간</strong>
+          <p>회원 탈퇴 시까지 보관하며, 관계 법령에 따라 보존할 필요가 있는 경우 해당 기간 동안 보관합니다.</p>
+        </div>
+        <div class="terms-notice">개인정보 수집 및 이용에 동의하지 않을 수 있으나, 동의하지 않을 경우 회원가입과 본인인증을 진행할 수 없습니다.</div>
+      </div>
+      <a class="action terms-accept primary" th:href="@{/signup(terms='agreed')}" data-terms-accept>내용을 확인했어요</a>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/auth.js}"></script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+/* 더보기 (G-H01~H14) — app.css 보정 */
+
+/* H01 더보기 */
+.more-screen .page-title { padding-top: 18px; padding-bottom: 14px; }
+.more-screen .menu-list { margin-top: 24px; }
+.more-screen .menu-list .action { min-height: 84px; padding: 0 8px 0 4px; }
+.more-screen .menu-list strong { font-size: 16px; color: var(--ink); }
+.more-screen .menu-list span { font-size: 12px; }
+.more-screen .logout { display: block; margin: 27px auto; color: var(--muted); text-decoration: underline; }
+.easy-mode .more-screen .page-title { padding-top: 19px; padding-bottom: 13px; }
+.easy-mode .more-screen .profile-card { min-height: 98px; }
+.easy-mode .more-screen .menu-list .action { min-height: 90px; }
+.easy-mode .more-screen .menu-list strong { font-size: 18px; }
+.easy-mode .more-screen .menu-list span { font-size: 14px; }
+.easy-mode .more-screen .logout { font-size: 13px; }
+
+/* H02~H04 내 정보 수정 */
+.personal-verified-mark { right: 0; bottom: 0; width: 24px; height: 24px; border-width: 2px; }
+.personal-verified-mark svg { width: 10px; height: 10px; }
+.personal-profile { padding-bottom: 40px; }
+.personal-profile > span { margin-top: 3px; }
+.personal-phone-copy { gap: 5px; }
+
+.personal-section-label { margin-bottom: 12px; }
+.personal-setting-row { min-height: 70px; }
+.personal-setting-row.personal-phone-row { min-height: 80px; }
+.linked-login-card { color: inherit; }
+.withdraw-link { color: #aaa; }
+input.field { display: block; width: 100%; max-width: none; border-bottom: 1px solid #d9d9d9; color: var(--ink); font-family: "Pretendard:SemiBold"; font-size: 16px; outline: none; }
+input.field:focus { border-color: var(--green); }
+input.field::placeholder { color: #d9d9d9; }
+.phone-code-group input.field { border-color: var(--green); }
+.personal-sheet-grabber { height: 26px; }
+.personal-modal-head > div:first-child { gap: 7px; }
+.personal-modal .phone-change-login-group { margin-top: 34px; }
+.personal-modal .phone-send-button { height: 42px; }
+.personal-modal .phone-code-group { margin-top: 30px; }
+
+/* H05~H09 견적내역·예약내역·후기 공통 보정 */
+.estimate-arrived-top > span, .upcoming-reservation-top span, .review-prompt-meta > span { padding: 5px 8px; font-size: 11px; }
+.estimate-arrived-top > b, .upcoming-reservation-top b { font-size: 14px; }
+.upcoming-reservation-top b { font-size: 16px; }
+.estimate-arrived-card > small, .upcoming-reservation-card > small, .review-prompt-meta > small { font-size: 13px; }
+.review-prompt > p { font-family: "Pretendard:SemiBold"; font-size: 13px; }
+.estimate-list-head, .reservation-past-head { margin-top: 30px; }
+.review-history-label { margin-top: 30px; }
+.estimate-history-row, .past-booking { min-height: 119px; }
+.estimate-history-main, .past-booking-main { gap: 8px; }
+.estimate-history-meta > span, .past-booking-meta span { padding: 5px 8px; font-size: 11px; }
+.estimate-history-meta > small, .past-booking-meta small { font-size: 13px; }
+.estimate-history-main > small, .past-booking-main > small { font-size: 13px; }
+.past-reservation-list { margin-top: 12px; }
+.past-reservation-year-label { font-size: 13px; }
+.past-reservation-year + .past-reservation-year { margin-top: 22px; }
+.my-review { min-height: 169px; padding-top: 18px; }
+.my-review-head > span { font-size: 13px; letter-spacing: 0; }
+.my-review-head > small { font-size: 13px; }
+.my-review-copy > p { font-size: 14px; word-break: keep-all; }
+.my-review-type { font-size: 13px; }
+.my-review > strong { margin-top: 14px; }
+.my-review-copy { margin-top: 12px; }
+.my-review-type { margin-top: 12px; }
+.save-toast { z-index: 50; padding: 12px 18px; font-size: 13px; }
+
+/* 쉬운 모드 (E-H02~H14) */
+.easy-mode .estimate-arrived-card, .easy-mode .upcoming-reservation-card, .easy-mode .review-prompt { min-height: 136px; }
+.easy-mode .estimate-arrived-top > span, .easy-mode .upcoming-reservation-top span, .easy-mode .review-prompt-meta > span { padding: 6px 10px; font-size: 13px; }
+.easy-mode .estimate-arrived-top > b { font-size: 16px; }
+.easy-mode .estimate-arrived-top svg { width: 15px; height: 15px; }
+.easy-mode .upcoming-reservation-top b { font-size: 18px; }
+.easy-mode .estimate-arrived-card > small, .easy-mode .upcoming-reservation-card > small, .easy-mode .review-prompt-meta > small { font-size: 15px; }
+.easy-mode .review-prompt > p { font-size: 15px; }
+.easy-mode .estimate-list-head, .easy-mode .reservation-past-head, .easy-mode .review-history-label { min-height: 50px; }
+.easy-mode .estimate-list-head span, .easy-mode .reservation-past-head span, .easy-mode .review-history-label > span { font-size: 19px; }
+.easy-mode .estimate-list-head strong, .easy-mode .reservation-past-head strong, .easy-mode .review-history-label > strong { font-size: 19px; }
+.easy-mode .estimate-filter-button, .easy-mode .reservation-filter-button { font-size: 15px; }
+.easy-mode .estimate-history-row, .easy-mode .past-booking { min-height: 135px; }
+.easy-mode .estimate-history-main, .easy-mode .past-booking-main { gap: 10px; }
+.easy-mode .estimate-history-meta > span, .easy-mode .past-booking-meta span { padding: 6px 10px; font-size: 13px; }
+.easy-mode .estimate-history-meta > small, .easy-mode .past-booking-meta small,
+.easy-mode .estimate-history-main > small, .easy-mode .past-booking-main > small { font-size: 15px; }
+.easy-mode .estimate-history-row strong, .easy-mode .past-booking strong { font-size: 18px; }
+.easy-mode .past-reservation-year-label { font-size: 15px; }
+.easy-mode .reservation-filter-menu .action { font-size: 17px; }
+.easy-mode .my-review { min-height: 192px; padding-top: 22px; }
+.easy-mode .my-review-head > span { font-size: 15px; }
+.easy-mode .my-review-head > small, .easy-mode .my-review-type { font-size: 15px; }
+.easy-mode .my-review > strong { font-size: 18px; }
+.easy-mode .my-review-copy > p { font-size: 16px; line-height: 1.75; }
+.easy-mode .personal-modal-head strong { font-size: 20px; }
+.phone-change-confirm { font-family: "Pretendard:Medium"; }
+.easy-mode .estimate-list-head, .easy-mode .reservation-past-head, .easy-mode .review-history-label { min-height: 64px; margin-top: 26px; }
+.easy-mode .reservation-filter-menu { max-height: none; }
+.easy-mode .reservation-filter-menu .action { min-height: 58px; font-size: 17px; }
+.easy-mode .reservation-filter-menu .action > span { font-size: 17px; }
+.easy-mode .upcoming-reservation-top b { font-size: 19px; }
+.easy-mode .past-reservation-list { margin-top: 18px; }
+
+/* H05 견적내역 — 캡처 실측 보정 */
+.estimate-arrived-card { min-height: 122px; background: #f5f5eb; }
+.estimate-arrived-card > small { margin-top: 10px; }
+.estimate-list-head { min-height: 60px; margin-top: 26px; border-bottom-color: #f0f2ee; }
+.estimate-history-row { border-bottom-color: #f0f2ee; }
+.estimate-history-main { gap: 10px; }
+.estimate-history-main > small { margin-top: 2px; }
+.estimate-list-head .estimate-filter-button > span, .reservation-past-head .reservation-filter-button > span { color: #555; font-family: "Pretendard:Regular"; font-size: inherit; }
+.easy-mode .estimate-filter-button, .easy-mode .reservation-filter-button { font-size: 14px; }
+.easy-mode .estimate-arrived-card > small { margin-top: 12px; }
+.easy-mode .estimate-history-main, .easy-mode .past-booking-main { gap: 12px; }
+.easy-mode .estimate-history-row { min-height: 136px; }
+.easy-mode .estimate-history-row strong { font-size: 19px; }
+.reservation-filter-menu .action > span { font-family: "Pretendard:Regular"; font-size: 12px; }
+
+/* H07 예약내역 — 캡처 실측 보정 */
+.upcoming-reservation-card { min-height: 122px; background: #f5f5eb; }
+.upcoming-reservation-card > small { margin-top: 10px; }
+.reservation-past-head { margin-top: 36px; }
+.past-reservation-list { margin-top: 20px; }
+.past-reservation-year-label { padding-bottom: 15px; border-bottom-color: #f0f2ee; }
+.past-reservation-year + .past-reservation-year { margin-top: 25px; }
+.past-booking { border-bottom-color: #f0f2ee; }
+.past-booking-main { gap: 10px; }
+.past-booking-main > small { margin-top: 2px; }
+.easy-mode .past-reservation-list { margin-top: 14px; }
+.easy-mode .upcoming-reservation-card > small { margin-top: 12px; }
+.easy-mode .past-booking { min-height: 136px; }
+.easy-mode .past-booking strong { font-size: 19px; }
+
+/* H09 후기 — 캡처 실측 보정 */
+.review-prompt { min-height: 122px; background: #f5f5eb; }
+.review-prompt > p { margin-top: 10px; }
+.review-history-label { min-height: 56px; margin-top: 24px; border-bottom-color: #f0f2ee; }
+.review-history-label > strong { font-size: 16px; }
+.my-review { padding-top: 19px; border-bottom-color: #f0f2ee; }
+.my-review-head > span { font-size: 16px; }
+.my-review-copy { margin-top: 10px; }
+.my-review-copy > p { line-height: 1.7; }
+.my-review-type { margin-top: 10px; }
+.easy-mode .review-prompt > p { margin-top: 12px; }
+.easy-mode .review-history-label { min-height: 56px; margin-top: 25px; }
+.easy-mode .my-review-head > span { font-size: 17px; }
+
+/* ── 후기 작성 (11/02 시안 06·07_review_new) ── */
+.review-new-page { padding-inline: 24px; padding-bottom: 120px; }
+.review-compose { max-width: 520px; margin: 0 auto; }
+.rv-title { margin-top: 18px; color: #222; font-family: "Pretendard:Bold"; font-size: 24px; line-height: 1.4; letter-spacing: -.01em; }
+.rv-sub { margin-top: 6px; color: #999; font-size: 14px; }
+.rv-rating { margin-top: 30px; display: flex; gap: 4px; }
+.rv-star { width: 40px; height: 40px; color: #e5e7e3; cursor: pointer; transition: color .12s ease, transform .12s ease; }
+.rv-star svg { width: 40px; height: 40px; fill: currentColor; }
+.rv-star.rated { color: #f6921e; }
+.rv-star:active { transform: scale(.92); }
+.rv-rating-label { margin-top: 8px; color: #999; font-size: 13px; }
+.rv-rating-label.rated { color: #ee8326; font-family: "Pretendard:Bold"; font-size: 14px; }
+.rv-editor { position: relative; margin-top: 28px; height: 168px; border: 1px solid #e3e3e3; border-radius: 16px; background: #fff; }
+.rv-editor:focus-within { border-color: var(--green); }
+.rv-editor textarea { display: block; width: 100%; height: 100%; padding: 16px 16px 36px; resize: none; outline: none; color: #333; font-size: 15px; line-height: 1.65; }
+.rv-editor textarea::placeholder { color: #aaa; }
+.rv-count { position: absolute; right: 17px; bottom: 13px; color: #aaa; font-size: 12px; }
+.rv-photo-head { margin-top: 28px; display: flex; align-items: baseline; gap: 7px; }
+.rv-photo-head strong { color: #222; font-family: "Pretendard:Bold"; font-size: 15px; }
+.rv-photo-head span { color: #999; font-size: 13px; }
+.rv-photo-grid { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.rv-photo-grid .review-photo-preview, .rv-photo-grid .review-photo-add { width: 76px; height: 76px; aspect-ratio: auto; border-radius: 12px; }
+.rv-photo-grid .review-photo-preview { background: #f6f6f4; }
+.rv-photo-grid .review-photo-remove { right: 5px; top: 4px; width: 20px; height: 20px; background: rgb(60 60 60 / .78); }
+.rv-photo-grid .review-photo-add { border: 1px dashed #cfcfcb; background: #f6f6f4; color: #666; gap: 3px; cursor: pointer; font-family: "Pretendard:Regular"; }
+.rv-photo-grid .review-photo-add span { color: #999; font-size: 11px; }
+.rv-photo-grid .review-photo-add[hidden] { display: none; }
+.rv-submit-bar { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; padding: 12px 24px max(28px, calc(var(--safe-bottom) + 12px)); background: #fff; }
+.rv-submit { display: block; width: 100%; max-width: 520px; height: 56px; margin: 0 auto; border-radius: 16px; background: var(--green); color: #fff; font-family: "Pretendard:Bold"; font-size: 17px; cursor: pointer; }
+.rv-submit:disabled { background: #e3e5e1; color: #a9aba7; cursor: default; }
+.easy-mode .rv-title { font-size: 27px; }
+.easy-mode .rv-sub { font-size: 16px; }
+.easy-mode .rv-rating { gap: 6px; }
+.easy-mode .rv-star, .easy-mode .rv-star svg { width: 50px; height: 50px; }
+.easy-mode .rv-rating-label { font-size: 15px; }
+.easy-mode .rv-rating-label.rated { font-size: 17px; }
+.easy-mode .rv-editor { height: 190px; }
+.easy-mode .rv-editor textarea { padding-bottom: 40px; font-size: 17px; }
+.easy-mode .rv-count { font-size: 14px; }
+.easy-mode .rv-photo-head strong { font-size: 18px; }
+.easy-mode .rv-photo-head span { font-size: 15px; }
+.easy-mode .rv-photo-grid { gap: 10px; }
+.easy-mode .rv-photo-grid .review-photo-preview, .easy-mode .rv-photo-grid .review-photo-add { width: 96px; height: 96px; }
+.easy-mode .rv-photo-grid .review-photo-remove { width: 26px; height: 26px; }
+.easy-mode .rv-photo-grid .review-photo-add span { font-size: 14px; }
+.easy-mode .rv-submit { height: 64px; font-size: 19px; }
+.easy-mode .review-new-page { padding-bottom: 130px; }
+
+/* ── 알림 (11/02 시안 05_notifications): 탭 + 읽지 않음 강조 ── */
+.notifications-screen { background: #fff; }
+.notification-header { border-bottom: 0; }
+.notification-read-all { padding: 8px 0 8px 8px; color: #9b9b9b; font-size: 13px; cursor: pointer; }
+.notification-tabs { position: sticky; z-index: 24; top: calc(56px + max(59px, env(safe-area-inset-top))); height: 58px; padding: 8px 20px 0; display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; border-bottom: 1px solid #eef0ec; }
+.notification-tabs button { position: relative; color: #999; font-size: 15px; cursor: pointer; }
+.notification-tabs button.active { color: var(--green); font-family: "Pretendard:Bold"; }
+.notification-tabs button.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; background: var(--green); }
+.notification-feed { padding-bottom: max(24px, var(--safe-bottom)); }
+.notification-row { min-height: 132px; padding: 21px 36px 20px 17px; grid-template-columns: 44px 1fr; gap: 15px; border-bottom: 1px solid #f0f2ee; }
+.notification-row.unread { background: #edf2ec; }
+.notification-row[hidden] { display: none; }
+.notification-type-icon svg { border-radius: 13px; }
+.notification-copy { gap: 0; }
+.notification-copy strong { color: #222; font-family: "Pretendard:Bold"; font-size: 15px; line-height: 1.5; }
+.notification-copy p { margin-top: 4px; color: #777; font-size: 14px; line-height: 22px; word-break: keep-all; }
+.notification-copy small { margin-top: 5px; color: #aaa; font-size: 12px; }
+.notification-row > i { right: 16px; top: 25px; width: 6px; height: 6px; background: #f07f23; }
+.notification-empty { padding: 56px 0; color: var(--muted); text-align: center; font-size: 14px; }
+.easy-mode .notification-read-all { font-size: 15px; }
+.easy-mode .notification-tabs { height: 64px; }
+.easy-mode .notification-tabs button { font-size: 18px; }
+.easy-mode .notification-row { min-height: 150px; padding: 22px 38px 22px 17px; grid-template-columns: 52px 1fr; gap: 14px; }
+.easy-mode .notification-type-icon, .easy-mode .notification-type-icon svg { width: 52px; height: 52px; }
+.easy-mode .notification-copy strong { font-size: 18px; }
+.easy-mode .notification-copy p { font-size: 16px; line-height: 26px; }
+.easy-mode .notification-copy small { font-size: 14px; }
+.easy-mode .notification-row > i { width: 8px; height: 8px; top: 27px; }
+.easy-mode .notification-copy { gap: 0; }
+/* 시안은 자간이 넓은 시스템 글꼴 기준 → 크기·자간을 맞춘다 */
+.notification-header > div:nth-child(2) { font-size: 18px; letter-spacing: .02em; }
+.notification-read-all { letter-spacing: .04em; }
+.notification-tabs button { font-size: 16px; letter-spacing: .04em; }
+.notification-copy strong { font-size: 16px; letter-spacing: .02em; }
+.notification-copy p { font-size: 15px; letter-spacing: .02em; }
+.notification-copy small { letter-spacing: .03em; }
+.notification-header .back img { content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M15 4.5 7.5 12l7.5 7.5' stroke='%23292929' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.notification-row { min-height: 0; padding-top: 18px; padding-bottom: 20px; }
+.notification-copy small { margin-top: 4px; }
+.notification-row > i { top: 23px; }
+/* 시안(시스템 글꼴, 넓은 자간)에 맞춘 크기·자간 */
+.rv-title { font-size: 26px; letter-spacing: 0; }
+.rv-sub { font-size: 15px; letter-spacing: .02em; }
+.rv-rating-label { font-size: 14px; letter-spacing: .03em; }
+.rv-rating-label.rated { font-size: 15px; }
+.rv-editor { margin-top: 26px; }
+.rv-editor textarea { font-size: 16px; letter-spacing: .03em; line-height: 25px; }
+.rv-photo-head strong { font-size: 16px; letter-spacing: .02em; }
+.rv-photo-head span { font-size: 14px; letter-spacing: .02em; }
+.review-new-page .back img { content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M15 4.5 7.5 12l7.5 7.5' stroke='%23292929' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.easy-mode .rv-title { font-size: 28px; }
+.easy-mode .rv-sub { font-size: 17px; }
+.easy-mode .rv-rating-label { font-size: 16px; }
+.easy-mode .rv-rating-label.rated { font-size: 18px; }
+.easy-mode .rv-editor textarea { font-size: 18px; line-height: 28px; }
+.easy-mode .rv-photo-head strong { font-size: 19px; }
+.easy-mode .rv-photo-head span { font-size: 16px; }
+.rv-editor textarea { letter-spacing: .05em; word-break: keep-all; }
+.rv-sub { margin-top: 2px; }
+.rv-rating-label { margin-top: 5px; }
+/* 시안(390px) 비율 유지: 폭 기준 크기는 cqw (430 프레임에서도 같은 비율) */
+.rv-rating { gap: 1.03cqw; }
+.rv-star, .rv-star svg { width: 10.26cqw; height: 10.26cqw; }
+.rv-editor { height: 43.1cqw; }
+.rv-photo-grid { gap: 2.05cqw; }
+.rv-photo-grid .review-photo-preview, .rv-photo-grid .review-photo-add { width: 19.5cqw; height: 19.5cqw; }
+.notification-row { grid-template-columns: 11.28cqw 1fr; column-gap: 3.85cqw; padding-left: 4.36cqw; }
+.notification-type-icon, .notification-type-icon svg { width: 11.28cqw; height: 11.28cqw; }
+.notification-tabs { padding-inline: 5.13cqw; }
+.easy-mode .rv-rating { gap: 1.5cqw; }
+.easy-mode .rv-star, .easy-mode .rv-star svg { width: 12.8cqw; height: 12.8cqw; }
+.easy-mode .rv-editor { height: 48.7cqw; }
+.easy-mode .rv-photo-grid { gap: 2.56cqw; }
+.easy-mode .rv-photo-grid .review-photo-preview, .easy-mode .rv-photo-grid .review-photo-add { width: 24.6cqw; height: 24.6cqw; }
+.easy-mode .notification-row { grid-template-columns: 13.3cqw 1fr; }
+.easy-mode .notification-type-icon, .easy-mode .notification-type-icon svg { width: 13.3cqw; height: 13.3cqw; }
+
+/* 프리플라이트(line-height 1.5) 기준 재보정: H05·H07·H09 상단 카드와 목록 행 */
+.estimate-arrived-card, .upcoming-reservation-card, .review-prompt { padding-top: 18px; }
+.estimate-arrived-route, .upcoming-reservation-route, .review-prompt > strong { margin-top: 5px; }
+.estimate-arrived-card > small, .upcoming-reservation-card > small, .review-prompt > p { margin-top: 6px; }
+.estimate-history-main, .past-booking-main { gap: 7px; }
+.estimate-history-main > small, .past-booking-main > small { margin-top: 0; }
+.estimate-list-head { margin-top: 28px; }
+.easy-mode .estimate-arrived-card > small, .easy-mode .upcoming-reservation-card > small, .easy-mode .review-prompt > p { margin-top: 8px; }
+.easy-mode .estimate-history-main, .easy-mode .past-booking-main { gap: 9px; }
+.past-reservation-year-label { padding-bottom: 11px; }
+.past-reservation-list { margin-top: 18px; }
+.my-review { padding-top: 16px; }
+.my-review-head > span { font-size: 14px; }
+.my-review > strong { margin-top: 9px; }
+.my-review-copy { margin-top: 8px; }
+.my-review-type { margin-top: 7px; }
+.easy-mode .review-prompt > p { margin-top: 5px; }
+.easy-mode .review-history-label { margin-top: 23px; }
+.easy-mode .my-review { padding-top: 18px; }
+.easy-mode .my-review-copy { margin-top: 6px; }
+.save-toast { padding: 10px 18px; }

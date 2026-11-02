@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U 휴대전화 로그인 (G-A05~A06)
+  state: (기본) 번호 입력 전 | sent (인증번호 발송 후 입력 완료)
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='휴대전화 로그인', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/auth.css}">
+</head>
+<body>
+<div class="app-shell auth-shell" th:with="state=${param.state != null ? param.state[0] : (state ?: '')}, sent=${state == 'sent'}">
+  <div class="screen form-page auth-form-page" data-phone-login th:attr="data-sent=${sent}">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/login})}"></a>
+      <div class="form-title">휴대전화 로그인</div>
+    </div>
+    <div class="form-content">
+      <div class="phone-login-group">
+        <div class="field-wrap no-label">
+          <input class="field" type="tel" inputmode="tel" name="phone" autocomplete="tel" aria-label="휴대폰 번호"
+                 placeholder="휴대폰 번호를 입력해주세요" maxlength="13" data-phone-input
+                 th:value="${sent} ? '010-1234-5678' : ''">
+        </div>
+        <div class="action phone-send-button" role="button" tabindex="0" data-send-code
+             th:classappend="${sent} ? 'active' : 'is-disabled'" th:attr="aria-disabled=${!sent}"
+             th:text="${sent} ? '재인증' : '인증하기'">인증하기</div>
+      </div>
+
+      <div class="phone-code-group" data-code-group th:hidden="${!sent}">
+        <div class="phone-code-label">
+          <span>인증번호</span>
+          <span class="phone-timer" data-timer th:attr="data-seconds=${sent} ? 179 : 180">02:59</span>
+        </div>
+        <div class="field-wrap no-label">
+          <input class="field" type="text" inputmode="numeric" name="code" autocomplete="one-time-code" aria-label="인증번호"
+                 placeholder="인증번호 6자리" maxlength="6" data-code-input
+                 th:value="${sent} ? '123456' : ''" th:classappend="${sent} ? 'is-focused'">
+        </div>
+        <div class="phone-code-hint"><span data-phone-echo>010-1234-5678</span> 으로 인증번호가 발송되었어요.</div>
+      </div>
+
+      <a class="action form-submit next-button" th:href="@{/login/complete}" data-login-submit
+         th:classappend="${sent} ? '' : 'is-disabled'" th:attr="aria-disabled=${!sent}">로그인</a>
+      <div class="form-links">
+        <a class="action" th:href="@{/signup}">회원가입</a>
+        <span></span>
+        <a class="action" th:href="@{/signup/verify}">계정 찾기</a>
+      </div>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/auth.js}"></script>
+</body>
+</html>

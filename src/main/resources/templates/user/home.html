@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U-001~002 홈 (일반 G-B01~B06), SCR-U-028 쉬운 모드 홈 (E-B01~B06, E-B08 사용법)
+  state: guest(비회원) | none(견적 없음) | reviewing(검토 중) | arrived(견적 도착) | booked(예약 완료)
+  mode : ?mode=easy 로 쉬운 모드 확인
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='홈', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/home.css}">
+</head>
+<body>
+<div class="app-shell home-shell">
+  <div class="screen home-screen" data-easy-class="easy-home" th:with="userName=${state == 'booked' ? '김코드' : userName}"><!--/* 예약 완료 캡처(G/E-B06)는 김코드님 */-->
+    <div th:replace="~{fragments/user-layout :: header(notificationCount=${state == 'guest' ? 0 : 1})}"></div>
+
+    <!--/* ── 쉬운 모드 ── */-->
+    <main class="easy-home-content" data-easy-only>
+      <!--/* 비회원 (시안 04): 제목 + 큰 로그인 버튼 */-->
+      <div class="login-hero hm-login-hero" th:if="${state == 'guest'}">
+        <div>로그인하고<br>더 많은 서비스를 이용해보세요</div>
+        <a class="action primary" th:href="@{/login}">로그인</a>
+      </div>
+
+      <div class="easy-welcome" th:unless="${state == 'guest'}">
+        <strong th:text="${userName} + '님, 무엇을 도와드릴까요?'">김무브님, 무엇을 도와드릴까요?</strong>
+      </div>
+
+      <!--/* 견적 없음 (시안 02) */-->
+      <div class="hm-start-card" th:if="${state == 'none'}">
+        <div class="hm-start-main">
+          <div class="hm-start-art"><img alt="" th:src="@{/images/user/home-video-estimate.svg}"></div>
+          <div class="hm-start-copy">
+            <span class="hm-eyebrow">첫 이사 견적</span>
+            <strong>영상으로 견적을 받아보세요</strong>
+            <small>집을 찍어 올리면 예상 비용을 알려드려요.</small>
+          </div>
+        </div>
+        <a class="action hm-start-button" th:href="@{/quote}">
+          <span>견적 요청</span>
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="m7.5 4.5 5.5 5.5-5.5 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+
+      <!--/* 견적 검토 중 · 견적 도착 · 예약 완료 */-->
+      <div th:if="${state == 'reviewing' or state == 'arrived' or state == 'booked'}"
+           th:with="s=${state == 'booked'
+                      ? {'confirmed', '예약 완료', '3월 18일 오전 10시에 이사해요', '원룸 · 일반포장', '예약 자세히 보기', '/reservations/1', 'reservation-confirmed-illustration.svg'}
+                      : (state == 'arrived'
+                      ? {'approved', '견적 도착', '이사 견적이 준비됐어요', '비용과 작업 내용을 확인해주세요.', '견적서 보기', '/move?tab=estimate', 'estimate-approved-illustration.svg'}
+                      : {'waiting-approval', '관리자 확인 중', '견적 요청이 접수됐어요', '담당자 확인이 끝나면 견적 정보를 알려드려요.', '진행 상황 보기', '/more/estimates', 'estimate-requested-illustration.svg'})}"
+           class="easy-status-card" th:classappend="'status-' + ${s[0]}">
+        <div class="easy-status-main">
+          <div class="easy-status-illustration"><img alt="" th:src="@{'/images/user/' + ${s[6]}}"></div>
+          <div class="easy-status-heading">
+            <span th:text="${s[1]}">견적 도착</span>
+            <strong th:text="${s[2]}">이사 견적이 준비됐어요</strong>
+            <small th:text="${s[3]}">비용과 작업 내용을 확인해주세요.</small>
+          </div>
+        </div>
+        <a class="action easy-status-button" th:href="@{${s[5]}}">
+          <span th:text="${s[4]}">견적서 보기</span>
+          <img alt="" class="chevron chevron-light" th:src="@{/images/user/ce2ac.svg}">
+        </a>
+      </div>
+
+      <div class="easy-menu-zone" th:classappend="${state == 'guest' or state == 'none'} ? 'hm-plain'">
+        <section class="easy-service-section">
+          <div class="easy-section-title">자주 쓰는 메뉴</div>
+          <div class="easy-service-grid">
+            <a class="action easy-service-card camera" th:href="@{/quote}">
+              <div class="easy-service-icon"><img alt="" th:src="@{/images/user/cd80e.svg}"></div>
+              <div class="easy-service-copy"><strong>영상으로 견적 받기</strong></div>
+            </a>
+            <a class="action easy-service-card move" th:href="@{/move}">
+              <div class="easy-service-icon"><img alt="" th:src="@{/images/user/91e58.svg}"></div>
+              <div class="easy-service-copy"><strong>내 이사 확인</strong></div>
+            </a>
+            <a class="action easy-service-card help" th:href="@{/chat}">
+              <div class="easy-service-icon"><img alt="" th:src="@{/images/user/mover-assistant-3d.svg}"></div>
+              <div class="easy-service-copy"><strong>상담원에게 묻기</strong></div>
+            </a>
+            <a class="action easy-service-card review" th:href="@{/more/reviews}">
+              <div class="easy-service-icon"><img alt="" th:src="@{/images/user/review-illustration.svg}"></div>
+              <div class="easy-service-copy"><strong>이사 후기 남기기</strong></div>
+            </a>
+          </div>
+        </section>
+
+        <div class="action easy-help-card" role="button" tabindex="0" data-open="#easyHelpModal">
+          <div class="easy-help-mark">?</div>
+          <div>
+            <strong>화면 사용법이 궁금하신가요?</strong>
+            <span>쉬운 화면 안내를 확인해 보세요</span>
+          </div>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </div>
+      </div>
+    </main>
+
+    <!--/* ── 일반 모드 ── */-->
+    <main class="home-content" data-standard-only>
+      <!--/* 비회원 */-->
+      <th:block th:if="${state == 'guest'}">
+        <div class="login-hero">
+          <div>로그인하고<br>더 많은 서비스를 이용해보세요</div>
+          <a class="action primary" th:href="@{/login}">로그인</a>
+        </div>
+        <!--/* 회원 전용 배너 캐러셀 (시안 03): 4초마다 자동 전환 · 좌우 스와이프 */-->
+        <div class="hm-banner" data-banner aria-roledescription="carousel" aria-label="회원 혜택">
+          <div class="hm-banner-track" data-banner-track>
+            <a class="action hm-banner-slide" th:href="@{/login}" aria-label="1 / 3">
+              <span class="hm-banner-chip">회원 전용</span>
+              <strong>영상만 찍으면<br>견적이 나와요</strong>
+              <img alt="" class="hm-banner-art" th:src="@{/images/user/home-video-estimate.svg}">
+            </a>
+            <a class="action hm-banner-slide" th:href="@{/login}" aria-label="2 / 3">
+              <span class="hm-banner-chip">회원 전용</span>
+              <strong>견적·예약 내역을<br>한곳에서 확인해요</strong>
+              <img alt="" class="hm-banner-art" th:src="@{/images/user/home-history.svg}">
+            </a>
+            <a class="action hm-banner-slide" th:href="@{/login}" aria-label="3 / 3">
+              <span class="hm-banner-chip">회원 전용</span>
+              <strong>궁금한 점은<br>채팅으로 물어보세요</strong>
+              <img alt="" class="hm-banner-art" th:src="@{/images/user/home-chat.svg}">
+            </a>
+          </div>
+          <span class="hm-banner-pager"><b data-banner-index>1</b> / 3</span>
+        </div>
+      </th:block>
+
+      <th:block th:unless="${state == 'guest'}">
+        <div class="home-greeting" th:text="${userName} + '님'">김무브님</div>
+
+        <!--/* 견적 없음 */-->
+        <div class="hm-start-card" th:if="${state == 'none'}"><!--/* 시안 01 */-->
+          <div class="hm-start-main">
+            <div class="hm-start-art"><img alt="" th:src="@{/images/user/home-video-estimate.svg}"></div>
+            <div class="hm-start-copy">
+              <span class="hm-eyebrow">첫 이사 견적</span>
+              <strong>영상으로 견적을 받아보세요</strong>
+              <small>AI가 짐을 보고 예상 비용을 알려드려요.</small>
+            </div>
+          </div>
+          <a class="action hm-start-button" th:href="@{/quote}"><span>견적 요청</span></a>
+        </div>
+
+        <!--/* 견적 검토 중 */-->
+        <a class="action home-estimate-status ready pending" th:if="${state == 'reviewing'}" th:href="@{/more/estimates}">
+          <div class="home-estimate-main">
+            <div class="home-estimate-visual"><img alt="" th:src="@{/images/user/estimate-requested-illustration.svg}"></div>
+            <div class="home-estimate-copy">
+              <span>관리자 확인 중</span>
+              <strong>견적 요청이 접수됐어요</strong>
+              <small>담당자 확인이 끝나면 견적 정보를 알려드려요.</small>
+            </div>
+          </div>
+          <div class="home-estimate-cta">진행 상황 보기 <img alt="" class="chevron chevron-light" th:src="@{/images/user/ce2ac.svg}"></div>
+        </a>
+
+        <!--/* 견적 도착 */-->
+        <a class="action home-estimate-status ready" th:if="${state == 'arrived'}" th:href="@{/move(tab='estimate')}">
+          <div class="home-estimate-main">
+            <div class="home-estimate-visual"><img alt="" th:src="@{/images/user/estimate-approved-illustration.svg}"></div>
+            <div class="home-estimate-copy">
+              <span>견적 도착</span>
+              <strong>이사 견적이 준비됐어요</strong>
+              <small>비용과 작업 내용을 확인해주세요.</small>
+            </div>
+          </div>
+          <div class="home-estimate-cta">
+            견적서 보기
+            <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16"><path d="m6 3.5 4.5 4.5L6 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>
+          </div>
+        </a>
+
+        <!--/* 예약 완료 */-->
+        <div class="my-booking-card" th:if="${state == 'booked'}">
+          <div class="my-booking-head">
+            <div class="my-booking-top">
+              <div class="my-booking-status-wrap">
+                <span class="my-booking-badge">예약 완료</span>
+                <span class="my-booking-type">원룸 · 일반포장</span>
+              </div>
+              <span class="my-booking-dday">D-30</span>
+            </div>
+            <div class="my-booking-date"><b>3월 18일 (수)</b><span>오전 10:00</span></div>
+          </div>
+          <div class="my-booking-body">
+            <div class="my-booking-route">
+              <div class="my-booking-place from"><small>출발</small><strong>강남구</strong><span>테헤란로 123, 301호</span></div>
+              <div class="my-booking-route-line" aria-hidden="true">
+                <div class="my-booking-dot from"></div><div class="my-booking-line"></div><div class="my-booking-dot to"></div>
+              </div>
+              <div class="my-booking-place to"><small>도착</small><strong>서초구</strong><span>서초대로 456, 804호</span></div>
+            </div>
+            <a class="action my-booking-detail-btn" th:href="@{/reservations/1}">
+              <span>예약 상세 보기</span>
+              <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+            </a>
+          </div>
+        </div>
+      </th:block>
+
+      <!--/* 빠른 메뉴 */-->
+      <section class="section">
+        <div class="section-title">빠른 메뉴</div>
+        <div class="quick-grid">
+          <a class="action quick-item quick-1" th:href="@{/quote}">
+            <div class="quick-icon"><img alt="" th:src="@{/images/user/cd80e.svg}"></div><div>영상 견적</div>
+          </a>
+          <a class="action quick-item quick-2" th:href="@{/more/reviews}">
+            <div class="quick-icon"><img alt="" th:src="@{/images/user/review-illustration.svg}"></div><div>후기</div>
+          </a>
+          <a class="action quick-item quick-3" th:href="@{/chat}">
+            <div class="quick-icon"><img alt="" th:src="@{/images/user/bec52.svg}"></div><div>상담하기</div>
+          </a>
+        </div>
+      </section>
+
+      <!--/* 실제 고객 후기 (시안 03 카드): 이름 + "원룸 반포장 · 어제" + 오른쪽 별점 + 내용 */-->
+      <section class="section review-section hm-reviews">
+        <div class="section-title">실제 고객 후기</div>
+        <div class="hm-review-card" th:each="r : ${reviews}">
+          <div class="hm-review-head">
+            <strong th:text="${r.name}">김코드</strong>
+            <span th:text="${#strings.replace(#strings.replace(r.type, '(', ' '), ')', '')} + ' · ' + ${#strings.substringAfter(r.meta, '· ')}">원룸 반포장 · 어제</span>
+            <b th:text="${r.stars}" th:attr="aria-label='평점 ' + ${#strings.length(#strings.replace(r.stars, '☆', ''))} + '점'">★★★★★</b>
+          </div>
+          <p th:text="${r.content}">후기 내용</p>
+        </div>
+      </section>
+    </main>
+
+    <nav th:replace="~{fragments/user-layout :: bottomNav(active='home', locked=${state == 'guest'})}"></nav>
+  </div>
+
+  <!--/* 촬영 방법 안내 (G-B03) */-->
+  <div id="guideModal" data-layer hidden>
+    <div class="estimate-guide-scrim" data-close></div>
+    <div aria-modal="true" class="estimate-guide-modal" role="dialog">
+      <div class="estimate-guide-head">
+        <div class="estimate-guide-icon"><img alt="" th:src="@{/images/user/cd80e.svg}"></div>
+        <div><span>영상 견적 촬영 안내</span><strong>이렇게 촬영해 주세요</strong></div>
+      </div>
+      <div class="estimate-guide-steps">
+        <div><b>1</b><span>현관부터 방을 차례대로 촬영해요.</span></div>
+        <div><b>2</b><span>큰 가구와 가전이 잘 보이게 촬영해요.</span></div>
+        <div><b>3</b><span>빠진 공간이 없는지 확인하고 올려요.</span></div>
+      </div>
+      <a class="action estimate-guide-start" th:href="@{/quote}">영상 견적 시작하기</a>
+      <div class="action estimate-guide-close" role="button" tabindex="0" data-close>닫기</div>
+    </div>
+  </div>
+
+  <!--/* 쉬운 화면 사용법 (E-B08) */-->
+  <div id="easyHelpModal" data-layer hidden>
+    <div class="easy-help-scrim" data-close></div>
+    <div aria-modal="true" class="easy-help-modal" role="dialog">
+      <div class="easy-help-modal-head">
+        <div class="easy-help-modal-icon">?</div>
+        <div><span>쉬운 화면 안내</span><strong>화면은 이렇게 사용해요</strong></div>
+      </div>
+      <div class="easy-help-steps">
+        <div><b>1</b><span><strong>위쪽 알림 카드</strong>에서 지금 해야 할 일을 확인해요.</span></div>
+        <div><b>2</b><span><strong>자주 쓰는 메뉴</strong>에서 원하는 서비스를 선택해요.</span></div>
+        <div><b>3</b><span><strong>아래쪽 메뉴</strong>로 홈, 내 이사, 채팅 화면을 이동해요.</span></div>
+      </div>
+      <div class="action easy-help-read" role="button" tabindex="0" id="easyHelpRead"
+           data-speech="쉬운 화면 사용법을 안내해 드릴게요. 위쪽 알림 카드에서 지금 해야 할 일을 확인하세요. 자주 쓰는 메뉴에서 원하는 서비스를 선택하세요. 아래쪽 메뉴로 홈, 내 이사, 이사 견적, 채팅, 더보기 화면을 이동할 수 있어요.">사용법 음성으로 듣기</div>
+      <div class="action easy-help-modal-close" role="button" tabindex="0" data-close>닫기</div>
+    </div>
+  </div>
+
+  <th:block th:replace="~{fragments/user-layout :: splash}"></th:block>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script>
+  // 회원 전용 배너 캐러셀: 4초마다 자동 전환, 좌우 스와이프, 탭 전환 시 일시 정지
+  (function () {
+    const banner = document.querySelector('[data-banner]');
+    if (!banner) return;
+    const track = banner.querySelector('[data-banner-track]');
+    const label = banner.querySelector('[data-banner-index]');
+    const count = track.children.length;
+    let index = 0, timer = null, startX = null, moved = false;
+    const go = (i) => {
+      index = (i + count) % count;
+      track.style.transform = 'translateX(' + (-100 * index) + '%)';
+      label.textContent = index + 1;
+    };
+    const play = () => { stop(); if (!matchMedia('(prefers-reduced-motion: reduce)').matches) timer = setInterval(() => go(index + 1), 4000); };
+    const stop = () => { if (timer) clearInterval(timer); timer = null; };
+    banner.addEventListener('pointerdown', (e) => { startX = e.clientX; moved = false; stop(); });
+    banner.addEventListener('pointerup', (e) => {
+      if (startX === null) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 30) { moved = true; go(index + (dx < 0 ? 1 : -1)); }
+      startX = null; play();
+    });
+    banner.addEventListener('pointercancel', () => { startX = null; play(); });
+    banner.addEventListener('click', (e) => { if (moved) { e.preventDefault(); moved = false; } }, true);
+    document.addEventListener('visibilitychange', () => (document.hidden ? stop() : play()));
+    // 확인용: ?banner=2 / 3 → 해당 슬라이드에 멈춤
+    const fixed = parseInt(new URLSearchParams(location.search).get('banner'), 10);
+    if (fixed >= 1 && fixed <= count) go(fixed - 1); else play();
+  })();
+
+  // 쉬운 화면 사용법 음성 안내 (E-B08)
+  (function () {
+    const btn = document.getElementById('easyHelpRead');
+    const reset = () => { btn.classList.remove('active'); btn.textContent = '사용법 음성으로 듣기'; };
+    btn.addEventListener('click', () => {
+      if (!window.speechSynthesis) return;
+      if (btn.classList.contains('active')) { speechSynthesis.cancel(); reset(); return; }
+      const guide = new SpeechSynthesisUtterance(btn.dataset.speech);
+      guide.lang = 'ko-KR';
+      guide.rate = 0.9;
+      guide.onend = reset;
+      btn.classList.add('active');
+      btn.textContent = '음성 안내 중지';
+      speechSynthesis.speak(guide);
+    });
+    document.querySelectorAll('#easyHelpModal [data-close]').forEach((el) =>
+      el.addEventListener('click', () => { if (window.speechSynthesis) speechSynthesis.cancel(); reset(); }));
+    // 확인용: ?help=open → 일반 모드는 촬영 방법 안내(G-B03), 쉬운 모드는 사용법(E-B08) / ?help=guide → 촬영 방법 안내(E-B03)
+    const help = new URLSearchParams(location.search).get('help');
+    if (help === 'guide' || (help === 'open' && CodeMove.mode() !== 'easy')) CodeMove.open('#guideModal');
+    else if (help === 'open') CodeMove.open('#easyHelpModal');
+  })();
+</script>
+</body>
+</html>

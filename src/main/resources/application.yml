@@ -23,3 +23,21 @@ mybatis:
 
 server:
   port: 8080
+  servlet:
+    session:
+      # URL 에 ;jsessionid= 가 붙지 않도록 쿠키로만 세션 유지
+      tracking-modes: cookie
+
+---
+# 로컬 개발: 템플릿·정적 파일을 src에서 직접 읽어 수정 즉시 반영 (재시작 불필요)
+spring:
+  config:
+    activate:
+      on-profile: local
+  thymeleaf:
+    prefix: file:src/main/resources/templates/
+  web:
+    resources:
+      static-locations: file:src/main/resources/static/
+      cache:
+        period: 0

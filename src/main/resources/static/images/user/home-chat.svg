@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 124" fill="none">
+  <!-- 홈 배너 3: 채팅 상담 (말풍선 2개 + 물음표 배지) — home-video-estimate.svg 와 같은 스타일 -->
+  <defs>
+    <linearGradient id="hcBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7fd3bc"/>
+      <stop offset="1" stop-color="#4aa98f"/>
+    </linearGradient>
+    <linearGradient id="hcBadge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7a043"/>
+      <stop offset="1" stop-color="#ed7a22"/>
+    </linearGradient>
+  </defs>
+  <path d="M20 14h52a14 14 0 0 1 14 14v34a14 14 0 0 1-14 14H40l-16 13 3-13h-7A14 14 0 0 1 6 62V28a14 14 0 0 1 14-14Z" fill="url(#hcBody)"/>
+  <path d="M22 21h48a9 9 0 0 1 9 9v30a9 9 0 0 1-9 9H22a9 9 0 0 1-9-9V30a9 9 0 0 1 9-9Z" fill="#f6fcf9"/>
+  <circle cx="23" cy="31" r="3.4" fill="#f0554a"/>
+  <rect x="30" y="29" width="16" height="4" rx="2" fill="#a9ddcc"/>
+  <rect x="21" y="41" width="50" height="5" rx="2.5" fill="#cdebe1"/>
+  <rect x="21" y="51" width="34" height="5" rx="2.5" fill="#cdebe1"/>
+  <path d="M38 76h30a10 10 0 0 1 10 10v12a10 10 0 0 1-10 10h-3l2 9-11-9H38a10 10 0 0 1-10-10V86a10 10 0 0 1 10-10Z" fill="#fbd98a"/>
+  <circle cx="42" cy="92" r="3.2" fill="#e2952f"/>
+  <circle cx="53" cy="92" r="3.2" fill="#e2952f"/>
+  <circle cx="64" cy="92" r="3.2" fill="#e2952f"/>
+  <circle cx="80" cy="64" r="17" fill="url(#hcBadge)" stroke="#fff" stroke-opacity=".75" stroke-width="2.5"/>
+  <path d="M74.5 59.5a5.5 5.5 0 1 1 7.6 5.1c-1.4.6-2.1 1.5-2.1 3v1" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="80" cy="74" r="2.3" fill="#fff"/>
+</svg>

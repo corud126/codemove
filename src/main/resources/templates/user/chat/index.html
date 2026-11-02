@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U-07x 채팅 (G-G01~G07)
+  state: (없음) 첫 화면 G01 | reservation 예약 문의 답변 G02 | estimate 견적 문의 답변 G03 | agent 상담사 연결 G04
+         | typing 메시지 입력 G05 | attach 파일 첨부 G06 | file 첨부 파일 전송 G07
+  퀵메뉴·메시지 전송·파일 첨부는 chat.js 에서 시뮬레이션
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='채팅', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/chat.css}">
+</head>
+<body>
+<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}">
+  <div class="screen chat-screen">
+    <div class="chat-header">
+      <a th:replace="~{fragments/user-layout :: back(href=null)}"></a>
+      <div class="chat-header-title"><strong>채팅</strong></div>
+      <span></span>
+    </div>
+
+    <main class="chat-content" id="chatContent">
+      <div class="chat-bot-row">
+        <div class="chat-avatar"><img alt="명품 이사 도우미 캐릭터" th:src="@{/images/user/mover-assistant-3d.svg}"></div>
+        <div class="chat-bot-name">명품 이사 도우미</div>
+      </div>
+      <div class="chat-menu-card">
+        <div class="chat-greeting">안녕하세요, 명품익스프레스입니다.<br>궁금하신 내용을 선택해주세요.</div>
+        <div class="chat-topic-list">
+          <div class="action chat-topic" role="button" tabindex="0" data-ask="이사 견적 알아보기">이사 견적 알아보기</div>
+          <div class="action chat-topic" role="button" tabindex="0" data-ask="예약 및 일정 확인">예약 및 일정 확인</div>
+          <div class="action chat-topic" role="button" tabindex="0" data-ask="영상 분석 견적">영상 분석 견적</div>
+          <div class="action chat-topic" role="button" tabindex="0" data-ask="이사 준비 체크리스트">이사 준비 체크리스트</div>
+          <div class="action chat-topic" role="button" tabindex="0" data-ask="결제 및 환불 문의">결제 및 환불 문의</div>
+          <div class="action chat-topic chat-topic-accent" role="button" tabindex="0" data-ask="상담사 연결">상담사 연결</div>
+        </div>
+        <div class="chat-hours">상담 운영시간　평일 09:00–18:00</div>
+      </div>
+
+      <div class="chat-restart-label" id="chatRestart" th:hidden="${state != 'reservation' and state != 'estimate' and state != 'agent' and state != 'file'}">상담 내용</div>
+      <div class="chat-thread" id="chatThread" aria-live="polite">
+        <!--/* G02 예약 문의 답변 */-->
+        <th:block th:if="${state == 'reservation'}">
+          <div class="chat-message-wrap user">
+            <div class="chat-message-content">
+              <div class="message user">예약 및 일정 확인</div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+          <div class="chat-message-wrap bot">
+            <div class="chat-mini-avatar"><img alt="" th:src="@{/images/user/mover-assistant-3d.svg}"></div>
+            <div class="chat-message-content">
+              <div class="message bot">김코드님의 이사 예약은 2026년 3월 18일 오전 10시로 확정되어 있어요.
+출발지는 강남구, 도착지는 서초구입니다.</div>
+              <div class="chat-quick-replies"><a class="action" th:href="@{/move(tab='booking')}">예약 정보 보기</a></div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+        </th:block>
+        <!--/* G03 견적 문의 답변 */-->
+        <th:block th:if="${state == 'estimate'}">
+          <div class="chat-message-wrap user">
+            <div class="chat-message-content">
+              <div class="message user">이사 견적 알아보기</div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+          <div class="chat-message-wrap bot">
+            <div class="chat-mini-avatar"><img alt="" th:src="@{/images/user/mover-assistant-3d.svg}"></div>
+            <div class="chat-message-content">
+              <div class="message bot">담당자가 확인한 견적이 준비되어 있어요.
+현재 견적 금액은 410,000원이며, 견적서의 작업 내용과 별도 비용을 확인한 뒤 확정할 수 있습니다.</div>
+              <div class="chat-quick-replies"><a class="action" th:href="@{/move(tab='estimate')}">견적서 보기</a></div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+        </th:block>
+        <!--/* G04 상담사 연결 */-->
+        <th:block th:if="${state == 'agent'}">
+          <div class="chat-message-wrap user">
+            <div class="chat-message-content">
+              <div class="message user">상담사 연결</div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+          <div class="chat-message-wrap bot">
+            <div class="chat-mini-avatar"><img alt="" th:src="@{/images/user/mover-assistant-3d.svg}"></div>
+            <div class="chat-message-content">
+              <div class="message bot">상담사에게 직접 문의할 수 있어요.
+상담 운영시간은 평일 09:00–18:00이며, 운영시간 외 요청은 다음 영업일에 확인합니다.</div>
+              <div class="chat-quick-replies"><div class="action" role="button" tabindex="0" data-ask="상담사 연결 요청">상담사 연결 요청</div></div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+        </th:block>
+        <!--/* G07 첨부 파일 전송 */-->
+        <th:block th:if="${state == 'file'}">
+          <div class="chat-message-wrap user">
+            <div class="chat-message-content">
+              <div class="message user">파일을 첨부했어요.</div>
+              <div class="chat-file-message"><img alt="" th:src="@{/images/user/paperclip.svg}"><span>거실_가구사진.jpg</span></div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+          <div class="chat-message-wrap bot">
+            <div class="chat-mini-avatar"><img alt="" th:src="@{/images/user/mover-assistant-3d.svg}"></div>
+            <div class="chat-message-content">
+              <div class="message bot">거실_가구사진.jpg 파일을 확인 요청에 첨부했어요.
+개인정보가 포함된 문서는 필요한 부분만 남기고 가려서 보내주세요.</div>
+              <div class="chat-quick-replies">
+                <div class="action" role="button" tabindex="0" data-ask="첨부한 파일로 어떤 상담을 받을 수 있나요?">첨부 관련 문의</div>
+                <div class="action" role="button" tabindex="0" data-ask="상담사 연결 요청">상담사 연결</div>
+              </div>
+              <small class="chat-message-time">10:00</small>
+            </div>
+          </div>
+        </th:block>
+      </div>
+    </main>
+
+    <!--/* 입력창 (G05 메시지 입력, G06 파일 첨부) */-->
+    <div class="chat-input">
+      <div class="chat-attachment-chip" id="chatAttachment" th:hidden="${state != 'attach'}">
+        <img alt="" th:src="@{/images/user/paperclip.svg}">
+        <span id="chatAttachmentName">거실_가구사진.jpg</span>
+        <div class="action" role="button" tabindex="0" aria-label="첨부 파일 제거" id="chatAttachmentRemove">
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <label class="action chat-attach" aria-label="파일 첨부">
+          <img alt="" th:src="@{/images/user/paperclip.svg}">
+          <input type="file" id="chatFile" hidden>
+        </label>
+        <div aria-label="상담 내용 입력" class="chat-editor" contenteditable="true" id="chatEditor"
+             data-placeholder="상담할 내용을 입력해주세요" role="textbox"
+             th:text="${state == 'typing' ? '사다리차 비용이 따로 드나요?' : (state == 'attach' ? '이 가구도 옮길 수 있나요?' : '')}"></div>
+        <div class="action chat-send" role="button" tabindex="0" aria-label="메시지 보내기" id="chatSend"
+             th:classappend="${state != 'typing' and state != 'attach'} ? 'is-disabled'">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/chat.js}"></script>
+</body>
+</html>

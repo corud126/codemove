@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U-08x 내 정보 수정 (G-H02~H04 / E-H02~H04)
+  state: (없음) 내 정보 수정 H02 | phone 휴대폰 번호 변경 H03 | verify 휴대폰 번호 변경_인증 H04
+  번호 입력·인증번호 발송·타이머는 more.js 에서 시뮬레이션
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='내 정보 수정', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/more.css}">
+</head>
+<body>
+<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}">
+  <div class="screen form-page">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/more})}"></a>
+      <div class="form-title">내 정보 수정</div>
+    </div>
+    <div class="form-content personal-page-content">
+      <div class="personal-profile">
+        <div class="personal-avatar-wrap">
+          <div class="avatar">김</div>
+          <div class="personal-verified-mark">
+            <svg aria-hidden="true" width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="m2.5 6.2 2.3 2.3 4.7-4.8" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <strong>김무브님</strong>
+        <span>본인인증 완료 · 일반 회원</span>
+      </div>
+
+      <div class="personal-section-label">기본 정보</div>
+      <div class="personal-settings-card">
+        <div class="personal-setting-row">
+          <span>이름</span>
+          <strong>김무브</strong>
+        </div>
+        <div class="personal-setting-row personal-phone-row">
+          <div class="personal-phone-copy">
+            <span>휴대폰 번호</span>
+            <span id="currentPhone">010-1234-5678</span>
+          </div>
+          <div class="action personal-change-button" role="button" tabindex="0" aria-label="휴대폰 번호 변경" data-open="#phoneSheet">변경</div>
+        </div>
+      </div>
+
+      <a class="action linked-login-card" href="#" aria-label="간편 로그인">
+        <strong>간편 로그인</strong>
+        <div class="linked-login-provider">
+          <img alt="네이버" class="linked-login-logo" th:src="@{/images/user/4a055.svg}">
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </div>
+      </a>
+
+      <div class="account-meta">
+        <div><strong>가입일</strong><b>2026. 02. 16</b></div>
+      </div>
+      <a class="action withdraw-link" href="#">회원 탈퇴</a>
+    </div>
+  </div>
+
+  <!--/* 휴대폰 번호 변경 바텀시트 (H03, H04) */-->
+  <div id="phoneSheet" data-layer th:hidden="${state != 'phone' and state != 'verify'}" th:attr="data-step=${state == 'verify' ? 'verify' : 'input'}">
+    <div class="personal-modal-scrim" data-close></div>
+    <div aria-labelledby="phone-change-title" aria-modal="true" class="personal-modal" role="dialog">
+      <div class="sheet-grabber personal-sheet-grabber" data-close><div class="sheet-handle"></div></div>
+      <div class="personal-modal-head">
+        <div>
+          <strong id="phone-change-title">휴대폰 번호 변경</strong>
+          <span>새 번호로 본인인증을 진행해요.</span>
+        </div>
+        <div class="action personal-modal-close" role="button" tabindex="0" aria-label="닫기" data-close>
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3 3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="phone-login-group phone-change-login-group">
+        <div class="field-wrap no-label">
+          <input class="field" id="nextPhone" type="tel" inputmode="tel" maxlength="13" aria-label="새 휴대폰 번호"
+                 placeholder="새 휴대폰 번호를 입력해주세요" th:value="${state == 'verify' ? '010-9876-5432' : ''}">
+        </div>
+        <div class="action phone-send-button" role="button" tabindex="0" id="sendCode" aria-label="인증하기"
+             th:classappend="${state == 'verify'} ? 'active'" th:text="${state == 'verify' ? '재인증' : '인증하기'}">인증하기</div>
+      </div>
+      <div class="phone-code-group" id="codeGroup" th:hidden="${state != 'verify'}">
+        <div class="phone-code-label">
+          <span>인증번호</span>
+          <span class="phone-timer" id="codeTimer">02:59</span>
+        </div>
+        <div class="field-wrap no-label">
+          <input class="field" id="verifyCode" type="text" inputmode="numeric" maxlength="6" aria-label="인증번호"
+                 placeholder="인증번호 6자리" th:value="${state == 'verify' ? '123456' : ''}">
+        </div>
+        <div class="phone-code-hint"><span id="codeHintPhone">010-9876-5432</span> 으로 인증번호가 발송되었어요.</div>
+      </div>
+      <div class="action form-submit next-button phone-change-confirm" role="button" tabindex="0" id="confirmPhone"
+           aria-label="인증하고 휴대폰 번호 변경" th:classappend="${state != 'verify'} ? 'is-disabled'">인증하고 변경</div>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/more.js}"></script>
+</body>
+</html>
