@@ -1,24 +1,153 @@
-# Compiled class file
+############################################
+# 🔒 Secrets / 환경 설정 (절대 커밋 금지)
+############################################
+# DB 계정·API Key 등은 아래 파일 또는 환경변수로만 관리
+.env
+.env.*
+!.env.example
+**/src/main/resources/application-local.yml
+**/src/main/resources/application-local.properties
+**/src/main/resources/application-secret.yml
+**/src/main/resources/application-secret.properties
+**/src/main/resources/application-prod.yml
+**/src/main/resources/application-prod.properties
+*.pem
+*.key
+*.p12
+*.jks
+credentials.json
+service-account*.json
+
+############################################
+# Java / Spring Boot
+############################################
 *.class
-
-# Log file
 *.log
-
-# BlueJ files
 *.ctxt
-
-# Mobile Tools for Java (J2ME)
 .mtj.tmp/
+hs_err_pid*
+replay_pid*
 
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.nar
 *.ear
+# Gradle Wrapper jar는 커밋해야 빌드 가능
+!gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Spring Boot
+.springBeans
+.sts4-cache/
+logs/
+*.log.*
+
+############################################
+# 업로드 파일 (영상·견적서·후기 사진·채팅 첨부)
+############################################
+uploads/
+upload/
+storage/
+**/src/main/resources/static/uploads/
+
+############################################
+# Frontend / Node (Figma Make 프로토타입 - React·Vite)
+############################################
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+############################################
+# AI (Python · OpenCV · YOLO)
+############################################
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+# 학습된 모델 가중치·데이터셋은 용량이 커서 별도 공유
+*.pt
+*.pth
+*.onnx
+*.h5
+datasets/
+runs/
+
+############################################
+# IDE
+############################################
+# IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# Eclipse / STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# VS Code (공유 설정은 유지)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+
+############################################
+# OS
+############################################
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Office 임시 파일 (pptx·docx 열어둘 때 생성)
+~$*
+
+############################################
+# 압축 파일
+############################################
 *.zip
 *.tar.gz
 *.rar
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# 설계 산출물(프로토타입·화면캡처)은 저장소에 보관
+!docs/**/*.zip
