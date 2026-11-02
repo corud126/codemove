@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: codemove
+  profiles:
+    # DB 계정은 application-local.yml(git 제외)에 작성
+    active: local
+  datasource:
+    driver-class-name: oracle.jdbc.OracleDriver
+  thymeleaf:
+    cache: false
+  servlet:
+    multipart:
+      # 영상 견적 업로드
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.codemove.domain
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: NULL
+
+server:
+  port: 8080
