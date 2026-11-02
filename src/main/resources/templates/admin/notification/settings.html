@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!--/* SCR-A-015 메시징 운영 설정
+  state: (기본) 모두 켜짐 · picker(A. 에티켓 시작 시간 선택 시트) · off(B. 전체 가동 꺼짐 + 경고) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='메시징 운영 설정', active='', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div class="icons-2 relative flex h-full min-h-0 flex-col overflow-hidden bg-[#f5f6f8]" data-messaging-settings
+       th:with="st=${param.state != null ? param.state[0] : ''}, off=${st == 'off'}"
+       th:attr="data-state=${st}">
+    <header class="relative flex h-14 shrink-0 items-center justify-center border-b border-[#e5e9e5] bg-white">
+      <h2 class="text-base font-extrabold text-[#29322b]">메시징 운영 설정</h2>
+      <a th:href="@{/admin/notifications}" aria-label="메시징 운영 설정 닫기"
+         class="absolute right-3 grid h-10 w-10 place-items-center rounded-full text-[#525c54] hover:bg-[#f2f4f2]">
+        <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+      </a>
+    </header>
+
+    <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+      <!--/* ① 전체 자동 메시징 가동 */-->
+      <section class="rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(36,58,39,.05)]">
+        <div class="flex items-start gap-3">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#edf3ed] text-[#346538]">
+            <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-settings'"/></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-extrabold text-[#303832]">전체 자동 메시징 가동</h3>
+            <p class="mt-2 text-[11px] leading-5 text-[#858d87]">끄기(Off) 상태일 경우, 설정된 모든 자동 알림(루틴)이 일시 정지되며 고객에게 메시지가 발송되지 않습니다.</p>
+          </div>
+          <button type="button" data-toggle="enabled" aria-label="전체 자동 메시징 가동"
+                  th:attr="aria-pressed=${!off}" class="group relative h-7 w-12 shrink-0 rounded-full bg-[#d8ddd9] transition aria-pressed:bg-[#346538]">
+            <span class="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform group-aria-pressed:translate-x-5"></span>
+          </button>
+        </div>
+        <div data-paused-alert th:attr="hidden=${off} ? null : 'hidden'"
+             class="mt-4 flex items-center gap-2 rounded-xl bg-[#fff0ee] px-3 py-2.5 text-[10px] font-bold text-[#a84a42]">
+          <svg class="icon" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-alert'"/></svg>
+          현재 모든 자동 메시지가 일시 정지되었습니다.
+        </div>
+      </section>
+
+      <!--/* ② 에티켓 시간 설정 · ③ 시작/종료 시간 */-->
+      <section data-dependent class="rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(36,58,39,.05)] transition">
+        <div class="flex items-start gap-3">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#f0effa] text-[#6864a1]">
+            <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-clock'"/></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-extrabold text-[#303832]">에티켓 시간 설정</h3>
+            <p class="mt-0.5 text-[10px] font-semibold text-[#7b817d]">야간 발송 보류</p>
+          </div>
+          <button type="button" data-toggle="quiet" aria-label="에티켓 시간 사용" aria-pressed="true"
+                  class="group relative h-7 w-12 shrink-0 rounded-full bg-[#d8ddd9] transition aria-pressed:bg-[#346538]">
+            <span class="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform group-aria-pressed:translate-x-5"></span>
+          </button>
+        </div>
+        <p class="mt-3 text-[11px] leading-5 text-[#858d87]">해당 시간에 발생한 알림은 즉시 발송되지 않고 보류되었다가, 에티켓 시간이 종료되면 일괄 발송됩니다.</p>
+        <div class="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <button type="button" data-time="start" data-value="22:00"
+                  class="rounded-xl bg-[#f4f4f8] px-2 py-3 text-xs font-extrabold text-[#5e6085] disabled:text-[#a7aea8]">오후 10:00</button>
+          <span class="text-xs font-bold text-[#999f9a]">~</span>
+          <button type="button" data-time="end" data-value="08:00"
+                  class="rounded-xl bg-[#f4f4f8] px-2 py-3 text-xs font-extrabold text-[#5e6085] disabled:text-[#a7aea8]">오전 08:00</button>
+        </div>
+      </section>
+
+      <!--/* ④ 알림톡 실패 시 문자(SMS) 대체 발송 */-->
+      <section data-dependent class="rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(36,58,39,.05)] transition">
+        <div class="flex items-start gap-3">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#edf3ed] text-[#346538]">
+            <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-chat'"/></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-extrabold leading-5 text-[#303832]">알림톡 실패 시 문자(SMS) 대체 발송</h3>
+          </div>
+          <button type="button" data-toggle="sms" aria-label="문자 대체 발송" aria-pressed="true"
+                  class="group relative h-7 w-12 shrink-0 rounded-full bg-[#d8ddd9] transition aria-pressed:bg-[#346538]">
+            <span class="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform group-aria-pressed:translate-x-5"></span>
+          </button>
+        </div>
+        <p class="mt-3 text-[11px] leading-5 text-[#858d87]">고객이 채널을 차단했거나 네트워크 오류로 알림톡 발송에 실패할 경우, 시스템이 이를 감지하여 일반 문자로 우회 발송합니다.</p>
+        <p class="mt-2 rounded-xl bg-[#fff7e8] px-3 py-2.5 text-[10px] font-semibold text-[#926b2d]">문자 대체 발송 시 별도의 발송 비용이 발생할 수 있습니다.</p>
+      </section>
+    </div>
+
+    <!--/* A. 시간 선택 시트 */-->
+    <div id="timePicker" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1f2d21]/45 backdrop-blur-[2px]">
+      <div class="w-full rounded-t-[24px] bg-white px-5 pb-6 pt-4 shadow-[0_-18px_50px_rgba(25,42,28,.22)]">
+        <div class="flex items-center justify-between">
+          <button type="button" data-close class="px-2 py-2 text-sm font-semibold text-[#828a84]">취소</button>
+          <h3 data-picker-title class="text-sm font-extrabold text-[#303832]">에티켓 시작 시간</h3>
+          <button type="button" data-picker-done class="px-2 py-2 text-sm font-extrabold text-[#346538]">완료</button>
+        </div>
+        <div class="relative mt-4 grid grid-cols-3 gap-2 overflow-hidden rounded-2xl bg-[#f5f6f5] p-3">
+          <div class="pointer-events-none absolute inset-x-3 top-1/2 h-11 -translate-y-1/2 rounded-xl border-y border-[#dfe4df] bg-white/70"></div>
+          <select data-picker="period" aria-label="오전 오후" size="3" class="relative z-10 h-32 bg-transparent text-center text-base font-bold outline-none">
+            <option>오전</option><option>오후</option>
+          </select>
+          <select data-picker="hour" aria-label="시" size="3" class="relative z-10 h-32 bg-transparent text-center text-base font-bold outline-none">
+            <option th:each="h : ${#numbers.sequence(1, 12)}" th:value="${#numbers.formatInteger(h, 2)}" th:text="${#numbers.formatInteger(h, 2)} + '시'">01시</option>
+          </select>
+          <select data-picker="minute" aria-label="분" size="3" class="relative z-10 h-32 bg-transparent text-center text-base font-bold outline-none">
+            <option th:each="m : ${ {'00','10','20','30','40','50'} }" th:value="${m}" th:text="${m} + '분'">00분</option>
+          </select>
+        </div>
+        <p class="mt-3 text-center text-[10px] text-[#8d958f]">각 항목을 위아래로 스크롤해 시간을 맞춰 주세요.</p>
+      </div>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts">
+  <script th:src="@{/js/admin/notification.js}"></script>
+</th:block>
+</body>
+</html>

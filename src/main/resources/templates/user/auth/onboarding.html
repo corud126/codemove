@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U 온보딩 · 로그인 방법 선택 (G-A01~A04)
+  state: 1 | 2 | 3 (온보딩 슬라이드, 미지정 시 1번부터 자동 전환) | login (로그인 방법 선택 바텀시트, /login)
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='온보딩', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/auth.css}">
+</head>
+<body>
+<div class="app-shell auth-shell"
+     th:with="state=${param.state != null ? param.state[0] : (state ?: '')},
+              slide=${state == '2' ? 2 : (state == '3' ? 3 : 1)}">
+  <div class="screen onboarding" data-onboarding th:attr="data-autoplay=${state == ''}">
+    <div class="onboarding-main">
+      <div class="onboarding-slide" data-slide="1" th:hidden="${slide != 1}">
+        <img alt="이삿짐을 배송하는 기사와 트럭" class="onboarding-art onboarding-art-main" th:src="@{/images/user/bd644.png}">
+        <div class="onboarding-title">신속하지만 정확하게<br>신뢰있는 이사</div>
+      </div>
+      <div class="onboarding-slide" data-slide="2" th:hidden="${slide != 2}">
+        <img alt="가구를 안전하게 운반하는 이사 카트" class="onboarding-art onboarding-art-service" th:src="@{/images/user/moving-dolly-3d.svg}">
+        <div class="onboarding-title">짐부터 일정까지 꼼꼼하게<br>믿고 맡기는 이사 준비</div>
+      </div>
+      <div class="onboarding-slide" data-slide="3" th:hidden="${slide != 3}">
+        <img alt="영상 견적 카메라" class="onboarding-art onboarding-art-icon onboarding-art-video" th:src="@{/images/user/cd80e.svg}">
+        <div class="onboarding-title">영상만 찍으면 빠르게<br>AI가 분석하는 이사 견적</div>
+      </div>
+      <div class="brand-name">명품익스프레스</div>
+      <div class="pager">
+        <div class="action pager-dot" role="button" tabindex="0" data-slide-to="1" th:classappend="${slide == 1} ? 'pager-active'" aria-label="1번째 온보딩 보기"><span></span></div>
+        <div class="action pager-dot" role="button" tabindex="0" data-slide-to="2" th:classappend="${slide == 2} ? 'pager-active'" aria-label="2번째 온보딩 보기"><span></span></div>
+        <div class="action pager-dot" role="button" tabindex="0" data-slide-to="3" th:classappend="${slide == 3} ? 'pager-active'" aria-label="3번째 온보딩 보기"><span></span></div>
+      </div>
+    </div>
+    <div class="onboarding-actions">
+      <a class="action outline" th:href="@{/login}" data-open="#loginSheet">로그인</a>
+      <a class="action primary" th:href="@{/signup}">회원가입</a>
+    </div>
+    <a class="action browse" th:href="@{/(state='guest')}">로그인하지 않고 둘러보기</a>
+  </div>
+
+  <!--/* G-A04 로그인 방법 선택 바텀시트 */-->
+  <div class="login-layer" id="loginSheet" data-layer th:hidden="${state != 'login'}">
+    <div class="scrim" data-close></div>
+    <div class="login-sheet" role="dialog" aria-label="로그인 방법 선택">
+      <div class="action sheet-grabber" role="button" tabindex="0" data-close aria-label="로그인 선택 화면 닫기">
+        <div class="sheet-handle"></div>
+      </div>
+      <div class="sheet-title">로그인 방법 선택</div>
+      <div class="social-row">
+        <a class="action social kakao" th:href="@{/}" aria-label="카카오 로그인"><img alt="카카오" th:src="@{/images/user/2a814.svg}"></a>
+        <a class="action social naver" th:href="@{/}" aria-label="네이버 로그인"><img alt="네이버" th:src="@{/images/user/4a055.svg}"></a>
+        <a class="action social apple" th:href="@{/}" aria-label="애플 로그인"><img alt="애플" th:src="@{/images/user/38175.png}"></a>
+      </div>
+      <a class="action phone-button" th:href="@{/login/phone}">
+        <img alt="" th:src="@{/images/user/1513d.svg}">
+        <span>휴대전화로 로그인</span>
+      </a>
+      <div class="account-help">계정이 기억나지 않나요?　<a class="action" th:href="@{/signup/verify}"><u>계정 찾기</u></a></div>
+    </div>
+  </div>
+
+  <th:block th:replace="~{fragments/user-layout :: splash}"></th:block>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/auth.js}"></script>
+</body>
+</html>

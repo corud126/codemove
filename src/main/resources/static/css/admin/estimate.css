@@ -1,0 +1,20 @@
+/* 견적 관리 화면 그룹 — Tailwind 로 표현하기 어려운 문서(견적서) 편집 상태만 둔다 */
+.estimate-sheet input[readonly] { cursor: inherit; }
+.estimate-sheet button:disabled { cursor: inherit; }
+
+/* 편집 모드: 입력 칸을 은은하게 표시 */
+[data-viewer].is-editing .estimate-sheet input:not([readonly]) { background-color: #fbfdf9; }
+[data-viewer].is-editing .estimate-sheet input:not([readonly]):focus { background-color: #eef5ee; box-shadow: inset 0 0 0 1px #346538; }
+[data-viewer].is-editing .estimate-sheet [data-choice] { cursor: pointer; }
+
+/* 문서 드래그 중 */
+[data-viewport].is-dragging { cursor: grabbing; }
+[data-page] { transform-origin: center center; will-change: transform; }
+
+/* 촬영 이미지 자리(파일이 없는 상태 미리보기용): 줄 노트 */
+.lined-paper {
+  background-color: #f4efe3;
+  background-image:
+    linear-gradient(90deg, transparent 18px, rgba(196, 92, 80, .35) 18px, rgba(196, 92, 80, .35) 19px, transparent 19px),
+    repeating-linear-gradient(180deg, transparent 0 15px, rgba(80, 90, 82, .28) 15px 16px);
+}

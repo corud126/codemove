@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U-08x 견적내역 (G-H05~H06 / E-H05~H06)
+  state: (없음) 견적내역 H05 | filter 필터 바텀시트 H06
+  필터(전체·검토 중·만료)는 more.js 에서 동작
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='견적내역', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/more.css}">
+</head>
+<body>
+<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}">
+  <div class="screen form-page">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/more})}"></a>
+      <div class="form-title">견적내역</div>
+    </div>
+    <div class="form-content estimate-history-page">
+      <a class="action estimate-arrived-card" th:href="@{/estimates/1}" aria-label="도착한 견적 상세">
+        <div class="estimate-arrived-top">
+          <span>견적 도착</span>
+          <b>
+            <svg aria-hidden="true" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5"/><path d="M10 5.7v4.7l3.2 1.8"/></svg>
+            2일 13시간 남음
+          </b>
+        </div>
+        <div class="estimate-arrived-route">
+          <strong>서초구 → 강동구</strong>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </div>
+        <small>5월 2일 (토) 이사 · 380,000원</small>
+      </a>
+
+      <div class="estimate-list-head" data-filter-group>
+        <div><strong>견적 목록</strong><span>2</span></div>
+        <div class="estimate-filter-wrap">
+          <div class="action estimate-filter-button" role="button" tabindex="0" aria-label="견적 목록 필터 선택"
+               data-filter-toggle="#estimateFilter" th:classappend="${state == 'filter'} ? 'open'">
+            <span data-filter-label>전체</span>
+            <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+          </div>
+        </div>
+      </div>
+
+      <div class="estimate-history-list" data-filter-list>
+        <a class="action estimate-history-row reviewing" data-status="reviewing" th:href="@{/estimates/1}" aria-label="2026. 06. 10 서초구 → 마포구 견적 상세">
+          <div class="estimate-history-main">
+            <div class="estimate-history-meta"><span>검토 중</span><small>2026. 06. 10</small></div>
+            <strong>서초구 → 마포구</strong>
+            <small>투룸 · 반포장</small>
+          </div>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </a>
+        <a class="action estimate-history-row expired" data-status="expired" th:href="@{/estimates/1}" aria-label="2026. 01. 24 강남구 → 송파구 견적 상세">
+          <div class="estimate-history-main">
+            <div class="estimate-history-meta"><span>만료</span><small>2026. 01. 24</small></div>
+            <strong>강남구 → 송파구</strong>
+            <small>원룸 · 일반포장</small>
+          </div>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </a>
+        <div class="past-reservation-empty" data-filter-empty hidden>해당하는 견적 내역이 없어요.</div>
+      </div>
+    </div>
+  </div>
+
+  <!--/* 필터 바텀시트 (H06) */-->
+  <div id="estimateFilter" class="filter-sheet" data-layer th:hidden="${state != 'filter'}">
+    <div class="action reservation-filter-dismiss" data-close aria-label="견적 목록 필터 닫기"></div>
+    <div class="reservation-filter-menu" role="menu">
+      <div class="reservation-filter-handle" role="button" tabindex="0" aria-label="필터 선택 화면 닫기" data-close><span></span></div>
+      <div class="reservation-filter-options">
+        <div class="action selected" role="menuitem" tabindex="0" data-filter="all">전체<span>✓</span></div>
+        <div class="action" role="menuitem" tabindex="0" data-filter="reviewing">검토 중<span hidden>✓</span></div>
+        <div class="action" role="menuitem" tabindex="0" data-filter="expired">만료<span hidden>✓</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/more.js}"></script>
+</body>
+</html>

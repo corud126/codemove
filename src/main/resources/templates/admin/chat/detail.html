@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!--/* SCR-A-007 채팅 상세
+  state: (기본) 답변 대기 · settings(A 대화 설정 메뉴) · replied(B 관리자 답장 후) · reply(답장 대상 지정) · empty(대화 검색 결과 없음)
+  채팅방 더미: /admin/chats/{고객 ID: luxury, kang22 ...} → chat.js 의 ROOMS (기본 홍길동) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='채팅 상세', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div class="icons-2 relative flex h-full min-h-0 flex-col bg-[#f5f6f8]" data-chat-detail>
+    <header class="flex h-14 shrink-0 items-center justify-between border-b border-[#e8ece8] bg-white px-3">
+      <div class="flex min-w-0 items-center gap-1">
+        <!--/* ① 뒤로 → 채팅 목록 */-->
+        <a th:href="@{/admin/chats/list}" aria-label="채팅 목록으로 돌아가기" data-history-back
+           class="grid h-10 w-9 shrink-0 place-items-center rounded-full text-[#3f4941] hover:bg-[#f2f5f2]">
+          <svg class="icon rotate-180" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-arrowRight'"/></svg>
+        </a>
+        <h2 class="truncate text-[15px] font-extrabold text-[#346538]" data-room-name>홍길동</h2>
+        <span data-room-waiting class="ml-1.5 flex shrink-0 items-center gap-1 rounded-full bg-[#fff0ee] px-2 py-1 text-[9px] font-bold text-[#bd5147]">
+          <span class="h-1.5 w-1.5 rounded-full bg-[#d95c50]"></span>대기 중
+        </span>
+      </div>
+      <div class="flex shrink-0 items-center">
+        <!--/* ② 대화 검색 */-->
+        <button type="button" aria-label="대화 내용 검색" data-search-open
+                class="grid h-10 w-9 place-items-center rounded-full text-[#3f4941] hover:bg-[#f2f5f2] aria-pressed:bg-[#f2f5f2]">
+          <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        </button>
+        <!--/* ③ 대화 설정 */-->
+        <div class="relative">
+          <button type="button" aria-label="대화 설정" aria-expanded="false" data-menu-toggle
+                  class="grid h-10 w-9 place-items-center rounded-full text-[#3f4941] hover:bg-[#f2f5f2] aria-expanded:bg-[#f2f5f2]">
+            <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-menu'"/></svg>
+          </button>
+          <div data-menu hidden
+               class="absolute right-0 top-11 z-30 w-48 rounded-xl border border-[#e2e7e2] bg-white p-2 shadow-[0_12px_32px_rgba(34,53,37,.16)]">
+            <button type="button" aria-pressed="false" data-option="hideAi"
+                    class="group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-[#4d554f] hover:bg-[#f5f6f5]">
+              AI 대화 내역 숨기기
+              <span class="grid h-5 w-5 place-items-center rounded-md border border-[#d8ddd8] text-transparent group-aria-pressed:border-[#346538] group-aria-pressed:bg-[#346538] group-aria-pressed:text-white">
+                <svg class="icon" width="13" height="13"><use th:href="@{/images/admin/icons.svg} + '#i-check'"/></svg>
+              </span>
+            </button>
+            <button type="button" aria-pressed="false" data-option="waitingOnly"
+                    class="group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-[#4d554f] hover:bg-[#f5f6f5]">
+              대기 답변만 보기
+              <span class="grid h-5 w-5 place-items-center rounded-md border border-[#d8ddd8] text-transparent group-aria-pressed:border-[#346538] group-aria-pressed:bg-[#346538] group-aria-pressed:text-white">
+                <svg class="icon" width="13" height="13"><use th:href="@{/images/admin/icons.svg} + '#i-check'"/></svg>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div data-search hidden class="flex shrink-0 items-center gap-2 border-b border-[#e8ece8] bg-white px-3 py-2.5">
+      <label class="flex flex-1 items-center gap-2 rounded-full bg-[#f2f3f5] px-4 py-2.5">
+        <svg class="icon text-[#8b928d]" width="16" height="16"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        <input type="search" data-search-input aria-label="대화 내용 검색" placeholder="대화 내용을 검색하세요"
+               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9ca29e] [&::-webkit-search-cancel-button]:hidden">
+        <span data-search-count hidden class="text-xs text-[#718074]">0건</span>
+      </label>
+      <button type="button" aria-label="대화 검색 닫기" data-search-close class="grid h-9 w-9 place-items-center rounded-full">
+        <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+      </button>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto p-4" data-messages-area>
+      <div class="mb-5 text-center">
+        <span class="rounded-full bg-[#e8ebe8] px-3 py-1.5 text-[10px] font-semibold text-[#7d857f]">오늘</span>
+      </div>
+      <div class="space-y-4" data-messages>
+        <div class="flex max-w-[84%] flex-col items-start gap-1" data-role="customer">
+          <div class="rounded-2xl rounded-tl-md bg-white p-3 text-[13px] leading-5 text-[#343b36] shadow-sm" data-text>이번 주 금요일 이사 예정인데, 비가 오면 어떻게 되나요?</div>
+        </div>
+        <div class="ml-auto flex max-w-[84%] flex-col items-end gap-1" data-role="ai">
+          <span class="text-[10px] font-bold text-[#6c7d6e]">AI</span>
+          <div class="rounded-2xl rounded-tr-md bg-[#e8efe8] p-3 text-[13px] leading-5 text-[#355639] shadow-sm" data-text>우천 시에도 기본적으로 이사는 진행되며, 가구와 짐은 방수 포장 후 안전하게 운반해 드립니다.</div>
+        </div>
+        <!--/* ④ 답변 대기 메시지 → 왼쪽으로 밀어 답장 대상 지정 */-->
+        <div class="flex max-w-[84%] touch-pan-y select-none flex-col items-start gap-1 transition-transform" data-role="customer" data-waiting data-swipe>
+          <div class="rounded-2xl border border-[#efc4bf] bg-[#fff0ee] p-3 text-[13px] leading-5 text-[#a44038] shadow-sm" data-text data-room-message>혹시 사다리차 추가 비용이 발생하나요?</div>
+          <span class="text-[10px] font-semibold text-[#ba554c]" data-waiting-hint>답변 대기 · 왼쪽으로 밀어 답장</span>
+        </div>
+      </div>
+      <div data-empty hidden class="py-16 text-center">
+        <p class="text-sm font-semibold text-[#656d67]">조회된 대화가 없습니다</p>
+        <p class="mt-1 text-xs text-[#979d98]">검색어나 설정을 변경해 주세요.</p>
+      </div>
+    </div>
+
+    <!--/* ⑤ 메시지 입력 · ⑥ 전송 */-->
+    <form data-send-form class="shrink-0 border-t border-[#e1e6e1] bg-white px-3 pb-3 pt-2 shadow-[0_-4px_16px_rgba(36,58,39,.06)]">
+      <div data-reply hidden class="mb-2 flex items-center gap-2 rounded-xl border-l-4 border-[#d6b24e] bg-[#fff8df] px-3 py-2">
+        <div class="min-w-0 flex-1">
+          <span class="block text-[10px] font-bold text-[#8c732d]">답장할 메시지</span>
+          <span class="block truncate text-xs text-[#6f633f]" data-reply-text></span>
+        </div>
+        <button type="button" aria-label="답장 취소" data-reply-cancel class="grid h-7 w-7 place-items-center rounded-full text-[#7a704f]">
+          <svg class="icon" width="15" height="15"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <div class="flex items-center gap-2 rounded-full bg-[#f2f3f5] py-1.5 pl-4 pr-1.5">
+        <input type="text" aria-label="메시지 입력" placeholder="메시지를 입력하세요" data-send-input autocomplete="off"
+               class="min-w-0 flex-1 bg-transparent py-2 text-sm text-[#29302b] outline-none placeholder:text-[#9ca29e]">
+        <button type="submit" aria-label="메시지 전송" disabled data-send-button
+                class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#346538] text-white transition disabled:bg-[#b8c2b9]">
+          <svg class="icon" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-send'"/></svg>
+        </button>
+      </div>
+    </form>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/chat.js}"></script></th:block>
+</body>
+</html>

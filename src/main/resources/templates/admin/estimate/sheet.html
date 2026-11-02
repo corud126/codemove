@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<!--/* 견적서/계약서 문서 fragment (SCR-A-002 견적 수정, SCR-A-004 견적서 등록 STEP 2·3 공용)
+  viewer(download, action) : 상단 도구(다운 · −/+ 배율 · 수정/저장) + 드래그 이동 가능한 문서 영역
+     download — true 면 [다운] 표시 / action — '' 이면 오른쪽 버튼 없음, '수정' 이면 수정·저장 토글
+  sheet : 문서 본문. 모든 값은 input[readonly] 이고, 상위 [data-viewer] 에 .is-editing 이 붙으면 편집 가능 (estimate.js)
+  미리보기: /dev/admin/estimate/sheet */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11/dist/index.global.js"></script>
+  <link rel="stylesheet" th:href="@{/css/admin/admin.css}">
+  <link rel="stylesheet" th:href="@{/css/admin/estimate.css}">
+</head>
+<body class="bg-[#bfc5c0] p-4">
+
+<div th:fragment="viewer(download, action)" data-viewer
+     class="overflow-hidden rounded-[18px] bg-[#dfe4df] shadow-[0_10px_30px_rgba(32,48,35,.15)]">
+  <div class="grid grid-cols-[1fr_auto_1fr] items-center border-b border-[#dfe4df] bg-white px-3 py-2.5">
+    <button th:if="${download}" type="button" data-download
+            class="flex h-8 w-fit items-center gap-1.5 rounded-lg bg-[#edf3ed] px-3 text-[10px] font-extrabold text-[#346538]">
+      <svg class="icon" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-document'"/></svg>다운
+    </button>
+    <span th:unless="${download}"></span>
+    <div class="flex items-center gap-1">
+      <button type="button" aria-label="축소" data-zoom="-10" class="grid h-8 w-8 place-items-center rounded-lg bg-[#f1f3f1] text-lg font-bold text-[#465048]">−</button>
+      <button type="button" aria-label="배율 초기화" data-zoom="0" class="w-12 text-center text-[10px] font-extrabold text-[#59615b]">100%</button>
+      <button type="button" aria-label="확대" data-zoom="10" class="grid h-8 w-8 place-items-center rounded-lg bg-[#f1f3f1] text-lg font-bold text-[#465048]">+</button>
+    </div>
+    <button th:if="${action != ''}" type="button" data-edit-toggle
+            class="h-8 justify-self-end rounded-lg bg-[#edf3ed] px-3 text-[10px] font-extrabold text-[#346538] [.is-editing_&]:bg-[#346538] [.is-editing_&]:text-white"
+            th:text="${action}">수정</button>
+  </div>
+  <div data-viewport class="relative grid grid-cols-1 h-[calc(var(--frame-h)_-_260px)] min-h-[430px] cursor-grab touch-none place-items-center overflow-hidden bg-[#bfc5c0]">
+    <div data-page class="aspect-[1488/2103] [container-type:inline-size] w-[min(calc(100%_-_24px),calc((max(var(--frame-h)_-_260px,430px)_-_24px)*1488/2103))] bg-white shadow-[0_8px_24px_rgba(20,30,22,.22)]">
+      <th:block th:replace="~{admin/estimate/sheet :: sheet}"/>
+    </div>
+  </div>
+</div>
+
+<!--/* 문서 본문 — 기본값은 견적 1번(홍길동) 더미 */-->
+<article th:fragment="sheet" class="estimate-sheet aspect-[1488/2103] w-full overflow-hidden bg-white p-[4cqw] text-black [container-type:inline-size]"
+         th:with="vc='h-full w-full min-w-0 bg-white px-[.55cqw] text-[1.25cqw] font-semibold outline-none',
+                  items=${ {'냉장고','1대','세탁기','1대','침대','1개','책상','2개','의자','4개','박스','25개'} }">
+  <header class="grid grid-cols-[1.25fr_.9fr_1.7fr] gap-[2cqw]">
+    <div>
+      <h4 class="text-[3.7cqw] font-black tracking-[-.08em]">명품 익스프레스</h4>
+      <p class="mt-[.8cqw] text-[1.05cqw] leading-[1.7]">포장이사 전문업체 관허 2015-7호<br>(피해보상)보증보험 가입</p>
+    </div>
+    <div class="text-center">
+      <h5 class="text-[3cqw] font-black">견적서 / 계약서</h5>
+      <p class="mt-[.6cqw] text-[1.3cqw] font-bold">(ESTIMATE REPORT)</p>
+    </div>
+    <div class="border-l border-t border-black text-[1.2cqw]">
+      <div th:each="r : ${ {'등록 번호|398-51-00044', '사무실전화|062) 252-0303', '대표자전화|010-9445-8224'} }" th:with="t=${#strings.arraySplit(r, '|')}"
+           class="grid min-h-[3cqw] grid-cols-[13cqw_1fr] border-b border-r border-black">
+        <b class="grid place-items-center border-r border-black" th:text="${t[0]}">등록 번호</b>
+        <span class="flex items-center px-[1cqw] font-bold" th:text="${t[1]}">398-51-00044</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="mt-[3cqw] border-l border-t border-black bg-white">
+    <div class="grid grid-cols-[15cqw_22cqw_7cqw_23cqw_1fr] grid-rows-[2.6cqw_2.6cqw]">
+      <b class="row-span-2 grid place-items-center border-b border-r border-black text-[1.35cqw] tracking-[.25em]">업체명</b>
+      <label class="row-span-2 border-b border-r border-black"><input readonly data-field="companyName" aria-label="업체명" value="명품익스프레스" th:class="${vc} + ' text-center font-black'"></label>
+      <b class="row-span-2 grid place-items-center border-b border-r border-black text-[1.2cqw]">담당자</b>
+      <label class="relative border-b border-r border-black"><input readonly data-field="customer" aria-label="담당자" value="홍길동" th:class="${vc} + ' pr-[3.5cqw] text-right'"><span class="pointer-events-none absolute right-[1cqw] top-[.65cqw] text-[1.1cqw] font-bold">(님)</span></label>
+      <label class="row-span-2 flex items-center gap-[1cqw] border-b border-r border-black px-[1cqw] text-[1.2cqw] font-black"><span class="shrink-0">견적일:</span><input readonly data-field="estimateDate" aria-label="견적일" value="26.03.25" th:class="${vc}"></label>
+      <label class="relative border-b border-r border-black pl-[5cqw]"><b class="pointer-events-none absolute left-[1cqw] top-[.6cqw] text-[1.1cqw]">TEL :</b><input readonly data-field="phone" aria-label="연락처" value="010-1234-5678" th:class="${vc}"></label>
+    </div>
+    <div th:each="r : ${ {'출발지|origin|서울 강남구 테헤란로 123|작업일|moveDate', '도착지|destination|경기 성남시 분당구 판교로 45|운송일|transportDate'} }"
+         th:with="t=${#strings.arraySplit(r, '|')}" class="grid min-h-[4.6cqw] grid-cols-[15cqw_1fr_27cqw]">
+      <b class="grid place-items-center border-b border-r border-black text-[1.35cqw] tracking-[.25em]" th:text="${t[0]}">출발지</b>
+      <label class="border-b border-r border-black"><input readonly th:attr="data-field=${t[1]}, aria-label=${t[0]}" th:value="${t[2]}" th:class="${vc}"></label>
+      <label class="flex items-center gap-[1cqw] border-b border-r border-black px-[1cqw] text-[1.2cqw] font-black"><span class="shrink-0" th:text="${t[3]} + ':'">작업일:</span><input readonly th:attr="data-field=${t[4]}, aria-label=${t[3]}" value="26.03.25" th:class="${vc}"></label>
+    </div>
+  </section>
+
+  <!--/* 품목 / 수량 (4묶음 x N행) */-->
+  <section class="mt-[1.2cqw] border-l border-t border-black bg-white">
+    <div class="grid grid-cols-4 bg-[#eeeeee]">
+      <label th:each="g, s : ${ {'전자기기', '가구', '', ''} }" class="h-[3.8cqw] border-b border-r border-black">
+        <input readonly th:attr="data-field='group' + ${s.index}, aria-label=|${s.count}번째 품목 그룹|, placeholder=${s.index >= 2} ? '관리자 입력' : null" th:value="${g}"
+               th:class="${vc} + ' bg-transparent text-center font-black placeholder:text-transparent [.is-editing_&]:placeholder:text-[#9aa09b]'">
+      </label>
+    </div>
+    <div class="grid grid-cols-8 bg-[#f5f5f5]">
+      <th:block th:each="i : ${#numbers.sequence(1, 4)}">
+        <b class="grid h-[3.4cqw] place-items-center border-b border-r border-black text-[1.2cqw]">품목</b>
+        <b class="grid h-[3.4cqw] place-items-center border-b border-r border-black text-[1.2cqw]">수량</b>
+      </th:block>
+    </div>
+    <div data-item-rows>
+      <div th:each="r : ${#numbers.sequence(0, 7)}" class="grid grid-cols-8 bg-white" data-item-row>
+        <th:block th:each="c : ${#numbers.sequence(0, 3)}" th:with="i=${r * 4 + c}">
+          <input readonly data-item-name aria-label="품목" th:value="${i * 2 < #lists.size(items)} ? ${items[i * 2]} : ''"
+                 th:class="${vc} + ' h-[3.1cqw] border-b border-r border-black text-center'">
+          <input readonly data-item-qty aria-label="수량" th:value="${i * 2 < #lists.size(items)} ? ${items[i * 2 + 1]} : ''"
+                 th:class="${vc} + ' h-[3.1cqw] border-b border-r border-black text-center'">
+        </th:block>
+      </div>
+    </div>
+  </section>
+  <div class="mt-[1cqw] hidden items-center justify-center gap-[1.2cqw] [.is-editing_&]:flex">
+    <button type="button" aria-label="품목 행 삭제" data-item-row-change="-1" class="grid h-[4cqw] w-[4cqw] place-items-center rounded-full border border-[#aeb5af] bg-white text-[2.3cqw] font-black disabled:opacity-40">−</button>
+    <span class="text-[1.1cqw] font-bold text-[#737b75]" data-item-row-count>8행</span>
+    <button type="button" aria-label="품목 행 추가" data-item-row-change="1" class="grid h-[4cqw] w-[4cqw] place-items-center rounded-full border border-[#aeb5af] bg-white text-[2.3cqw] font-black disabled:opacity-40">+</button>
+  </div>
+
+  <section class="mt-[1.1cqw] grid grid-cols-[1fr_1.1fr] gap-[.8cqw]">
+    <!--/* 옵션 비용 */-->
+    <div class="grid grid-cols-[5.5cqw_1fr] border-l border-t border-black">
+      <strong class="grid place-items-center border-b border-r border-black px-[1cqw] text-center text-[1.4cqw] leading-[1.8]">옵<br>션<br>비<br>용</strong>
+      <div>
+        <div th:each="o, s : ${ {'피아노|일반|그랜드', '돌침대|분해|조립', '조립장|분해|조립', '벽걸이TV|탈착|설치', '홈씨어터|분리|설치', '수작업|계단|승강기', '안마의자|분리|설치', '에어컨|탈착|설치'} }"
+             th:with="t=${#strings.arraySplit(o, '|')}" data-option-row
+             class="grid min-h-[2.75cqw] grid-cols-[10cqw_1fr_2.5cqw_10cqw] border-b border-r border-black text-[1.05cqw]">
+          <b class="flex items-center px-[.8cqw]" th:text="'· ' + ${t[0]}">· 피아노</b>
+          <span class="flex items-center gap-[1.1cqw]">
+            <button th:each="c : ${ {t[1], t[2]} }" type="button" data-choice th:attr="data-value=${c}"
+                    class="flex items-center gap-[.35cqw] text-[#69716b] aria-pressed:font-black aria-pressed:text-black" aria-pressed="false">
+              <span class="text-[1.25cqw]" data-box>□</span><span th:text="${c}">일반</span>
+            </button>
+          </span>
+          <span class="flex items-center justify-center">₩</span>
+          <input readonly th:attr="data-field='option' + ${s.index}, aria-label=|${t[0]} 옵션 비용|" value=""
+                 class="min-w-0 bg-white px-[.5cqw] text-right outline-none">
+        </div>
+      </div>
+    </div>
+    <div class="border-l border-t border-black">
+      <div class="grid min-h-[5.5cqw] grid-cols-[10cqw_1fr] border-b border-r border-black">
+        <b class="grid place-items-center text-[1.3cqw]">작업내용</b>
+        <div class="flex items-center justify-center gap-[2.2cqw] px-[1cqw] text-[1.2cqw]" data-radio="workMethod">
+          <button th:each="m : ${ {'포장', '일반', '보관'} }" type="button" data-choice th:attr="data-value=${m}, aria-pressed=${m == '포장'}"
+                  class="flex items-center gap-[.6cqw] text-[#69716b] aria-pressed:font-black aria-pressed:text-black">
+            <span class="text-[1.5cqw]" data-box th:text="${m == '포장'} ? '■' : '□'">□</span><span th:text="${m}">포장</span>
+          </button>
+        </div>
+      </div>
+      <div class="grid min-h-[4.7cqw] grid-cols-[10cqw_1fr] border-b border-r border-black">
+        <b class="grid place-items-center text-[1.3cqw]">운반방법</b>
+        <div class="flex items-center justify-center gap-[1.6cqw] px-[.6cqw] text-[1.05cqw]">
+          <span th:each="m : ${ {'사다리차|전', '승강기|후', '계단작업|'} }" th:with="t=${#strings.arraySplit(m + ' ', '|')}" class="flex items-center gap-[.4cqw]" data-transport>
+            <b th:text="${t[0]}">사다리차</b>
+            <button th:each="v : ${ {'전', '후'} }" type="button" data-choice th:attr="data-value=${v}, aria-pressed=${#strings.trim(t[1]) == v}"
+                    class="text-[#8a918c] aria-pressed:font-black aria-pressed:text-black aria-pressed:underline aria-pressed:decoration-[.18cqw] aria-pressed:underline-offset-[.3cqw]"
+                    th:text="${v}">전</button>
+          </span>
+        </div>
+      </div>
+      <label class="grid min-h-[5.3cqw] grid-cols-[10cqw_1fr] border-b border-r border-black"><b class="grid place-items-center text-[1.3cqw]">이사물량</b><input readonly data-field="volume" aria-label="이사물량" value="3.5톤" th:class="${vc}"></label>
+      <label class="grid min-h-[6.1cqw] grid-cols-[10cqw_1fr] border-b border-r border-black"><b class="grid place-items-center text-[1.3cqw]">비고</b><input readonly data-field="note" aria-label="비고" value="파손 주의 물품은 별도 포장하며, 현장 상황에 따라 추가 비용이 발생할 수 있습니다." th:class="${vc}"></label>
+    </div>
+  </section>
+
+  <!--/* 비용 */-->
+  <section class="mt-[.7cqw] grid grid-cols-2 border-l border-t border-black">
+    <div class="border-r border-black">
+      <h5 class="grid h-[2.8cqw] place-items-center border-b border-black text-[1.35cqw] font-black">A. 작업 비용</h5>
+      <label th:each="m : ${ {'이사비용|movingCost|1,050,000', '사다리비용|extraCost|270,000', '총 비용|total|1,320,000', '계약금10%|deposit|132,000', '잔금|balance|1,188,000'} }"
+             th:with="t=${#strings.arraySplit(m, '|')}"
+             class="grid grid-cols-[23cqw_1fr] border-b border-black"
+             th:classappend="${t[1] == 'deposit' or t[1] == 'balance'} ? 'min-h-[5.4cqw]' : 'min-h-[2.8cqw]'">
+        <b class="grid place-items-center border-r border-black text-[1.25cqw]" th:text="${t[0]}">이사비용</b>
+        <span class="flex items-center bg-white pl-[.8cqw] text-[1.25cqw] font-semibold">₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=${t[0]}" th:value="${t[2]}" th:class="${vc} + ' text-right'"></span>
+      </label>
+    </div>
+    <div class="border-r border-black">
+      <h5 class="grid h-[2.8cqw] place-items-center border-b border-black text-[1.35cqw] font-black">B. 별도 비용</h5>
+      <label th:each="m : ${ {'출발지 사다리(　)층|departureLadder|150,000', '도착지 사다리(　)층|destinationLadder|120,000', '사다리 소계|ladderSubtotal|270,000'} }"
+             th:with="t=${#strings.arraySplit(m, '|')}" class="grid min-h-[2.8cqw] grid-cols-[25cqw_1fr] border-b border-black">
+        <b class="grid place-items-center border-r border-black text-[1.15cqw]" th:text="${t[0]}">출발지 사다리(　)층</b>
+        <span class="flex items-center bg-white pl-[.8cqw] text-[1.25cqw] font-semibold">₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=${t[0]}" th:value="${t[2]}" th:class="${vc} + ' text-right'"></span>
+      </label>
+    </div>
+  </section>
+
+  <footer class="mt-[.8cqw] grid grid-cols-[12cqw_1fr_9cqw_1fr] border-l border-t border-black text-[1.2cqw]">
+    <b class="grid min-h-[5cqw] place-items-center border-b border-r border-black">견적 담당자</b>
+    <span class="flex items-center justify-between border-b border-r border-black px-[1.3cqw] font-black"><span>김선국</span><span>(서명)/H.P　010-9445-8224</span></span>
+    <b class="grid place-items-center border-b border-r border-black text-center">고객<br>확인</b>
+    <span class="flex items-end justify-end border-b border-r border-black p-[1cqw] font-black">(서명)</span>
+  </footer>
+</article>
+
+</body>
+</html>

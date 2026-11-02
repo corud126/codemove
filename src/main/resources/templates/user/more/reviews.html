@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U-08x 후기 (G-H09, G-H12 / E-H09, E-H12)
+  state: (없음) 후기 목록 H09 | done 후기 등록 완료 H12 (방금 쓴 후기 + 토스트)
+  후기 작성 화면에서 등록하면 more.js 가 sessionStorage 의 작성 내용으로 방금 쓴 후기를 채운다
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='후기', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/more.css}">
+</head>
+<body>
+<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}">
+  <div class="screen form-page">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/more})}"></a>
+      <div class="form-title">후기</div>
+    </div>
+    <div class="form-content review-history-page">
+      <a class="action review-prompt" th:href="@{/more/reviews/new}" aria-label="3월 18일 이사 후기 작성">
+        <div class="review-prompt-meta"><span>후기 작성</span><small>3월 18일 이사</small></div>
+        <strong>강남구 <i>→</i> 서초구</strong>
+        <p>서비스는 만족스러우셨나요?</p>
+        <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+      </a>
+      <div class="history-label review-history-label">
+        <strong>내가 쓴 후기</strong>
+        <span th:text="${state == 'done' ? 2 : 1}">1</span>
+      </div>
+
+      <!--/* 방금 쓴 후기 (H12) */-->
+      <div class="my-review submitted-review" id="submittedReview" th:if="${state == 'done'}">
+        <div class="my-review-head"><span data-review-stars>★★★★★</span><small>방금 전</small></div>
+        <strong>강남구 → 서초구</strong>
+        <div class="my-review-copy">
+          <p data-review-text>기사님들이 친절하시고 짐도 꼼꼼하게 옮겨주셨어요. 다음에도 이용할게요!</p>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </div>
+        <small class="my-review-type">원룸 · 일반포장</small>
+        <div class="my-review-photos" data-review-photos hidden></div>
+      </div>
+
+      <div class="my-review">
+        <div class="my-review-head"><span>★★★★★</span><small>2025. 11. 03</small></div>
+        <strong>송파구 → 성동구</strong>
+        <div class="my-review-copy">
+          <p>친절하게 응대해주시고 꼼꼼히 챙겨주셔서 편하게 이사했습니다.</p>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </div>
+        <small class="my-review-type">원룸 · 반포장</small>
+      </div>
+    </div>
+  </div>
+  <div class="save-toast" id="reviewToast" role="status" th:if="${state == 'done'}">후기가 등록되었어요.</div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/more.js}"></script>
+</body>
+</html>

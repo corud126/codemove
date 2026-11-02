@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!--/* SCR-A-012 리뷰 관리
+  상태: (기본) | ?state=reply (A 답변 작성: 이서준 리뷰) | ?state=edit-reply (B 답변 수정: 김명품 리뷰)
+        ?state=filter (별점 4점 필터) | ?state=empty (선택한 별점 리뷰 없음: 2점)
+  별점 필터·답변 달기/등록/취소·답변 수정(연필→체크)은 review.js (더미 리뷰 12건) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='리뷰 관리', active='', fixed=false, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div id="reviewList" class="space-y-5 px-4 pb-28 pt-6"
+       th:with="state=${param.state != null ? param.state[0] : ''},
+                reply='소중한 후기 감사합니다. 앞으로도 안전하고 꼼꼼한 이사 서비스로 보답하겠습니다.'"
+       th:attr="data-state=${state}">
+    <h2 class="px-1 text-[24px] font-extrabold tracking-[-0.04em] text-[#346538]">리뷰 관리</h2>
+
+    <!--/* 평균 별점 · 별점별 분포 */-->
+    <section class="flex items-center gap-5 rounded-[20px] bg-white p-5 shadow-[0_5px_18px_rgba(36,58,39,.06)]">
+      <div class="w-[100px] shrink-0 border-r border-[#edf0ed] pr-5 text-center">
+        <strong class="text-[38px] font-extrabold tracking-[-0.05em] text-[#29312b]">4.5</strong>
+        <div class="mt-2 flex justify-center gap-0.5 text-[13px] leading-none" aria-label="별점 5점">
+          <span th:each="i : ${#numbers.sequence(1, 5)}" class="text-[#f2b84b]">★</span>
+        </div>
+        <p class="mt-2 text-[9px] text-[#969d98]">평균 별점</p>
+      </div>
+      <div class="flex-1 space-y-2">
+        <div th:each="d : ${ {'5|7|58', '4|4|33', '3|1|8', '2|0|0', '1|0|0'} }" th:with="t=${#strings.arraySplit(d, '|')}" class="flex items-center gap-2">
+          <span class="w-5 text-[9px] font-bold text-[#777f79]" th:text="${t[0]} + '점'">5점</span>
+          <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eef0ee]">
+            <div class="h-full rounded-full bg-[#f2b84b]" th:style="|width:${t[2]}%|"></div>
+          </div>
+          <span class="w-3 text-right text-[9px] font-semibold text-[#8c938e]" th:text="${t[1]}">7</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="flex items-center justify-between px-1">
+      <p class="text-[14px] font-extrabold text-[#303832]">전체 리뷰 <span class="text-[#346538]">12개</span></p>
+      <label class="relative">
+        <span class="sr-only">별점 분류</span>
+        <select id="ratingFilter" class="h-9 appearance-none rounded-lg border border-[#dfe4df] bg-white pl-3 pr-8 text-[11px] font-semibold text-[#535b55] outline-none focus:border-[#346538]">
+          <option value="전체">전체</option>
+          <option th:each="r : ${#numbers.sequence(5, 1, -1)}" th:value="${r}" th:text="${r} + '점'"
+                  th:selected="${(state == 'filter' and r == 4) or (state == 'empty' and r == 2)}">5점</option>
+        </select>
+        <svg class="icon pointer-events-none absolute right-2 top-2.5 text-[#778079]" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-chevron'"/></svg>
+      </label>
+    </div>
+
+    <!--/* 리뷰: id|이름|날짜|이사유형|이용회차|별점|내용|답변여부(Y)|사진 */-->
+    <div class="space-y-4" id="reviewCards">
+      <article th:each="v : ${ {
+            '1|김명품|2026-06-02|가정이사|3|5|포장부터 정리까지 정말 꼼꼼하게 해주셨어요. 직원분들도 친절해서 안심하고 이사했습니다.|Y|https://images.unsplash.com/photo-1730154838368-c37b1fdebcf6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=500',
+            '2|이서준|2026-05-29|기업이사|2|5|사무실 집기 이동이 많았는데 예정 시간 안에 잘 마무리해 주셨습니다.|N|-',
+            '3|박하윤|2026-05-21|보관이사|4|5|보관 상태도 좋았고 다시 배송받을 때 파손된 물건 없이 잘 도착했어요.|N|-',
+            '4|최유진|2026-05-18|가정이사|1|4|전체적으로 괜찮았지만 도착 시간이 조금 늦어 아쉬웠습니다.|Y|-',
+            '5|정도현|2026-05-14|원룸이사|2|5|짐이 많지 않았는데도 세심하게 포장해 주셔서 만족했습니다.|N|-',
+            '6|한지민|2026-05-10|가정이사|5|5|상담부터 이사 완료까지 안내가 정확하고 친절했어요.|Y|-',
+            '7|윤서아|2026-05-07|보관이사|1|4|보관 일정 변경 과정에서 안내가 조금 늦었습니다.|N|-',
+            '8|강민준|2026-05-03|기업이사|3|5|업무 공백 없이 빠르게 이전을 마칠 수 있어 좋았습니다.|Y|-',
+            '9|송하윤|2026-04-29|원룸이사|2|4|합리적인 가격에 서비스도 깔끔해서 다시 이용하고 싶어요.|N|-',
+            '10|임지호|2026-04-24|가정이사|4|3|일부 가구에 흠집이 생겨서 사후 처리를 요청했습니다.|N|-',
+            '11|오지안|2026-04-20|사무실이사|2|5|복잡한 장비도 안전하게 옮겨 주셔서 정말 감사합니다.|Y|-',
+            '12|문예준|2026-04-16|가정이사|1|4|포장은 꼼꼼했지만 정리 시간이 예상보다 오래 걸렸습니다.|N|-'} }"
+               th:with="t=${#strings.arraySplit(v, '|')}, answered=${t[7] == 'Y'}, rating=${#conversions.convert(t[5], 'java.lang.Integer')}"
+               th:attr="data-review=${t[0]}, data-rating=${t[5]}, data-name=${t[1]}"
+               th:hidden="${(state == 'filter' and rating != 4) or state == 'empty'}"
+               class="rounded-[20px] bg-white p-5 shadow-[0_5px_18px_rgba(36,58,39,.06)]">
+        <div class="flex items-start gap-3">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#edf3ed] text-[13px] font-extrabold text-[#346538]" th:text="${#strings.substring(t[1], 0, 1)}">김</span>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-[12px] font-bold text-[#303832]" th:text="${t[1]}">김명품</p>
+            <p class="mt-1 text-[9px] text-[#9ca29d]" th:text="${t[2]}">2026-06-02</p>
+          </div>
+          <span class="flex shrink-0 items-center gap-2 text-[9px] font-semibold text-[#8b928d]">
+            <b class="rounded-full bg-[#edf3ed] px-2 py-1 text-[#346538]" th:text="${t[3]}">가정이사</b>
+            <span th:text="|이용 ${t[4]}회차|">이용 3회차</span>
+          </span>
+        </div>
+
+        <div class="mt-4">
+          <div class="flex gap-0.5 text-[14px] leading-none" th:attr="aria-label=|별점 ${t[5]}점|">
+            <span th:each="i : ${#numbers.sequence(1, 5)}" th:class="${i <= rating} ? 'text-[#f2b84b]' : 'text-[#dfe3df]'">★</span>
+          </div>
+          <p class="mt-3 text-[12px] leading-5 text-[#505852]" th:text="${t[6]}">리뷰 내용</p>
+        </div>
+
+        <div th:if="${t[8] != '-'}" class="mt-3 overflow-x-auto">
+          <img th:src="${t[8]}" alt="고객이 첨부한 이삿짐 박스 사진" class="h-20 w-28 rounded-xl bg-[#eef0ee] object-cover">
+        </div>
+
+        <!--/* 관리자 답변 (연필 → 수정 → 체크로 완료) */-->
+        <div data-answer th:hidden="${!answered}" class="mt-4 rounded-[14px] bg-[#f7f8f7] p-4"
+             th:with="editing=${state == 'edit-reply' and t[0] == '1'}" th:classappend="${editing} ? 'is-editing'">
+          <div class="flex items-center justify-between">
+            <p class="text-[11px] font-extrabold text-[#465048]">관리자 답변</p>
+            <button type="button" data-answer-toggle th:attr="aria-label=${editing} ? '답변 수정 완료' : '답변 수정'"
+                    class="grid h-8 w-8 place-items-center rounded-lg text-[#65806a] hover:bg-[#e9eeea] [.is-editing_&]:bg-[#346538] [.is-editing_&]:text-white">
+              <span class="[.is-editing_&]:hidden"><svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons.svg} + '#i-edit'"/></svg></span>
+              <span class="hidden [.is-editing_&]:block"><svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons.svg} + '#i-check'"/></svg></span>
+            </button>
+          </div>
+          <p class="mt-2 text-[11px] leading-5 text-[#69716b] [.is-editing_&]:hidden" data-answer-text th:text="${reply}">답변</p>
+          <textarea data-answer-input aria-label="관리자 답변 수정" th:text="${reply}"
+                    class="mt-2 hidden min-h-20 w-full resize-none rounded-lg border border-[#dbe1dc] bg-white p-3 text-[11px] leading-5 text-[#505852] outline-none focus:border-[#346538] [.is-editing_&]:block"></textarea>
+        </div>
+
+        <!--/* 답변 작성 */-->
+        <div data-reply-form th:hidden="${answered or !(state == 'reply' and t[0] == '2')}" class="mt-4 rounded-[14px] bg-[#f7f8f7] p-3">
+          <textarea data-reply-input aria-label="답변 내용" placeholder="답변 내용을 입력하세요..."
+                    class="min-h-20 w-full resize-none rounded-lg border border-[#dbe1dc] bg-white p-3 text-[11px] leading-5 text-[#505852] outline-none placeholder:text-[#a8aea9] focus:border-[#346538]"></textarea>
+          <div class="mt-2 flex justify-end gap-2">
+            <button type="button" data-reply-cancel class="rounded-lg border border-[#d9ded9] bg-white px-3 py-2 text-[10px] font-bold text-[#737b75]">취소</button>
+            <button type="button" data-reply-submit class="rounded-lg bg-[#346538] px-3 py-2 text-[10px] font-bold text-white disabled:opacity-40">답변 등록</button>
+          </div>
+        </div>
+        <button type="button" data-reply-open th:hidden="${answered or (state == 'reply' and t[0] == '2')}"
+                class="mt-4 flex items-center gap-1.5 text-[11px] font-bold text-[#346538]">
+          <svg class="icon" width="15" height="15"><use th:href="@{/images/admin/icons.svg} + '#i-chat'"/></svg>답변 달기
+        </button>
+      </article>
+      <div id="reviewEmpty" th:hidden="${state != 'empty'}" class="rounded-[20px] bg-white py-14 text-center shadow-[0_5px_18px_rgba(36,58,39,.06)]">
+        <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#f3f5f3] text-[#a3aaa4]">
+          <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-star'"/></svg>
+        </span>
+        <p class="mt-3 text-[11px] font-bold text-[#747c76]">선택한 별점의 리뷰가 없습니다.</p>
+      </div>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/review.js}"></script></th:block>
+</body>
+</html>

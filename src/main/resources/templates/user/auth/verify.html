@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U 회원가입 인증번호 입력 (G-A11~A12)
+  state: (기본) 미입력 | filled (6자리 입력 완료)
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='인증번호 입력', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/auth.css}">
+</head>
+<body>
+<div class="app-shell auth-shell"
+     th:with="state=${param.state != null ? param.state[0] : (state ?: '')}, filled=${state == 'filled'}">
+  <div class="screen form-page auth-form-page" data-verify>
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/signup})}"></a>
+    </div>
+    <div class="form-content verify-page">
+      <div class="signup-copy"><span data-user-name>김무브</span>님,<br>인증번호를 입력해 주세요</div>
+      <div class="verify-help">인증번호 문자 메시지가 <b>010</b>으로 발송되었습니다.</div>
+      <div class="otp-row" data-otp>
+        <input class="otp-box" type="text" inputmode="numeric" maxlength="1" aria-label="인증번호 1번째 자리" autocomplete="one-time-code"
+               th:value="${filled} ? '1' : ''" th:classappend="${filled} ? 'otp-filled'">
+        <input class="otp-box" type="text" inputmode="numeric" maxlength="1" aria-label="인증번호 2번째 자리"
+               th:value="${filled} ? '2' : ''" th:classappend="${filled} ? 'otp-filled'">
+        <input class="otp-box" type="text" inputmode="numeric" maxlength="1" aria-label="인증번호 3번째 자리"
+               th:value="${filled} ? '3' : ''" th:classappend="${filled} ? 'otp-filled'">
+        <input class="otp-box" type="text" inputmode="numeric" maxlength="1" aria-label="인증번호 4번째 자리"
+               th:value="${filled} ? '4' : ''" th:classappend="${filled} ? 'otp-filled'">
+        <input class="otp-box" type="text" inputmode="numeric" maxlength="1" aria-label="인증번호 5번째 자리"
+               th:value="${filled} ? '5' : ''" th:classappend="${filled} ? 'otp-filled'">
+        <input class="otp-box" type="text" inputmode="numeric" maxlength="1" aria-label="인증번호 6번째 자리"
+               th:value="${filled} ? '6' : ''" th:classappend="${filled} ? 'otp-filled'">
+      </div>
+      <div class="otp-meta">
+        <span class="otp-timer" data-timer th:attr="data-seconds=${filled} ? 178 : 180" th:text="${filled} ? '02:58' : '03:00'">03:00</span>
+        <div class="action otp-resend" role="button" tabindex="0" data-otp-resend>재발송</div>
+      </div>
+      <a class="action form-submit verify-submit" th:href="@{/signup/welcome}" data-verify-submit
+         th:classappend="${filled} ? 'primary' : 'next-button is-disabled'" th:attr="aria-disabled=${!filled}">인증 완료</a>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/auth.js}"></script>
+</body>
+</html>

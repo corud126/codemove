@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!--/* SCR-A-006 채팅 목록
+  state: (기본) 전체 15 · menu(A 필터·정렬 메뉴) · sort(정렬 팝업) · empty(B 검색 결과 없음)
+  filter: all | waiting(채팅 관리 ② 대기 상담 바로 확인) | unread */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='채팅 목록', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div class="icons-2 relative flex h-full min-h-0 flex-col bg-[#f5f6f8]" data-chat-list>
+    <header class="flex h-14 shrink-0 items-center justify-between border-b border-[#e8ece8] bg-white px-4">
+      <div class="flex items-center gap-1">
+        <a th:href="@{/admin/chats}" aria-label="채팅 관리로 돌아가기" data-back-link data-history-back hidden
+           class="-ml-2 grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#3f4941] hover:bg-[#f2f5f2]">
+          <svg class="icon rotate-180" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-arrowRight'"/></svg>
+        </a>
+        <h2 class="text-xl font-extrabold tracking-[-0.03em] text-[#346538]">채팅</h2>
+      </div>
+      <div class="flex items-center gap-1">
+        <!--/* ② 검색 */-->
+        <button type="button" aria-label="채팅 검색" data-search-open
+                class="grid h-10 w-10 place-items-center rounded-full text-[#3f4941] hover:bg-[#f2f5f2] aria-pressed:bg-[#f2f5f2]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        </button>
+        <!--/* ③ 필터 · 정렬 메뉴 */-->
+        <div class="relative">
+          <button type="button" aria-label="채팅 목록 메뉴" aria-expanded="false" data-menu-toggle
+                  class="grid h-10 w-10 place-items-center rounded-full text-[#3f4941] hover:bg-[#f2f5f2] aria-expanded:bg-[#f2f5f2]">
+            <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons.svg} + '#i-menu'"/></svg>
+          </button>
+          <div data-menu hidden
+               class="absolute right-0 top-11 z-30 w-36 overflow-hidden rounded-xl border border-[#e2e7e2] bg-white p-1.5 shadow-[0_12px_32px_rgba(34,53,37,.16)]">
+            <button type="button" data-filter="all" class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#4d554f]">전체</button>
+            <button type="button" data-filter="waiting" class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#4d554f]">대기</button>
+            <button type="button" data-filter="unread" class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#4d554f]">안 읽음</button>
+            <div class="my-1 border-t border-[#edf0ed]"></div>
+            <button type="button" data-sort-open
+                    class="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#4d554f] hover:bg-[#f5f6f5]">
+              정렬 <span class="text-xs text-[#8c948e]" data-sort-label>최신 순</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div data-search hidden class="flex shrink-0 items-center gap-2 border-b border-[#e8ece8] bg-white px-4 py-2.5">
+      <label class="flex flex-1 items-center gap-2 rounded-full bg-[#f2f3f5] px-4 py-2.5">
+        <svg class="icon text-[#8b928d]" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        <input type="search" data-search-input aria-label="고객 이름 또는 대화 내용 검색" placeholder="이름 또는 대화 내용을 입력하세요"
+               class="min-w-0 flex-1 bg-transparent text-sm text-[#29302b] outline-none placeholder:text-[#9ca29e] [&::-webkit-search-cancel-button]:hidden">
+        <button type="button" aria-label="검색어 지우기" data-search-clear hidden class="text-[#a34d45]">
+          <svg class="icon" width="13" height="13"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+        </button>
+        <span data-search-count hidden class="text-xs font-semibold text-[#718074]">0건</span>
+      </label>
+      <button type="button" aria-label="검색 닫기" data-search-close
+              class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#626a64] hover:bg-[#f2f3f5]">
+        <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+      </button>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-3">
+      <!--/* ① 전체 채팅 수 · 정렬 기준 */-->
+      <div class="mb-2 flex items-center justify-between px-1">
+        <span class="text-xs font-semibold text-[#7c847e]"><span data-count-label>전체 채팅</span> <span data-count>15</span></span>
+        <span class="text-xs text-[#9aa09b]" data-sort-label>최신 순</span>
+      </div>
+      <!--/* ④ 채팅방 · ⑤ 대기 중 배지 · 안 읽은 수 */-->
+      <div data-rooms>
+        <a th:each="r : ${ {'홍길동|혹시 사다리차 추가 비용이 발생하나요?|방금|1|3|15|luxury', '김명품|엘리베이터를 사용하지 못하는데요?|2분 전|1|2|14|luxury2', '박철수|네, 알겠습니다. 내일 뵙겠습니다.|오후 3:30|0|0|13|park789', '최지우|에어컨 이전 설치도 같이 되나요?|8분 전|1|4|12|choi00', '강민주|포장 박스는 언제 가져다 주시나요?|12분 전|1|2|11|kang22', '이서준|견적서 확인했습니다.|오전 10:15|0|0|10|lee01', '윤아름|귀중품은 따로 챙겨야 하나요?|18분 전|1|1|9|yoon44', '송지호|이사 시작 시간은 몇 시인가요?|어제|0|0|8|song90', '정현우|주소 변경은 어디서 하나요?|어제|0|1|7|jung11', '한유진|계약금 입금 완료했습니다.|어제|0|0|6|han26', '오도현|방문 견적 일정을 변경하고 싶어요.|월요일|0|1|5|oh03', '문지안|침대 분해와 조립도 부탁드려요.|월요일|0|0|4|moon08', '임지수|주차 공간 사진 보내드립니다.|일요일|0|0|3|lim19', '김도윤|카드 결제가 가능한가요?|토요일|0|0|2|kim24', '이지민|친절한 안내 감사합니다.|금요일|0|0|1|jimin31'} }"
+           th:with="t=${#strings.arraySplit(r, '|')}"
+           th:href="@{/admin/chats/{id}(id=${t[6]})}"
+           th:attr="data-name=${t[0]},data-msg=${t[1]},data-waiting=${t[3]},data-unread=${t[4]},data-activity=${t[5]}"
+           class="mb-2 flex w-full items-center gap-3 rounded-2xl border border-white bg-white p-3.5 text-left shadow-[0_3px_12px_rgba(36,58,39,.05)] transition active:scale-[.99]">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#edf3ed] text-sm font-extrabold text-[#346538]"
+                th:text="${#strings.substring(t[0], 0, 1)}">홍</span>
+          <span class="min-w-0 flex-1">
+            <strong class="block truncate text-sm text-[#29302b]" th:text="${t[0]}">홍길동</strong>
+            <span class="mt-1 block truncate text-xs text-[#737b75]" th:text="${t[1]}">혹시 사다리차 추가 비용이 발생하나요?</span>
+          </span>
+          <span class="flex shrink-0 flex-col items-end gap-1.5">
+            <span class="text-[10px] text-[#9aa09b]" th:text="${t[2]}">방금</span>
+            <span th:if="${t[3] == '1'}" class="rounded-full bg-[#fff0ee] px-2 py-1 text-[10px] font-bold text-[#bd5147]">대기 중</span>
+            <span th:if="${t[4] != '0'}" th:text="${t[4]}"
+                  class="grid h-5 min-w-5 place-items-center rounded-full bg-[#346538] px-1 text-[10px] font-bold text-white">3</span>
+          </span>
+        </a>
+      </div>
+      <div data-empty hidden class="grid place-items-center py-20 text-center">
+        <span class="mb-3 grid h-12 w-12 place-items-center rounded-full bg-white text-[#9aa29c]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        </span>
+        <p class="text-sm font-semibold text-[#656d67]">일치하는 채팅이 없습니다</p>
+        <p class="mt-1 text-xs text-[#979d98]">이름 또는 대화 내용을 다시 확인해 주세요.</p>
+      </div>
+    </div>
+
+    <!--/* 채팅방 순서 정렬 */-->
+    <div id="sortModal" data-layer hidden role="dialog" aria-modal="true"
+         class="absolute inset-0 z-40 grid place-items-center bg-[#1f2d21]/40 p-6 backdrop-blur-[2px]">
+      <div class="w-full rounded-[20px] bg-white p-5 shadow-[0_20px_50px_rgba(25,42,28,.24)]">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-extrabold text-[#29302b]">채팅방 순서 정렬</h3>
+          <button type="button" aria-label="정렬 창 닫기" data-close class="grid h-8 w-8 place-items-center rounded-full hover:bg-[#f2f3f5]">
+            <svg class="icon" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+          </button>
+        </div>
+        <div class="mt-4 space-y-2">
+          <label th:each="o : ${ {'latest|최신 순|최근 메시지를 받은 채팅부터 표시', 'unread|안 읽은 순|읽지 않은 메시지가 많은 채팅부터 표시'} }"
+                 th:with="t=${#strings.arraySplit(o, '|')}"
+                 class="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e7eae7] p-3.5 has-checked:border-[#9db39f] has-checked:bg-[#f1f6f1]">
+            <input type="radio" name="chatSort" class="accent-[#346538]" th:value="${t[0]}" th:checked="${t[0] == 'latest'}">
+            <span>
+              <strong class="block text-sm text-[#303832]" th:text="${t[1]}">최신 순</strong>
+              <span class="mt-0.5 block text-xs text-[#8a918c]" th:text="${t[2]}">설명</span>
+            </span>
+          </label>
+        </div>
+        <button type="button" data-sort-apply class="mt-5 h-11 w-full rounded-xl bg-[#346538] text-sm font-bold text-white">적용</button>
+      </div>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/chat.js}"></script></th:block>
+</body>
+</html>

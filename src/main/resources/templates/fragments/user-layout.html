@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* 사용자 앱 공통 fragment
+  사용 예)
+  <head th:replace="~{fragments/user-layout :: head(title='홈', links=~{::link})}">
+    <link rel="stylesheet" th:href="@{/css/user/home.css}">
+  </head>
+  <div th:replace="~{fragments/user-layout :: header(notificationCount=1)}"></div>
+  <nav th:replace="~{fragments/user-layout :: bottomNav(active='home', locked=false)}"></nav>
+  <th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+  <th:block th:replace="~{fragments/user-layout :: splash}"></th:block>   (앱 진입 화면만, .app-shell 안)
+*/-->
+
+<head th:fragment="head(title, links)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <script>
+    // 반응형 프레임: 화면은 설계 폭 430px 로 그리고 기기에 맞게 배율(--frame-zoom)·높이(--app-h)를 정한다 (첫 렌더 전에 실행)
+    //  휴대폰(폭 480px 미만): 기기 폭에 꽉 차게, 높이 = 기기 높이 ÷ 배율
+    //  PC·태블릿: 430 × 932 프레임, 창이 작으면 비율 유지 축소
+    (function () {
+      const root = document.documentElement;
+      function fit() {
+        const phone = innerWidth < 480;
+        const zoom = phone ? innerWidth / 430 : Math.min(1, (innerHeight - 48) / 932, (innerWidth - 32) / 430);
+        root.style.setProperty('--frame-zoom', zoom.toFixed(4));
+        root.style.setProperty('--app-h', (phone ? innerHeight / zoom : 932).toFixed(2) + 'px');
+      }
+      fit();
+      addEventListener('resize', fit);
+    })();
+  </script>
+  <title th:text="${title} + ' | 명품익스프레스'">명품익스프레스</title>
+  <link rel="stylesheet" th:href="@{/css/user/app.css}">
+  <th:block th:replace="${links}"/>
+</head>
+
+<body>
+
+<!--/* 브랜드 마크 (집 + 미소) */-->
+<svg th:fragment="brandMark(cls)" aria-hidden="true" th:class="'brand-mark ' + ${cls}" viewBox="0 0 132 130" xmlns="http://www.w3.org/2000/svg">
+  <path class="brand-mark-house" d="M54 5a18 18 0 0 1 24 0l44 38a29 29 0 0 1 10 22v42a23 23 0 0 1-23 23H23A23 23 0 0 1 0 107V65a29 29 0 0 1 10-22L54 5Z"/>
+  <path class="brand-mark-smile" d="M35 80c17 16 45 16 62 0"/>
+</svg>
+
+<!--/* 상단 헤더: 로고 · 일반/쉬운 모드 · 알림 */-->
+<div th:fragment="header(notificationCount)" class="app-header">
+  <div class="brand-row">
+    <a class="action brand-home" th:href="@{/}" aria-label="홈으로 이동">
+      <svg th:replace="~{:: brandMark('header-brand-mark')}"></svg>
+    </a>
+  </div>
+  <div class="header-actions">
+    <div class="mode-toggle">
+      <div class="action mode-active" role="button" tabindex="0" data-mode="standard" aria-label="일반 모드">일반</div>
+      <div class="action" role="button" tabindex="0" data-mode="easy" aria-label="쉬운 모드">쉬운</div>
+    </div>
+    <a class="action notification-button" th:href="@{/notifications}" aria-label="알림">
+      <img alt="" class="bell" th:src="@{/images/user/0ebe3.svg}">
+      <span class="notification-dot" th:if="${notificationCount > 0}"></span>
+    </a>
+  </div>
+</div>
+
+<!--/* 뒤로 가기 버튼. href 미지정 시 history.back() */-->
+<a th:fragment="back(href)" class="action back" th:href="${href} ?: '#'" th:attr="data-back=${href == null}" aria-label="뒤로 가기">
+  <img alt="" th:src="@{/images/user/4bbcf.svg}">
+</a>
+
+<!--/* 하단 탭: active = home | move | quote | chat | more, locked = 비회원(홈 외 잠금) */-->
+<nav th:fragment="bottomNav(active, locked)" class="bottom-nav">
+  <a class="action nav-item" th:href="${locked} ? @{/(state='guest')} : @{/}" th:classappend="${active == 'home'} ? 'selected'" aria-label="홈">
+    <div class="nav-icon"><img alt="" th:src="${active == 'home'} ? @{/images/user/b676d.svg} : @{/images/user/home-outline.svg}"></div>
+    <div>홈</div>
+  </a>
+  <a class="action nav-item" th:href="${locked} ? @{/login} : @{/move}" th:classappend="|${active == 'move' ? 'selected' : ''} ${locked ? 'nav-locked' : ''}|" aria-label="내 이사">
+    <div class="nav-icon"><img alt="" th:src="${active == 'move'} ? @{/images/user/move-active.svg} : @{/images/user/05dbf.svg}"></div>
+    <div>내 이사</div>
+  </a>
+  <a class="action nav-item nav-center" th:href="${locked} ? @{/login} : @{/quote}" th:classappend="|${active == 'quote' ? 'selected' : ''} ${locked ? 'nav-locked' : ''}|" aria-label="이사견적">
+    <div class="nav-icon-center"><img alt="" th:src="@{/images/user/b046e.svg}"></div>
+    <div>이사견적</div>
+  </a>
+  <a class="action nav-item" th:href="${locked} ? @{/login} : @{/chat}" th:classappend="|${active == 'chat' ? 'selected' : ''} ${locked ? 'nav-locked' : ''}|" aria-label="채팅">
+    <div class="nav-icon"><img alt="" th:src="${active == 'chat'} ? @{/images/user/chat-active.svg} : @{/images/user/d6860.svg}"></div>
+    <div>채팅</div>
+  </a>
+  <a class="action nav-item" th:href="${locked} ? @{/login} : @{/more}" th:classappend="|${active == 'more' ? 'selected' : ''} ${locked ? 'nav-locked' : ''}|" aria-label="더보기">
+    <div class="nav-icon"><img alt="" th:src="${active == 'more'} ? @{/images/user/more-active.svg} : @{/images/user/4caa7.svg}"></div>
+    <div>더보기</div>
+  </a>
+</nav>
+
+<!--/* 스플래시 (앱 진입 화면에 포함, .app-shell 안에 둔다)
+  브라우저 세션당 처음 한 번 표시 후 사라진다. ?splash=1 이면 다시 표시, ?splash=hold 이면 사라지지 않고 유지, ?splash=off 이면 표시 안 함(확인용). */-->
+<th:block th:fragment="splash">
+  <div class="splash" id="splash" aria-hidden="true">
+    <svg th:replace="~{:: brandMark('splash-brand-mark')}"></svg>
+    <div class="splash-title">명품익스프레스</div>
+  </div>
+  <script>
+    (function () {
+      const KEY = 'codemove.splashShown';
+      const el = document.getElementById('splash');
+      const param = new URLSearchParams(location.search).get('splash');
+      let shown = false;
+      try { shown = sessionStorage.getItem(KEY) === '1'; sessionStorage.setItem(KEY, '1'); } catch (_) { /* 저장 불가 시 매번 표시 */ }
+      if ((shown && !param) || param === 'off') { el.remove(); return; }
+      if (param === 'hold') { el.querySelector('.splash-title').classList.add('font-ready'); return; }
+      // 브랜드 글꼴 로드(최대 0.45초) → 제목 표시 → 0.65초 후 페이드아웃
+      const fontReady = document.fonts ? document.fonts.load('700 26px "Gmarket Sans TTF:Bold"') : Promise.resolve();
+      Promise.race([fontReady, new Promise((r) => setTimeout(r, 450))]).finally(() => {
+        el.querySelector('.splash-title').classList.add('font-ready');
+        setTimeout(() => {
+          el.classList.add('splash-closing');
+          setTimeout(() => el.remove(), 220);
+        }, 650);
+      });
+    })();
+  </script>
+</th:block>
+
+<th:block th:fragment="scripts">
+  <script th:src="@{/js/user/app.js}"></script>
+</th:block>
+
+</body>
+</html>

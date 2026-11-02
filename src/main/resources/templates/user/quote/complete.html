@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U-010 견적 요청 완료 (G-C20 / 쉬운 모드 E-C20: ?mode=easy, 음성 안내 켜짐: &voice=on) */-->
+<head th:replace="~{fragments/user-layout :: head(title='견적 요청 완료', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/quote.css}">
+</head>
+<body>
+<div class="app-shell">
+  <!--/* 견적 요청 완료 박스 그림 (일반·쉬운 모드 공용) */-->
+  <div th:remove="all"><th:block th:fragment="successArt">
+    <svg aria-hidden="true" class="quote-success-art" viewBox="0 0 180 150">
+      <ellipse class="quote-success-art-shadow" cx="88" cy="135" rx="58" ry="8"/>
+      <path class="quote-success-art-side" d="m88 50 47 22v48l-47 17Z"/>
+      <path class="quote-success-art-front" d="m41 72 47-22v87l-47-17Z"/>
+      <path class="quote-success-art-top" d="m41 72 47 22 47-22-47-22Z"/>
+      <path class="quote-success-art-tape" d="m72 58 47 22v17l-12 5V86L60 64Z"/>
+      <circle class="quote-success-art-badge" cx="132" cy="45" r="24"/>
+      <path class="quote-success-art-check" d="m121 45 8 8 15-17"/>
+    </svg>
+  </th:block></div>
+
+  <!--/* 일반 모드 (G-C20) */-->
+  <div class="screen quote-success q-success" data-standard-only>
+    <section class="quote-success-main">
+      <th:block th:replace="~{:: successArt}"></th:block>
+      <strong>견적 요청을 보냈어요</strong>
+      <div class="quote-success-flow">
+        <span class="is-current">요청 접수</span><i></i><span>담당자 확인</span><i></i><span>견적 안내</span>
+      </div>
+    </section>
+    <div class="quote-success-actions">
+      <a class="action quote-success-primary" th:href="@{/move(tab='estimate')}">요청 내역 보기</a>
+      <a class="action quote-success-home" th:href="@{/}">홈으로</a>
+    </div>
+  </div>
+
+  <!--/* 쉬운 모드 (E-C20): 밝은 배경 + 2단계 안내 */-->
+  <div class="screen easy-quote-success q-success-easy" data-easy-only>
+    <div class="easy-success-utility">
+      <button type="button" class="action easy-voice-guide" data-q-voice aria-pressed="false"
+              data-voice-text="견적 요청을 잘 보냈어요. 명품익스프레스 담당자가 이사 내용을 확인합니다. 견적이 준비되면 알림으로 알려드릴게요.">
+        <svg aria-hidden="true" fill="none" height="24" viewBox="0 0 24 24" width="24"><path d="M5 10v4h3l4 3V7L8 10H5Z" fill="currentColor"/><path d="M15 9.5c.7.6 1 1.4 1 2.5s-.3 1.9-1 2.5M17.5 7c1.3 1.3 2 3 2 5s-.7 3.7-2 5" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/></svg>
+        <strong data-q-voice-label>음성으로 듣기</strong>
+        <span hidden>끄기</span>
+      </button>
+    </div>
+    <div class="easy-quote-success-content">
+      <div class="easy-quote-success-main">
+        <div class="easy-quote-success-art"><th:block th:replace="~{:: successArt}"></th:block></div>
+        <strong>견적 요청을 잘 보냈어요</strong>
+        <div class="easy-quote-success-guide">
+          <div class="easy-success-guide-row"><b>1</b><span>담당자가 이사 내용을 확인해요</span></div>
+          <div class="easy-success-guide-row"><b>2</b><span>견적이 준비되면 알려드려요</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="easy-quote-success-actions">
+      <a class="action easy-success-primary" th:href="@{/move(tab='estimate')}">요청 내역 확인하기</a>
+      <a class="action easy-success-home" th:href="@{/}">홈으로 돌아가기</a>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script>
+  /* 쉬운 모드 음성 안내 (Web Speech API) — ?voice=on 이면 켜진 상태로 시작 */
+  (function () {
+    const btn = document.querySelector('[data-q-voice]');
+    if (!btn) return;
+    let on = new URLSearchParams(location.search).get('voice') === 'on';
+    const synth = window.speechSynthesis;
+    function render() {
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', on);
+      btn.querySelector('[data-q-voice-label]').textContent = on ? '음성 안내 켜짐' : '음성으로 듣기';
+      btn.querySelector('span').hidden = !on;
+    }
+    function speak() {
+      if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+      synth.cancel();
+      if (!on) return;
+      const u = new SpeechSynthesisUtterance(btn.dataset.voiceText);
+      u.lang = 'ko-KR';
+      u.rate = 0.88;
+      u.onend = () => { on = false; render(); };
+      synth.speak(u);
+    }
+    btn.addEventListener('click', () => { on = !on; render(); speak(); });
+    window.addEventListener('pagehide', () => synth && synth.cancel());
+    render();
+    if (on) speak();
+  })();
+</script>
+</body>
+</html>

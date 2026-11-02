@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<!--/* SCR-A-014 알림 내역
+  state: (기본) 전체 팝업 알림 기록 · empty(A. 검색 결과 없음 — 검색어 '없는내용') */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='알림 내역', active='', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div class="icons-2 relative flex h-full min-h-0 flex-col bg-[#f5f6f8]" data-noti-history
+       th:with="isEmpty=${param.state != null and param.state[0] == 'empty'}" th:data-initial-query="${isEmpty} ? '없는내용' : null">
+    <header class="relative flex h-14 shrink-0 items-center justify-center border-b border-[#e5e9e5] bg-white">
+      <h2 class="text-base font-extrabold text-[#29322b]">알림 내역</h2>
+      <a th:href="@{/admin/notifications}" aria-label="알림 내역 닫기"
+         class="absolute right-3 grid h-10 w-10 place-items-center rounded-full text-[#525c54] hover:bg-[#f2f4f2]">
+        <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+      </a>
+    </header>
+
+    <!--/* ① 검색 */-->
+    <div class="shrink-0 px-4 pb-2 pt-4">
+      <label class="flex items-center gap-2 rounded-full bg-[#ecefee] px-4 py-3">
+        <svg class="icon shrink-0 text-[#858d87]" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        <input data-history-query type="text" aria-label="알림 내역 검색"
+               class="min-w-0 flex-1 bg-transparent text-sm text-[#303832] outline-none placeholder:text-[#9ca29e]"
+               placeholder="회원명 또는 알림 내용을 검색하세요">
+        <button type="button" data-history-clear hidden aria-label="검색어 지우기" class="grid h-5 w-5 place-items-center text-[#346538]">
+          <svg class="icon" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+        </button>
+        <span data-history-count hidden class="text-[10px] font-bold text-[#718074]">0건</span>
+      </label>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-2">
+      <!--/* ② 관리자 수신 / 사용자 수신 건수 */-->
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-2xl bg-white px-4 py-3 shadow-[0_3px_12px_rgba(36,58,39,.05)]">
+          <p class="text-[10px] font-semibold text-[#858d87]">관리자 수신</p>
+          <p class="mt-1 text-[15px] font-extrabold text-[#346538]"><span data-count-admin>8</span>건</p>
+        </div>
+        <div class="rounded-2xl bg-white px-4 py-3 shadow-[0_3px_12px_rgba(36,58,39,.05)]">
+          <p class="text-[10px] font-semibold text-[#858d87]">사용자 수신</p>
+          <p class="mt-1 text-[15px] font-extrabold text-[#346538]"><span data-count-user>10</span>건</p>
+        </div>
+      </div>
+
+      <!--/* ③ 전체 팝업 알림 기록 · ④ 알림 카드(대상, 수신자, 분류, 내용, 시간) */-->
+      <div class="mb-2 mt-4 flex items-center justify-between px-1">
+        <p class="text-xs font-bold text-[#68716a]">전체 팝업 알림 기록</p>
+        <span class="text-[10px] font-semibold text-[#969d98]">최신 발송순</span>
+      </div>
+      <div class="space-y-2" data-history-list>
+        <a th:each="r : ${ {
+              '관리자|admin|채팅 대기|강민주 고객님이 관리자 상담을 요청했습니다. 응답이 필요합니다.|10분 전|/admin/chats/kang22',
+              '이서준|admin|오늘의 일정|오늘(10/27)은 이서준 고객님의 ‘이사 확정’ 일정이 있습니다.|2시간 전|/admin/schedule',
+              '최지우|admin|이사 예약|최지우 고객님이 신규 가정이사 예약을 신청했습니다.|3시간 전|/admin/reservations',
+              '홍길동|admin|견적서 등록|홍길동 고객님의 신규 견적서가 접수되었습니다.|어제|/admin/estimates',
+              '김명품|admin|상태 변경|김명품 고객님의 예약 상태가 ‘승인 대기’에서 ‘견적 협의’로 변경되었습니다.|어제|/admin/reservations',
+              '홍길동|user|방문 견적|내일 오전 9시에 방문 견적이 예정되어 있습니다.|어제|/admin/schedule',
+              '김명품|user|견적서 등록|요청하신 이사 견적서가 등록되었습니다. 확인해 주세요.|어제|/admin/estimates',
+              '박철수|user|예약 확정|계약금 입금이 확인되어 이사 예약이 확정되었습니다.|2일 전|/admin/reservations',
+              '최지우|user|이사 D-3|이사 예정일이 3일 남았습니다. 준비 사항을 확인해 주세요.|2일 전|/admin/reservations',
+              '정현우|user|상태 변경|예약 상태가 승인 대기에서 견적 협의로 변경되었습니다.|3일 전|/admin/reservations',
+              '강민주|user|포장 박스|포장 박스 배송이 오늘 오후에 시작될 예정입니다.|3일 전|/admin/reservations',
+              '이서준|user|이사 당일|오늘은 이사 예정일입니다. 담당 기사 정보를 확인해 주세요.|4일 전|/admin/schedule',
+              '윤아름|user|이사 완료|이사 완료 처리가 되었습니다. 서비스 이용은 어떠셨나요?|5일 전|/admin/reservations',
+              '송지호|user|일정 변경|방문 견적 일정이 10월 2일 오후 2시로 변경되었습니다.|6일 전|/admin/schedule',
+              '박철수|admin|내용 수정|박철수 고객님의 이사 희망 일정이 관리자에 의해 수정되었습니다.|8일 전|/admin/reservations',
+              '한유진|user|견적 접수|견적 요청이 정상적으로 접수되었습니다.|10일 전|/admin/estimates',
+              '윤아름|admin|신규 가입|새로운 고객(yoon44)이 시스템에 신규 회원으로 등록되었습니다.|12일 전|/admin/members',
+              '관리자|admin|데이터 삭제|퀵메뉴 설정에서 ‘결제 문의’ 항목이 성공적으로 삭제되었습니다.|15일 전|/admin/chats/entry'} }"
+                 th:with="t=${#strings.arraySplit(r, '|')}" th:href="@{${t[5]}}"
+                 th:attr="data-recipient=${t[1]},data-search=${t[0] + ' ' + t[2] + ' ' + t[3]}"
+                 class="flex items-center gap-3 rounded-2xl border border-white bg-white p-3.5 shadow-[0_3px_12px_rgba(36,58,39,.05)]">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#edf3ed] text-sm font-extrabold text-[#346538]"
+                th:text="${#strings.substring(t[0], 0, 1)}">관</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-start justify-between gap-2">
+              <strong class="truncate text-sm text-[#303832]" th:text="${t[0]}">관리자</strong>
+              <span class="shrink-0 pt-0.5 text-[9px] text-[#9aa09b]" th:text="${t[4]}">10분 전</span>
+            </div>
+            <div class="mt-1 flex items-center gap-1.5">
+              <span class="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                    th:classappend="${t[1] == 'admin'} ? 'bg-[#fff0ee] text-[#bd5147]' : 'bg-[#edf3ed] text-[#346538]'"
+                    th:text="${t[1] == 'admin'} ? '관리자 수신' : '사용자 수신'">관리자 수신</span>
+              <span class="truncate text-[10px] text-[#7d847f]" th:text="${t[2]}">채팅 대기</span>
+            </div>
+            <p class="mt-1 truncate text-xs text-[#5f6761]" th:text="${t[3]}">내용</p>
+          </div>
+        </a>
+      </div>
+      <div data-history-empty hidden class="py-20 text-center">
+        <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white text-[#9aa19b]">
+          <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+        </span>
+        <p class="mt-3 text-xs font-semibold text-[#747c76]">검색 결과가 없습니다.</p>
+      </div>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/notification.js}"></script></th:block>
+</body>
+</html>

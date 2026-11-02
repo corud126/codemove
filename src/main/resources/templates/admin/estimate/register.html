@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!--/* SCR-A-003 견적서 등록 ① 첨부·인식 / SCR-A-004 견적서 등록 ② 수정·등록 (견적 관리 > [+ 등록])
+  상태(A-003): (기본 STEP 1) | ?state=chooser (A 첨부 방식 선택) | ?state=photo-preview (B 사진 미리보기) | ?state=analyzing (C AI 분석 중)
+  상태(A-004): ?state=step2 (STEP 2 견적서 수정) | ?state=step3 (A STEP 3 미리보기) | ?state=step4 (B STEP 4 견적 등록)
+              ?state=unrecognized (STEP 4, 담당자 미인식 → 등록 비활성) | ?state=pdf-preview | ?state=pdf-register (PDF 3단계: 이름·날짜 직접 입력)
+  첨부 → AI 인식(모의) → 수정 → 미리보기 → 등록 흐름은 estimate.js */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='견적서 등록', active='estimate', fixed=false, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div id="estimateRegister" class="px-4 pb-28 pt-6" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}, data-list-url=@{/admin/estimates}">
+    <!--/* 단계 표시 — 사진: 첨부·수정·미리보기·견적 등록 / PDF: 첨부·미리보기·견적 등록 (estimate.js 가 갱신) */-->
+    <div id="registerSteps" class="mb-5 px-2 pt-1">
+      <div class="flex items-center">
+        <th:block th:each="s, i : ${ {'첨부', '수정', '미리보기', '견적 등록'} }">
+          <div class="flex min-w-0 flex-col items-center gap-1.5">
+            <span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-extrabold"
+                  th:classappend="${i.first} ? 'bg-[#346538] text-white' : 'bg-[#eef0ee] text-[#929994]'" th:text="${i.count}">1</span>
+            <span class="whitespace-nowrap text-[8px] font-bold" th:classappend="${i.first} ? 'text-[#346538]' : 'text-[#8a918c]'" th:text="${s}">첨부</span>
+          </div>
+          <span th:unless="${i.last}" class="mx-2 mb-5 h-px flex-1 bg-[#dfe4df]"></span>
+        </th:block>
+      </div>
+    </div>
+
+    <!--/* STEP 1 첨부 */-->
+    <div data-step="1">
+      <h2 class="px-1 text-[24px] font-extrabold tracking-[-0.04em] text-[#346538]">견적서 등록</h2>
+      <section id="attachCard" class="relative mt-5 overflow-hidden rounded-[22px] border border-[#e0e6e1] bg-white p-6 shadow-[0_5px_18px_rgba(36,58,39,.06)]">
+        <span class="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#79917c]">Step 1</span>
+        <button type="button" data-open="#attachChooser" class="mt-5 block w-full text-center">
+          <span class="mx-auto flex w-fit items-center gap-3">
+            <span class="grid h-14 w-14 place-items-center rounded-2xl bg-[#edf3ed] text-[#346538]">
+              <svg class="icon" width="27" height="27"><use th:href="@{/images/admin/icons.svg} + '#i-camera'"/></svg>
+            </span>
+            <span class="grid h-14 w-14 place-items-center rounded-2xl bg-[#edf3ed] text-[#346538]">
+              <svg class="icon" width="26" height="26"><use th:href="@{/images/admin/icons.svg} + '#i-document'"/></svg>
+            </span>
+          </span>
+          <strong class="mx-auto mt-5 block max-w-[290px] text-[16px] leading-6 text-[#303832]">과거 수기 견적서를 촬영하거나 PDF 파일을 첨부하세요.</strong>
+          <span class="mt-2 block text-[10px] text-[#8f9691]">AI가 텍스트를 자동 인식하여 아래 필드에 입력합니다.</span>
+        </button>
+
+        <!--/* 선택한 파일 */-->
+        <div id="selectedFile" hidden class="mt-5 flex items-center gap-2 rounded-xl bg-[#f6f8f6] px-3 py-2.5 text-left">
+          <svg class="icon text-[#346538]" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-document'"/></svg>
+          <span class="min-w-0 flex-1 truncate text-[10px] font-semibold text-[#59615b]" data-file-name>photo.jpg</span>
+        </div>
+
+        <!--/* B 촬영 이미지 미리보기 */-->
+        <div id="photoPreview" hidden class="mt-5 rounded-2xl border border-[#e1e6e1] bg-[#f8f9f8] p-3">
+          <p class="mb-2 text-left text-[10px] font-extrabold text-[#4c554e]">촬영 이미지 미리보기</p>
+          <div class="lined-paper h-44 w-full overflow-hidden rounded-xl">
+            <img hidden alt="촬영한 수기 견적서 미리보기" class="h-full w-full object-cover" data-preview-img>
+          </div>
+          <div class="mt-3 flex justify-end gap-2">
+            <button type="button" id="retakeButton" class="rounded-lg border border-[#d8ded9] bg-white px-3 py-2 text-[10px] font-bold text-[#707871]">다시 촬영</button>
+            <button type="button" id="analyzeButton" class="rounded-lg bg-[#346538] px-4 py-2 text-[10px] font-bold text-white">확인</button>
+          </div>
+        </div>
+
+        <!--/* 첨부 썸네일 */-->
+        <div id="attachThumb" hidden class="lined-paper absolute bottom-3 right-3 h-14 w-12 rotate-3 overflow-hidden rounded-lg border-2 border-white shadow-[0_4px_12px_rgba(34,43,36,.2)]">
+          <img hidden alt="" class="h-full w-full object-cover" data-preview-img>
+        </div>
+
+        <!--/* A 첨부 방식 선택 시트 */-->
+        <div id="attachChooser" data-layer hidden class="absolute inset-0 z-10 flex items-end bg-[#1e2b20]/35 p-4 backdrop-blur-[2px]">
+          <div class="w-full rounded-[18px] bg-white p-4 shadow-xl [animation:slideUp_.2s_ease-out]">
+            <div class="mb-4 flex items-center justify-between">
+              <p class="text-[13px] font-extrabold text-[#303832]">첨부 방식 선택</p>
+              <button type="button" aria-label="첨부 방식 닫기" data-close class="grid h-8 w-8 place-items-center rounded-full bg-[#f1f4f1] text-[#677068]">
+                <svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="flex cursor-pointer flex-col items-center gap-2 rounded-xl bg-[#edf3ed] p-4 text-[#346538]">
+                <input type="file" accept="image/*" capture="environment" class="sr-only" id="photoInput">
+                <svg class="icon" width="25" height="25"><use th:href="@{/images/admin/icons.svg} + '#i-camera'"/></svg>
+                <span class="text-[10px] font-bold">사진 촬영</span>
+              </label>
+              <label class="flex cursor-pointer flex-col items-center gap-2 rounded-xl bg-[#edf3ed] p-4 text-[#346538]">
+                <input type="file" accept=".pdf,application/pdf" class="sr-only" id="pdfInput">
+                <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons.svg} + '#i-document'"/></svg>
+                <span class="text-[10px] font-bold">PDF 첨부</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!--/* C AI 분석 중 */-->
+        <div id="analyzing" hidden class="absolute inset-0 z-20 grid place-items-center rounded-[22px] bg-white/92 backdrop-blur-sm">
+          <div class="text-center">
+            <span class="mx-auto block h-9 w-9 animate-spin rounded-full border-2 border-[#dce7dd] border-t-[#346538]"></span>
+            <p class="mt-3 text-[11px] font-bold text-[#346538]">AI가 견적서를 분석하고 있습니다</p>
+            <p class="mt-1 text-[9px] text-[#929994]">완료되면 Step 2로 이동합니다.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!--/* STEP 2 견적서 수정 (인식 결과를 문서 위에서 직접 고침) */-->
+    <div data-step="2" hidden>
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <p class="text-[9px] font-extrabold tracking-[.12em] text-[#7a927d]">STEP 2</p>
+          <h2 class="mt-1 text-[20px] font-extrabold text-[#346538]">견적서 수정</h2>
+        </div>
+        <button type="button" data-goto-step="3" class="h-9 rounded-xl bg-[#346538] px-4 text-[11px] font-extrabold text-white">다음</button>
+      </div>
+      <div id="draftViewer"><th:block th:replace="~{admin/estimate/sheet :: viewer(download=false, action='')}"/></div>
+    </div>
+
+    <!--/* STEP 3 견적서 미리보기 */-->
+    <div data-step="3" hidden>
+      <div class="mb-4 flex items-center justify-between">
+        <button type="button" id="previewBack" class="flex items-center gap-1 text-[10px] font-bold text-[#59625b]">
+          <svg class="icon rotate-180" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-arrowRight'"/></svg><span data-back-label>수정으로</span>
+        </button>
+        <h2 class="text-[16px] font-extrabold text-[#29312b]">견적서 미리보기</h2>
+        <button type="button" data-goto-step="4" class="h-9 rounded-xl bg-[#346538] px-4 text-[11px] font-extrabold text-white">다음</button>
+      </div>
+      <div id="previewViewer"><th:block th:replace="~{admin/estimate/sheet :: viewer(download=true, action='')}"/></div>
+    </div>
+
+    <!--/* STEP 4 견적 등록 */-->
+    <div data-step="4" hidden>
+      <section class="rounded-[20px] bg-white p-5 shadow-[0_5px_18px_rgba(36,58,39,.06)]">
+        <p class="text-[9px] font-extrabold tracking-[.12em] text-[#7a927d]" data-step4-label>STEP 4</p>
+        <h2 class="mt-1 text-[20px] font-extrabold text-[#346538]">견적 등록</h2>
+        <!--/* 사진: 인식 정보 사용 */-->
+        <div data-photo-only>
+          <p class="mt-5 rounded-xl bg-[#f7f8f7] px-4 py-3 text-[11px] text-[#59615b]">견적서에서 인식한 담당자와 견적일이 등록 정보로 사용됩니다.</p>
+          <p id="unrecognizedNotice" hidden class="mt-2 px-1 text-[10px] font-semibold text-[#b9574f]">담당자 또는 견적일을 인식하지 못했습니다. [이전]으로 돌아가 STEP 2에서 직접 입력해 주세요.</p>
+        </div>
+        <!--/* PDF: 이름·날짜 직접 입력 */-->
+        <div data-pdf-only hidden class="mt-5 space-y-3">
+          <label class="block"><span class="mb-1.5 block text-[10px] font-bold text-[#687069]">이름</span>
+            <input id="registerName" type="text" placeholder="고객 이름을 입력하세요"
+                   class="h-11 w-full rounded-xl border border-[#dfe4df] bg-white px-3 text-[12px] font-semibold outline-none focus:border-[#346538]"></label>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-bold text-[#687069]">날짜</span>
+            <input id="registerDate" type="text" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD"
+                   class="h-11 w-full rounded-xl border border-[#dfe4df] bg-white px-3 text-[12px] font-semibold outline-none focus:border-[#346538]"></label>
+        </div>
+        <label class="mt-5 block">
+          <span class="mb-2 block text-[10px] font-extrabold text-[#59615b]">분류</span>
+          <select id="registerStatus" class="h-11 w-full rounded-xl border border-[#dfe4df] bg-white px-3 text-[12px] font-semibold">
+            <option>견적 검토</option><option>견적 승인</option><option>견적 확정</option>
+          </select>
+        </label>
+      </section>
+      <div class="mt-4 grid grid-cols-[1fr_2fr] gap-2">
+        <button type="button" data-goto-step="3" class="h-12 rounded-xl border border-[#d9ded9] bg-white text-[11px] font-bold">이전</button>
+        <button type="button" id="registerSubmit" class="h-12 rounded-xl bg-[#346538] text-[12px] font-extrabold text-white disabled:opacity-40">견적 관리에 등록</button>
+      </div>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts">
+  <link rel="stylesheet" th:href="@{/css/admin/estimate.css}">
+  <script th:src="@{/js/admin/estimate.js}"></script>
+</th:block>
+</body>
+</html>

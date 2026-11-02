@@ -1,0 +1,26 @@
+/* 온보딩 · 로그인 · 회원가입 (G-A01~A13) — app.css 프로토타입 스타일을 캡처 기준으로 보정 */
+
+/* 로그인 방법 선택 바텀시트 레이어 (G-A04) */
+.login-layer { position: fixed; z-index: 30; inset: 0; }
+.account-help a.action { display: inline; }
+
+/* 입력칸: 프로토타입 contentEditable div → input */
+input.field { display: block; height: 40px; width: 100%; max-width: none; margin: 0; border: 0; border-bottom: 1px solid #d9d9d9; border-radius: 0; background: transparent; color: var(--body); font-family: "Pretendard:SemiBold", sans-serif; font-size: 16px; }
+input.field::placeholder { color: #d9d9d9; opacity: 1; }
+input.field:focus, input.field.is-focused { border-color: var(--green); }
+label.field-label { display: block; }
+/* 쉬운 모드 48px 입력칸: 프로토타입(div)처럼 글자를 위쪽 8px 에 둔다 (input 은 세로 가운데 정렬이라 3px 내려감) */
+.easy-mode input.field { height: 48px; padding: 8px 4px 12px; }
+
+/* 개인정보 수집 동의 행 */
+.terms-link { min-width: 0; color: #5a5a5a; }
+.terms-row span svg { display: block; }
+.terms-row span:not(.terms-checked) svg { visibility: hidden; }
+.signup-copy + .field-wrap { margin-top: 24px; }
+
+/* ── 쉬운 모드 (E-A01~A13) ──
+   app.css 의 .easy-mode .form-title(22px) · .field(48px/18px) · .form-submit(60px/18px) 를 그대로 쓰고,
+   캡처에서 커진 부분만 보정한다. 온보딩·개인정보 안내·인증번호·가입 완료는 일반 모드와 동일. */
+.easy-mode .onboarding-actions .action { font-size: 17px; }
+.easy-mode .sheet-title { font-size: 17px; }
+.easy-mode .phone-button { font-size: 17px; }

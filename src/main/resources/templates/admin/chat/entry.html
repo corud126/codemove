@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<!--/* SCR-A-009 첫화면/퀵메뉴 설정
+  state: (기본) 퀵메뉴 2개 · greeting(A 인사말 수정) · preview(B 미리보기) · menu(퀵메뉴 조회) · delete(퀵메뉴 삭제 확인) · full(4개 등록 · 처리불가) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='첫화면/퀵메뉴 설정', active='', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div class="icons-2 relative flex h-full min-h-0 flex-col overflow-hidden bg-[#f5f6f8]" data-chat-entry>
+    <header class="relative flex h-14 shrink-0 items-center justify-center border-b border-[#e5e9e5] bg-white px-4">
+      <h2 class="text-base font-extrabold text-[#29322b]">첫화면/퀵메뉴 설정</h2>
+      <a th:href="@{/admin/chats}" aria-label="첫화면 설정 닫기"
+         class="absolute right-3 grid h-10 w-10 place-items-center rounded-full text-[#525c54] hover:bg-[#f2f4f2]">
+        <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+      </a>
+    </header>
+
+    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 pb-24">
+      <!--/* ① 인사말 */-->
+      <section class="rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(36,58,39,.05)]">
+        <div class="flex items-center gap-3">
+          <span class="grid h-10 w-10 place-items-center rounded-xl bg-[#edf3ed] text-[#346538]">
+            <svg class="icon" width="19" height="19"><use th:href="@{/images/admin/icons.svg} + '#i-chat'"/></svg>
+          </span>
+          <h3 class="flex-1 text-sm font-extrabold text-[#303832]">인사말</h3>
+          <button type="button" aria-label="인사말 수정" data-greeting-open
+                  class="grid h-9 w-9 place-items-center rounded-xl bg-[#f3f5f3] text-[#346538]">
+            <svg class="icon" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-edit'"/></svg>
+          </button>
+        </div>
+        <p class="mt-4 whitespace-pre-line rounded-xl bg-[#f7f8f7] p-3 text-xs leading-5 text-[#59615b]" data-greeting>안녕하세요! 명품익스프레스 AI 상담 챗봇입니다. 이사와 관련해 궁금한 내용을 편하게 물어보세요.</p>
+      </section>
+
+      <!--/* ② 퀵메뉴 설정 (최대 4개) · ③ X 삭제 · ④ 빈 칸 등록 */-->
+      <section class="rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(36,58,39,.05)]">
+        <div class="flex items-center gap-3">
+          <span class="grid h-10 w-10 place-items-center rounded-xl bg-[#edf3ed] text-[#346538]">
+            <svg class="icon" width="19" height="19"><use th:href="@{/images/admin/icons.svg} + '#i-menu'"/></svg>
+          </span>
+          <div class="flex-1">
+            <h3 class="text-sm font-extrabold text-[#303832]">퀵메뉴 설정</h3>
+            <p class="mt-0.5 text-[10px] text-[#929994]">최대 4개까지 등록</p>
+          </div>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3" data-quick-grid>
+          <div th:each="q : ${ {'이사 견적', '예약 방법'} }" class="relative aspect-square rounded-2xl border border-[#dce6dc] bg-[#f1f6f1] p-3">
+            <span class="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-white text-[#a34d45] shadow-sm">
+              <svg class="icon" width="13" height="13"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+            </span>
+            <div class="flex h-full flex-col items-center justify-center text-center">
+              <span class="grid h-10 w-10 place-items-center rounded-xl bg-white text-[#346538] shadow-sm">
+                <svg class="icon" width="19" height="19"><use th:href="@{/images/admin/icons.svg} + '#i-chat'"/></svg>
+              </span>
+              <strong class="mt-3 text-xs text-[#344037]" th:text="${q}">이사 견적</strong>
+            </div>
+          </div>
+          <div th:each="i : ${ {1, 2} }" class="grid aspect-square place-content-center rounded-2xl border border-dashed border-[#bfc9c0] bg-[#fafbfa] text-center text-xs font-bold text-[#718074]">
+            <span class="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-[#edf3ed] text-lg text-[#346538]">+</span>등록
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!--/* ⑤ 미리 보기 */-->
+    <div class="absolute inset-x-0 bottom-0 z-10 border-t border-[#e5e9e5] bg-white/95 p-3 backdrop-blur-md">
+      <button type="button" data-open="#previewLayer"
+              class="mx-auto block h-11 min-w-32 rounded-full bg-[#346538] px-8 text-sm font-bold text-white shadow-[0_6px_18px_rgba(52,101,56,.24)]">미리 보기</button>
+    </div>
+
+    <!--/* A. 인사말 수정 */-->
+    <div id="greetingModal" data-layer hidden class="absolute inset-0 z-40 grid place-items-center bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
+      <div role="dialog" aria-modal="true" class="w-full rounded-[22px] bg-white p-5 shadow-[0_20px_50px_rgba(25,42,28,.24)]">
+        <div class="relative flex items-center justify-center">
+          <h3 class="text-base font-extrabold text-[#303832]">인사말 수정</h3>
+          <button type="button" aria-label="인사말 수정 닫기" data-close class="absolute right-0 grid h-8 w-8 place-items-center rounded-full hover:bg-[#f2f3f2]">
+            <svg class="icon" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+          </button>
+        </div>
+        <textarea data-greeting-input aria-label="인사말"
+                  class="mt-5 h-36 w-full resize-none rounded-2xl border border-[#dfe4df] bg-[#f7f8f7] p-3 text-sm leading-6 text-[#303832] outline-none focus:border-[#89a18b]"></textarea>
+        <button type="button" data-greeting-save
+                class="mt-4 h-12 w-full rounded-xl bg-[#346538] text-sm font-extrabold text-white disabled:bg-[#bcc5bd]">등록</button>
+      </div>
+    </div>
+
+    <!--/* ④ 퀵메뉴 조회 (답변 주제 선택) */-->
+    <div id="menuLayer" data-layer hidden class="absolute inset-0 z-40 flex flex-col bg-[#f5f6f8]">
+      <header class="relative flex h-14 shrink-0 items-center justify-center border-b border-[#e5e9e5] bg-white">
+        <h3 class="text-base font-extrabold text-[#303832]">퀵메뉴 조회</h3>
+        <button type="button" aria-label="퀵메뉴 조회 닫기" data-close class="absolute right-3 grid h-10 w-10 place-items-center rounded-full">
+          <svg class="icon" width="19" height="19"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+        </button>
+      </header>
+      <div class="flex min-h-0 flex-1 flex-col p-4">
+        <label class="flex items-center gap-2 rounded-full bg-white px-4 py-3 shadow-[0_3px_12px_rgba(36,58,39,.05)]">
+          <svg class="icon text-[#8b928d]" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
+          <input type="search" data-menu-query placeholder="검색어를 입력하세요" aria-label="답변 주제 검색"
+                 class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9ca29e]">
+        </label>
+        <p class="mb-2 mt-5 px-1 text-xs font-bold text-[#69716b]">AI챗봇 대화 내역</p>
+        <div class="min-h-0 flex-1 space-y-2 overflow-y-auto" data-menu-candidates></div>
+      </div>
+    </div>
+
+    <!--/* ③ 퀵메뉴 삭제 확인 */-->
+    <div id="deleteModal" data-layer hidden class="absolute inset-0 z-50 grid place-items-center bg-[#1f2d21]/45 p-6 backdrop-blur-[2px]">
+      <div role="alertdialog" aria-modal="true" class="w-full rounded-[22px] bg-white p-5 text-center shadow-[0_20px_50px_rgba(25,42,28,.24)]">
+        <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#fff0ee] text-[#b64b42]">
+          <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-trash'"/></svg>
+        </span>
+        <h3 class="mt-4 text-base font-extrabold text-[#303832]">정말 삭제하시겠습니까?</h3>
+        <p class="mt-2 text-xs text-[#8a918c]">삭제된 데이터는 복구할 수 없습니다.</p>
+        <div class="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" data-close class="h-11 rounded-xl bg-[#f0f2f0] text-sm font-bold text-[#646c66]">취소</button>
+          <button type="button" data-delete-confirm class="h-11 rounded-xl bg-[#c65249] text-sm font-bold text-white">삭제</button>
+        </div>
+      </div>
+    </div>
+
+    <!--/* B. 미리보기 (고객이 보는 첫 화면) */-->
+    <div id="previewLayer" data-layer hidden class="absolute inset-0 z-40 flex flex-col bg-[#f3f6f2]">
+      <header class="relative flex h-14 shrink-0 items-center justify-center border-b border-[#e0e5df] bg-white">
+        <h3 class="text-base font-extrabold text-[#303832]">미리보기</h3>
+        <button type="button" aria-label="미리보기 닫기" data-close class="absolute right-3 grid h-10 w-10 place-items-center rounded-full">
+          <svg class="icon" width="19" height="19"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+        </button>
+      </header>
+      <div class="min-h-0 flex-1 overflow-y-auto p-5 pt-7">
+        <div class="mb-4 flex items-center gap-3 px-1">
+          <span class="grid h-11 w-11 place-items-center rounded-full bg-[#dce9d8] text-[#346538] shadow-[0_4px_12px_rgba(36,58,39,.12)]">
+            <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-robot'"/></svg>
+          </span>
+          <strong class="block text-sm text-[#59615b]">명품 이사 도우미</strong>
+        </div>
+        <div class="rounded-[22px] bg-white p-3 shadow-[0_8px_24px_rgba(36,58,39,.08)]">
+          <div class="p-2">
+            <p class="whitespace-pre-line text-sm leading-7 text-[#38413a]" data-preview-greeting></p>
+            <div class="mt-4 space-y-2">
+              <div class="space-y-2" data-preview-menus></div>
+              <button type="button" class="h-14 w-full rounded-xl bg-[#fff5e8] px-4 text-sm font-bold text-[#ad6d32]">상담사 연결</button>
+            </div>
+            <p class="mt-4 text-right text-[10px] text-[#9aa09b]">상담 운영시간　평일 09:00–18:00</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div data-toast hidden class="absolute inset-x-4 bottom-20 z-[60] rounded-xl bg-[#26352a] px-4 py-3 text-center text-xs font-semibold text-white shadow-lg"></div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/chat.js}"></script></th:block>
+</body>
+</html>

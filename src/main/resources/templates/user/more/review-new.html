@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U-08x 후기 작성 (G-H10~H11 / E-H10~H11) — 11/02 시안(06·07_review_new) 기준
+  state: (없음) 빈 화면 (별점 미선택, 등록 버튼 비활성) | filled 입력 완료 (별점 4 '좋아요', 내용 38자, 사진 2장)
+  별점(라벨)·글자 수·사진 첨부(최대 5장, input file)·등록 버튼 활성화는 more.js → /more/reviews?state=done
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='후기 작성', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/more.css}">
+</head>
+<body>
+<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}, filled=${state == 'filled'}, rating=${filled ? 4 : 0}">
+  <div class="screen form-page review-new-page">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/more/reviews})}"></a>
+      <div class="form-title">후기 작성</div>
+    </div>
+    <form class="review-compose" id="reviewForm" th:action="@{/more/reviews}" method="get" novalidate>
+      <h1 class="rv-title">이사 서비스는 어떠셨나요?</h1>
+      <p class="rv-sub">강남구 → 서초구 · 원룸 일반포장 · 3월 18일</p>
+
+      <div class="rv-rating" id="ratingRow" role="radiogroup" aria-label="별점" th:attr="data-rating=${rating}">
+        <button type="button" class="rv-star" th:each="star : ${#numbers.sequence(1, 5)}"
+                th:classappend="${star <= rating} ? 'rated'" role="radio"
+                th:attr="data-star=${star},aria-label=${star} + '점',aria-checked=${star == rating}">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2.6l2.82 5.9 6.45.82-4.74 4.48 1.2 6.4L12 17.08l-5.73 3.12 1.2-6.4L2.73 9.32l6.45-.82L12 2.6z"/></svg>
+        </button>
+      </div>
+      <p class="rv-rating-label" id="ratingLabel" th:classappend="${filled} ? 'rated'" th:text="${filled ? '좋아요' : '별점을 선택해주세요'}">별점을 선택해주세요</p>
+
+      <div class="rv-editor">
+        <textarea id="reviewText" name="content" maxlength="500" aria-label="후기 내용" placeholder="이사 경험을 자세히 들려주세요."
+                  th:text="${filled ? '기사님들이 친절하시고 짐도 꼼꼼하게 옮겨주셨어요. 다음에도 이용할게요!' : ''}"></textarea>
+        <span class="rv-count" id="reviewCount" th:text="${filled ? '39/500' : '0/500'}">0/500</span>
+      </div>
+
+      <div class="rv-photo-head"><strong>사진 첨부</strong><span>선택 · 최대 5장</span></div>
+      <input accept="image/jpeg,image/png,image/webp" class="review-photo-input" id="reviewPhotoInput" multiple type="file">
+      <div class="rv-photo-grid" id="reviewPhotoGrid">
+        <th:block th:if="${filled}">
+          <div class="review-photo-preview">
+            <img alt="이사 기사님 사진" th:src="@{/images/user/bd644.png}">
+            <button type="button" class="review-photo-remove" aria-label="사진 삭제">
+              <svg aria-hidden="true" width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="review-photo-preview">
+            <img alt="이삿짐 상자 사진" th:src="@{/images/user/415ab.png}">
+            <button type="button" class="review-photo-remove" aria-label="사진 삭제">
+              <svg aria-hidden="true" width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </th:block>
+        <label class="action review-photo-add" for="reviewPhotoInput" id="reviewPhotoAdd" aria-label="후기 사진 추가">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2.5v13M2.5 9h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span id="photoCount" th:text="${filled ? '2/5' : '0/5'}">0/5</span>
+        </label>
+      </div>
+
+      <div class="rv-submit-bar">
+        <button class="rv-submit" type="submit" id="reviewSubmit" th:disabled="${!filled}">후기 등록</button>
+      </div>
+    </form>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/more.js}"></script>
+</body>
+</html>
