@@ -56,13 +56,5 @@
     if (e.key === 'Escape') document.querySelectorAll('[data-layer]:not([hidden])').forEach(close);
   });
 
-  // PC(폭 480px 이상): 430 × 874 프레임이 창에 다 들어오도록 비율 유지 축소
-  function fitFrame() {
-    const zoom = innerWidth < 480 ? 1 : Math.min(1, (innerHeight - 48) / 874, (innerWidth - 32) / 430);
-    document.documentElement.style.setProperty('--frame-zoom', zoom.toFixed(3));
-  }
-  fitFrame();
-  addEventListener('resize', fitFrame);
-
   window.CodeMoveAdmin = { open, close };
 })();

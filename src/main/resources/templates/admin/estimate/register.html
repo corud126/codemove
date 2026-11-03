@@ -1,158 +1,381 @@
 <!DOCTYPE html>
-<!--/* SCR-A-003 견적서 등록 ① 첨부·인식 / SCR-A-004 견적서 등록 ② 수정·등록 (견적 관리 > [+ 등록])
-  상태(A-003): (기본 STEP 1) | ?state=chooser (A 첨부 방식 선택) | ?state=photo-preview (B 사진 미리보기) | ?state=analyzing (C AI 분석 중)
-  상태(A-004): ?state=step2 (STEP 2 견적서 수정) | ?state=step3 (A STEP 3 미리보기) | ?state=step4 (B STEP 4 견적 등록)
-              ?state=unrecognized (STEP 4, 담당자 미인식 → 등록 비활성) | ?state=pdf-preview | ?state=pdf-register (PDF 3단계: 이름·날짜 직접 입력)
-  첨부 → AI 인식(모의) → 수정 → 미리보기 → 등록 흐름은 estimate.js */-->
+<!--/* SCR-A-003/004 견적서 등록 (견적 관리 > [등록]) — 디자인 기준: docs/ui/관리자디자인기준.md · 사용자 앱 견적 흐름과 같은 단계 막대·제목
+  단계 3개 (사진·PDF 공통): 1 첨부 → 2 확인·수정 → 3 등록. 단계 이동은 ?state= 주소
+  상태: (기본) 첨부 — 첨부 영역 하나(사진·PDF) | ?state=photo-preview 사진 확인 | ?state=pdf-preview PDF 확인
+        ?state=analyzing 견적서 읽는 중 (첨부에서 넘어오면 자동으로 review, 직접 열면 멈춤)
+        ?state=review 사진 인식 결과 확인·수정 | ?state=unrecognized 미인식 3칸(주황) + '확인이 필요한 항목' 요약
+        ?state=pdf-review PDF 이름·연락처·견적일·총 비용 입력
+        ?state=register 등록 (&source=pdf 이면 PDF 등록) | &picker=open 회원 연결 시트 | ?state=full-view 원본 사진 크게 보기 (&full=open 은 등록 단계 문서)
+  ERD: SOURCE_TYPE(사진/PDF 등록) · MEMBER_ID(선택) · CONTACT_NAME/PHONE · ESTIMATE_DATE · STATUS · TBL_QUOTE 본문 · TBL_QUOTE_ITEM(4그룹 고정, 수량+단위) · TBL_QUOTE_OPTION 8종
+  첨부 · 미인식 확인 · 금액 계산 · 회원 연결 · 등록(목록에 추가 + 알림)은 estimate.js (더미 데이터) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='견적서 등록', active='estimate', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
-  <div id="estimateRegister" class="px-4 pb-28 pt-6" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}, data-list-url=@{/admin/estimates}">
-    <!--/* 단계 표시 — 사진: 첨부·수정·미리보기·견적 등록 / PDF: 첨부·미리보기·견적 등록 (estimate.js 가 갱신) */-->
-    <div id="registerSteps" class="mb-5 px-2 pt-1">
-      <div class="flex items-center">
-        <th:block th:each="s, i : ${ {'첨부', '수정', '미리보기', '견적 등록'} }">
-          <div class="flex min-w-0 flex-col items-center gap-1.5">
-            <span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-extrabold"
-                  th:classappend="${i.first} ? 'bg-[#346538] text-white' : 'bg-[#eef0ee] text-[#929994]'" th:text="${i.count}">1</span>
-            <span class="whitespace-nowrap text-[8px] font-bold" th:classappend="${i.first} ? 'text-[#346538]' : 'text-[#8a918c]'" th:text="${s}">첨부</span>
-          </div>
-          <span th:unless="${i.last}" class="mx-2 mb-5 h-px flex-1 bg-[#dfe4df]"></span>
-        </th:block>
+  <th:block th:replace="~{admin/estimate/sheet :: styles}"/>
+  <style>
+    .reg-scan { position: absolute; left: 22px; right: 22px; height: 2px; border-radius: 2px; background: #6b9be3; box-shadow: 0 0 10px rgb(107 155 227 / .6); animation: regScan 1.8s ease-in-out infinite alternate; }
+    @keyframes regScan { from { top: 30%; } to { top: 74%; } }
+    @media (prefers-reduced-motion: reduce) { .reg-scan { animation: none; top: 52%; } }
+    /* 입력칸 기본값은 components 층: Tailwind 유틸리티(pr-9 등 단위 자리)가 이길 수 있게 */
+    @layer components { .reg-input { height: 48px; width: 100%; border-radius: 12px; background: #fff; padding: 0 14px; font-size: 15px; color: #1a1a1a; outline: none; box-shadow: inset 0 0 0 1px #e5e7eb; transition: box-shadow .15s; }
+    .reg-input::placeholder { color: #b0b4b1; }
+    .reg-input:focus { box-shadow: inset 0 0 0 2px #346538; }
+    .reg-input[data-missing] { box-shadow: inset 0 0 0 2px #f5831a; background: #fffaf4; }
+    .reg-input[readonly] { background: #f7f8f6; color: #555; } }
+    [data-missing] + .reg-missing { display: block; }
+    .reg-missing { display: none; }
+    .reg-toggle { height: 36px; border-radius: 999px; padding: 0 14px; font-size: 14px; font-weight: 600; color: #555; box-shadow: inset 0 0 0 1px #e5e7eb; background: #fff; }
+    .reg-toggle[aria-pressed="true"] { color: #346538; background: #eef4f0; box-shadow: inset 0 0 0 1.5px #85a388; }
+  </style>
+
+  <div id="regFlow" class="flex min-h-full flex-col"
+       th:with="state=${param.state != null ? param.state[0] : ''},
+                pdf=${param.source != null and param.source[0] == 'pdf'},
+                step=${state == 'review' or state == 'unrecognized' or state == 'pdf-review' or state == 'analyzing' or state == 'full-view'} ? 2 : (${state == 'register'} ? 3 : 1),
+                missing=${state == 'unrecognized'},
+                isReview=${state == 'review' or state == 'unrecognized' or state == 'full-view'},
+                inp='reg-input tabular-nums'"
+       th:attr="data-state=${state}, data-source=${pdf} ? 'pdf' : 'photo'">
+
+    <!--/* 흐름 머리: 뒤로 · 단계 막대 · n/3 (사용자 앱 .flow-head 와 같은 구성) */-->
+    <div class="sticky top-0 z-10 grid grid-cols-[auto_1fr_auto] items-center gap-3 bg-[#f7f8f6]/95 px-3 py-2.5 backdrop-blur">
+      <a aria-label="뒤로 가기" class="grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]"
+         th:href="${state == 'photo-preview' or state == 'pdf-preview'} ? '?'
+                 : (${isReview or state == 'analyzing'} ? '?state=photo-preview'
+                 : (${state == 'pdf-review'} ? '?state=pdf-preview'
+                 : (${state == 'register'} ? (${pdf} ? '?state=pdf-review' : '?state=review')
+                 : @{/admin/estimates})))">
+        <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronLeft'"/></svg>
+      </a>
+      <div class="h-1 overflow-hidden rounded-full bg-[#e5e7e1]" role="progressbar" aria-label="진행 단계" th:attr="aria-valuenow=${step}" aria-valuemin="1" aria-valuemax="3">
+        <i class="block h-full rounded-full bg-[#346538] transition-[width]" th:style="|width:${step * 100 / 3.0}%|"></i>
       </div>
+      <span class="w-8 text-right text-[13px] font-semibold tabular-nums text-[#888]" th:text="|${step}/3|">1/3</span>
     </div>
 
-    <!--/* STEP 1 첨부 */-->
-    <div data-step="1">
-      <h2 class="px-1 text-[24px] font-extrabold tracking-[-0.04em] text-[#346538]">견적서 등록</h2>
-      <section id="attachCard" class="relative mt-5 overflow-hidden rounded-[22px] border border-[#e0e6e1] bg-white p-6 shadow-[0_5px_18px_rgba(36,58,39,.06)]">
-        <span class="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#79917c]">Step 1</span>
-        <button type="button" data-open="#attachChooser" class="mt-5 block w-full text-center">
-          <span class="mx-auto flex w-fit items-center gap-3">
-            <span class="grid h-14 w-14 place-items-center rounded-2xl bg-[#edf3ed] text-[#346538]">
-              <svg class="icon" width="27" height="27"><use th:href="@{/images/admin/icons.svg} + '#i-camera'"/></svg>
+    <main class="flex-1 px-4 pb-6">
+      <p class="mt-3 px-1 text-[13px] font-bold text-[#346538]">견적서 등록</p>
+
+      <!--/* ── 1. 첨부 ── */-->
+      <th:block th:if="${state == ''}">
+        <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">견적서를 첨부해 주세요</h2>
+        <p class="mt-2 px-1 text-[14px] text-[#888]">AI가 내용을 읽어 칸을 채워 드려요.</p>
+        <!--/* 첨부 영역 하나: 휴대폰에서는 촬영·사진 보관함·파일 선택이 기기 메뉴로 뜬다. 고른 파일 종류(PDF/사진)로 다음 화면 결정 */-->
+        <label class="mt-6 flex h-[200px] cursor-pointer flex-col items-center justify-center rounded-[20px] border-[1.5px] border-dashed border-[#9cb59e] bg-[#f8faf5] transition hover:bg-[#f1f6ee]">
+          <input type="file" accept="image/*,.pdf,application/pdf" class="sr-only" data-attach aria-label="견적서 첨부 (사진 또는 PDF)">
+          <!--/* 문서 아이콘 (파랑 + 노랑 포인트 1개) */-->
+          <svg aria-hidden="true" width="36" height="44" viewBox="0 0 36 44">
+            <path d="M5 0h19l12 12v27a5 5 0 0 1-5 5H5a5 5 0 0 1-5-5V5a5 5 0 0 1 5-5Z" fill="#6fa8dc"/>
+            <path d="M24 0v7a5 5 0 0 0 5 5h7Z" fill="#3d6e9e"/>
+            <rect x="7" y="17" width="16" height="3" rx="1.5" fill="#e9f1fa"/><rect x="7" y="24" width="22" height="3" rx="1.5" fill="#e9f1fa"/>
+            <rect x="5" y="31" width="18" height="8" rx="2.5" fill="#f2c14e"/>
+          </svg>
+          <strong class="mt-4 flex items-center gap-1.5 text-[16px] font-bold text-[#346538]">
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1.3v9.4M1.3 6h9.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>견적서 첨부
+          </strong>
+          <small class="mt-1.5 text-[13px] text-[#888]">사진 촬영 · 사진 · PDF</small>
+        </label>
+      </th:block>
+
+      <!--/* ── 1. 사진 확인 ── */-->
+      <th:block th:if="${state == 'photo-preview'}">
+        <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">사진을 확인해 주세요</h2>
+        <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-6 block w-full overflow-hidden rounded-[20px] bg-white text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <span class="lined-paper block aspect-[4/3] w-full"></span>
+          <span class="flex items-center justify-between gap-2 px-4 py-3.5">
+            <span class="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-[#292929]">
+              <svg class="icon shrink-0 text-[#346538]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-camera'"/></svg><span class="truncate">photo.jpg</span>
             </span>
-            <span class="grid h-14 w-14 place-items-center rounded-2xl bg-[#edf3ed] text-[#346538]">
-              <svg class="icon" width="26" height="26"><use th:href="@{/images/admin/icons.svg} + '#i-document'"/></svg>
-            </span>
+            <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
           </span>
-          <strong class="mx-auto mt-5 block max-w-[290px] text-[16px] leading-6 text-[#303832]">과거 수기 견적서를 촬영하거나 PDF 파일을 첨부하세요.</strong>
-          <span class="mt-2 block text-[10px] text-[#8f9691]">AI가 텍스트를 자동 인식하여 아래 필드에 입력합니다.</span>
-        </button>
-
-        <!--/* 선택한 파일 */-->
-        <div id="selectedFile" hidden class="mt-5 flex items-center gap-2 rounded-xl bg-[#f6f8f6] px-3 py-2.5 text-left">
-          <svg class="icon text-[#346538]" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-document'"/></svg>
-          <span class="min-w-0 flex-1 truncate text-[10px] font-semibold text-[#59615b]" data-file-name>photo.jpg</span>
         </div>
+      </th:block>
 
-        <!--/* B 촬영 이미지 미리보기 */-->
-        <div id="photoPreview" hidden class="mt-5 rounded-2xl border border-[#e1e6e1] bg-[#f8f9f8] p-3">
-          <p class="mb-2 text-left text-[10px] font-extrabold text-[#4c554e]">촬영 이미지 미리보기</p>
-          <div class="lined-paper h-44 w-full overflow-hidden rounded-xl">
-            <img hidden alt="촬영한 수기 견적서 미리보기" class="h-full w-full object-cover" data-preview-img>
+      <!--/* ── 1. PDF 확인 ── */-->
+      <th:block th:if="${state == 'pdf-preview'}">
+        <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">파일을 확인해 주세요</h2>
+        <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-6 block w-full overflow-hidden rounded-[20px] bg-white text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <span class="block bg-[#eef0ee] px-10 py-6">
+            <span class="mx-auto block w-[70%] shadow-[0_6px_18px_rgba(26,26,26,.12)]"><span inert class="pointer-events-none block"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></span></span>
+          </span>
+          <span class="flex items-center justify-between gap-2 px-4 py-3.5">
+            <span class="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-[#292929]">
+              <svg class="icon shrink-0 text-[#346538]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-document'"/></svg><span class="truncate">견적서_정도현_230914.pdf</span>
+            </span>
+            <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
+          </span>
+        </div>
+      </th:block>
+
+      <!--/* ── 읽는 중 ── */-->
+      <th:block th:if="${state == 'analyzing'}">
+        <div class="flex min-h-[460px] flex-col items-center justify-center text-center">
+          <div class="relative grid h-[168px] w-[168px] place-items-center rounded-[26px] bg-[#eff1ed]">
+            <svg aria-hidden="true" width="92" height="112" viewBox="0 0 92 112">
+              <ellipse cx="46" cy="106" rx="34" ry="4" fill="#e0e2de"/>
+              <rect x="8" y="4" width="76" height="96" rx="9" fill="#fff"/>
+              <rect x="8" y="4" width="76" height="20" rx="9" fill="#8dbde8"/><rect x="8" y="16" width="76" height="8" fill="#8dbde8"/>
+              <rect x="20" y="36" width="40" height="5" rx="2.5" fill="#dfe3e8"/><rect x="20" y="49" width="52" height="5" rx="2.5" fill="#dfe3e8"/>
+              <rect x="20" y="62" width="30" height="5" rx="2.5" fill="#dfe3e8"/><rect x="20" y="75" width="46" height="5" rx="2.5" fill="#dfe3e8"/>
+              <rect x="54" y="84" width="22" height="9" rx="3" fill="#f2c14e"/>
+            </svg>
+            <i class="reg-scan"></i>
           </div>
-          <div class="mt-3 flex justify-end gap-2">
-            <button type="button" id="retakeButton" class="rounded-lg border border-[#d8ded9] bg-white px-3 py-2 text-[10px] font-bold text-[#707871]">다시 촬영</button>
-            <button type="button" id="analyzeButton" class="rounded-lg bg-[#346538] px-4 py-2 text-[10px] font-bold text-white">확인</button>
+          <h2 class="mt-8 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">견적서를 읽고 있어요</h2>
+          <p class="mt-2 text-[14px] text-[#888]">잠시만 기다려 주세요.</p>
+        </div>
+      </th:block>
+
+      <!--/* ── 2. 확인·수정 (사진) ── */-->
+      <th:block th:if="${isReview}">
+        <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">인식된 내용을 확인해 주세요</h2>
+        <p class="mt-2 px-1 text-[14px] text-[#888]">틀린 곳은 눌러서 고칠 수 있어요.</p>
+
+        <!--/* 원본 사진 */-->
+        <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-5 flex w-full items-center gap-3 rounded-[16px] bg-white p-3 text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <span class="lined-paper h-14 w-11 shrink-0 rounded-[8px]"></span>
+          <span class="min-w-0 flex-1"><span class="block text-[15px] font-semibold text-[#292929]">원본 사진</span><span class="block truncate text-[13px] text-[#888]">photo.jpg</span></span>
+          <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
+        </div>
+
+        <!--/* 확인이 필요한 항목 요약 → 눌러서 해당 칸으로 이동 */-->
+        <div id="missingSummary" th:hidden="${!missing}" class="mt-3 rounded-[16px] bg-[#fff3e6] px-4 py-3.5">
+          <p class="flex items-center gap-1.5 text-[15px] font-bold text-[#d9701a]">
+            <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-alert'"/></svg>확인이 필요한 항목 <span data-missing-count>3</span>개
+          </p>
+          <div class="mt-2.5 flex flex-wrap gap-1.5" data-missing-links>
+            <button th:each="m : ${ {'customer|담당자', 'estimateDate|견적일', 'toAddress|도착지'} }" th:with="t=${#strings.arraySplit(m, '|')}"
+                    type="button" th:attr="data-jump=${t[0]}" class="h-8 rounded-full bg-white px-3 text-[13px] font-semibold text-[#d9701a]" th:text="${t[1]}">담당자</button>
           </div>
         </div>
 
-        <!--/* 첨부 썸네일 */-->
-        <div id="attachThumb" hidden class="lined-paper absolute bottom-3 right-3 h-14 w-12 rotate-3 overflow-hidden rounded-lg border-2 border-white shadow-[0_4px_12px_rgba(34,43,36,.2)]">
-          <img hidden alt="" class="h-full w-full object-cover" data-preview-img>
-        </div>
+        <!--/* 고객·주소 */-->
+        <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <h3 class="text-[17px] font-bold text-[#1a1a1a]">고객·주소</h3>
+          <div class="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-3.5">
+            <label th:each="f : ${ {'업체명|companyName|명품익스프레스|2', '담당자|customer|김민준|1', '연락처|phone|010-4821-7735|1',
+                                    '출발지|fromAddress|광주 북구 용봉로 77, 3층|2', '도착지|toAddress|광주 서구 상무중앙로 110, 12층|2'} }"
+                   th:with="t=${#strings.arraySplit(f, '|')}, miss=${missing and (t[1] == 'customer' or t[1] == 'toAddress')}"
+                   class="block" th:classappend="${t[3] == '2'} ? 'col-span-2'">
+              <span class="mb-1.5 block px-0.5 text-[13px] text-[#888]" th:text="${t[0]}">담당자</span>
+              <input th:class="${inp}" th:attr="data-field=${t[1]}, data-missing=${miss} ? 'true' : null, data-required=${t[1] == 'customer' or t[1] == 'toAddress'} ? 'true' : null" th:value="${miss} ? '' : ${t[2]}">
+              <span class="reg-missing mt-1 px-0.5 text-[12px] font-medium text-[#d9701a]">확인 필요</span>
+            </label>
+          </div>
+        </section>
 
-        <!--/* A 첨부 방식 선택 시트 */-->
-        <div id="attachChooser" data-layer hidden class="absolute inset-0 z-10 flex items-end bg-[#1e2b20]/35 p-4 backdrop-blur-[2px]">
-          <div class="w-full rounded-[18px] bg-white p-4 shadow-xl [animation:slideUp_.2s_ease-out]">
-            <div class="mb-4 flex items-center justify-between">
-              <p class="text-[13px] font-extrabold text-[#303832]">첨부 방식 선택</p>
-              <button type="button" aria-label="첨부 방식 닫기" data-close class="grid h-8 w-8 place-items-center rounded-full bg-[#f1f4f1] text-[#677068]">
-                <svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+        <!--/* 일정·작업 */-->
+        <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <h3 class="text-[17px] font-bold text-[#1a1a1a]">일정·작업</h3>
+          <div class="mt-4 grid grid-cols-3 gap-x-2 gap-y-3.5">
+            <label th:each="f : ${ {'견적일|estimateDate|26.09.04', '작업일|workDate|26.09.20', '운송일|transportDate|26.09.20'} }"
+                   th:with="t=${#strings.arraySplit(f, '|')}, miss=${missing and t[1] == 'estimateDate'}" class="block">
+              <span class="mb-1.5 block px-0.5 text-[13px] text-[#888]" th:text="${t[0]}">견적일</span>
+              <input th:class="${inp} + ' px-2.5 text-center'" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD"
+                     th:attr="data-field=${t[1]}, data-missing=${miss} ? 'true' : null, data-required=${t[1] == 'estimateDate'} ? 'true' : null" th:value="${miss} ? '' : ${t[2]}">
+              <span class="reg-missing mt-1 px-0.5 text-[12px] font-medium text-[#d9701a]">확인 필요</span>
+            </label>
+          </div>
+          <p class="mb-1.5 mt-4 px-0.5 text-[13px] text-[#888]">작업 형태</p>
+          <div class="grid grid-cols-4 gap-1.5" data-radio>
+            <button th:each="w : ${ {'포장', '반포장', '일반', '보관'} }" type="button" class="reg-toggle px-0" th:attr="aria-pressed=${w == '포장'}" th:text="${w}">포장</button>
+          </div>
+          <p class="mb-1.5 mt-4 px-0.5 text-[13px] text-[#888]">운반 방법</p>
+          <div class="overflow-hidden rounded-[12px] ring-1 ring-inset ring-[#eef0ee]">
+            <div class="grid grid-cols-[1fr_72px_72px] items-center gap-2 bg-[#f7f8f6] px-3 py-2 text-[12px] font-semibold text-[#888]"><span>방법</span><span class="text-center">출발지</span><span class="text-center">도착지</span></div>
+            <div th:each="c : ${ {'사다리차|Y|Y', '엘리베이터|N|N', '계단|N|N'} }" th:with="t=${#strings.arraySplit(c, '|')}"
+                 class="grid grid-cols-[1fr_72px_72px] items-center gap-2 border-t border-[#eef0ee] px-3 py-2">
+              <span class="text-[15px] font-semibold text-[#292929]" th:text="${t[0]}">사다리차</span>
+              <button type="button" class="reg-toggle h-8 px-0" th:attr="aria-pressed=${t[1] == 'Y'}, aria-label=|${t[0]} 출발지|">사용</button>
+              <button type="button" class="reg-toggle h-8 px-0" th:attr="aria-pressed=${t[2] == 'Y'}, aria-label=|${t[0]} 도착지|">사용</button>
+            </div>
+          </div>
+          <div class="mt-4 grid grid-cols-[1fr_2fr] gap-2.5">
+            <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">이사물량</span>
+              <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="decimal" value="3.5"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">톤</span></span></label>
+            <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">비고</span>
+              <input th:class="${inp}" maxlength="500" value="파손 주의 물품 별도 포장"></label>
+          </div>
+        </section>
+
+        <!--/* 품목 — 그룹 4개 고정 (ERD Q14), 수량 + 단위 */-->
+        <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <h3 class="text-[17px] font-bold text-[#1a1a1a]">품목</h3>
+          <div th:each="g : ${ {'전자기기=모니터:6:대,컴퓨터:3:대,공기청정기:1:대,소형 냉장고:1:대,전자레인지:1:대,프린터/복합기:1:대,TV:1:대',
+                                '가구=의자:6:개,테이블:2:개,원형 테이블:1:개,파티션:3:개,대형 캐비넷:2:개,책상:2:개,데스크 수납함:3:개,보조 서랍장:3:개',
+                                '생활용품=', '기타='} }"
+               th:with="grp=${#strings.arraySplit(g + ' ', '=')}, items=${#strings.isEmpty(#strings.trim(grp[1])) ? null : #strings.arraySplit(#strings.trim(grp[1]), ',')}"
+               class="mt-4 border-t border-[#eef0ee] pt-3 first-of-type:mt-3">
+            <div class="flex items-center justify-between">
+              <p class="text-[14px] font-bold text-[#555]"><span th:text="${grp[0]}">전자기기</span> <span class="ml-0.5 font-semibold text-[#888]" th:text="${items != null} ? ${#arrays.length(items)} : 0">7</span></p>
+              <button type="button" class="flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold text-[#346538] hover:bg-[#eef4f0]">
+                <svg class="icon" width="15" height="15"><use th:href="@{/images/admin/icons-v2.svg} + '#i-plus'"/></svg>추가
               </button>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-              <label class="flex cursor-pointer flex-col items-center gap-2 rounded-xl bg-[#edf3ed] p-4 text-[#346538]">
-                <input type="file" accept="image/*" capture="environment" class="sr-only" id="photoInput">
-                <svg class="icon" width="25" height="25"><use th:href="@{/images/admin/icons.svg} + '#i-camera'"/></svg>
-                <span class="text-[10px] font-bold">사진 촬영</span>
-              </label>
-              <label class="flex cursor-pointer flex-col items-center gap-2 rounded-xl bg-[#edf3ed] p-4 text-[#346538]">
-                <input type="file" accept=".pdf,application/pdf" class="sr-only" id="pdfInput">
-                <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons.svg} + '#i-document'"/></svg>
-                <span class="text-[10px] font-bold">PDF 첨부</span>
-              </label>
+            <div th:if="${items != null}" class="mt-2 space-y-1.5">
+              <div th:each="it : ${items}" th:with="t=${#strings.arraySplit(it, ':')}" class="grid grid-cols-[1fr_56px_48px] gap-1.5">
+                <input class="reg-input h-11" th:value="${t[0]}" aria-label="품목">
+                <input class="reg-input h-11 px-2 text-right tabular-nums" inputmode="numeric" maxlength="3" th:value="${t[1]}" aria-label="수량">
+                <input class="reg-input h-11 px-1 text-center" maxlength="5" th:value="${t[2]}" aria-label="단위">
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!--/* C AI 분석 중 */-->
-        <div id="analyzing" hidden class="absolute inset-0 z-20 grid place-items-center rounded-[22px] bg-white/92 backdrop-blur-sm">
-          <div class="text-center">
-            <span class="mx-auto block h-9 w-9 animate-spin rounded-full border-2 border-[#dce7dd] border-t-[#346538]"></span>
-            <p class="mt-3 text-[11px] font-bold text-[#346538]">AI가 견적서를 분석하고 있습니다</p>
-            <p class="mt-1 text-[9px] text-[#929994]">완료되면 Step 2로 이동합니다.</p>
+        <!--/* 옵션 8종 × 선택 2 + 비용 */-->
+        <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <h3 class="text-[17px] font-bold text-[#1a1a1a]">옵션</h3>
+          <div class="mt-2 divide-y divide-[#eef0ee]">
+            <div th:each="o : ${ {'피아노|일반|그랜드|N|N|', '돌침대|분해|조립|N|N|', '조립장|분해|조립|N|N|', '벽걸이TV|탈착|설치|Y|Y|50,000',
+                                  '홈씨어터|분리|설치|N|N|', '수작업|계단|승강기|N|N|', '안마의자|분리|설치|N|N|', '에어컨|탈착|설치|N|N|'} }"
+                 th:with="t=${#strings.arraySplit(o + ' ', '|')}" class="grid grid-cols-[68px_1fr_100px] items-center gap-2 py-2">
+              <span class="text-[15px] font-semibold text-[#292929]" th:text="${t[0]}">피아노</span>
+              <span class="flex gap-1">
+                <button type="button" class="reg-toggle h-8 px-2.5 text-[13px]" th:attr="aria-pressed=${t[3] == 'Y'}" th:text="${t[1]}">일반</button>
+                <button type="button" class="reg-toggle h-8 px-2.5 text-[13px]" th:attr="aria-pressed=${t[4] == 'Y'}" th:text="${t[2]}">그랜드</button>
+              </span>
+              <span class="relative block"><input class="reg-input h-10 pr-7 text-right text-[14px] tabular-nums" inputmode="numeric" data-money data-option th:value="${#strings.trim(t[5])}" th:attr="aria-label=|${t[0]} 비용|"><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[13px] text-[#888]">원</span></span>
+            </div>
           </div>
-        </div>
-      </section>
-    </div>
+        </section>
 
-    <!--/* STEP 2 견적서 수정 (인식 결과를 문서 위에서 직접 고침) */-->
-    <div data-step="2" hidden>
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <p class="text-[9px] font-extrabold tracking-[.12em] text-[#7a927d]">STEP 2</p>
-          <h2 class="mt-1 text-[20px] font-extrabold text-[#346538]">견적서 수정</h2>
+        <!--/* 금액 — 총 비용 = 이사비용 + 사다리 + 옵션, 계약금 10% */-->
+        <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <h3 class="text-[17px] font-bold text-[#1a1a1a]">금액</h3>
+          <label class="mt-4 block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">이사비용</span>
+            <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money data-field="movingCost" value="1,100,000"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
+          <div th:each="l : ${ {'출발지 사다리|fromLadderFloor|3|fromLadderCost|120,000', '도착지 사다리|toLadderFloor|12|toLadderCost|150,000'} }" th:with="t=${#strings.arraySplit(l, '|')}"
+               class="mt-3 grid grid-cols-[88px_1fr] gap-2">
+            <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]" th:text="${t[0]}">출발지 사다리</span>
+              <span class="relative block"><input th:class="${inp} + ' pr-8 text-right'" inputmode="numeric" maxlength="3" th:attr="data-field=${t[1]}" th:value="${t[2]}"><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">층</span></span></label>
+            <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-transparent">비용</span>
+              <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money th:attr="data-field=${t[3]}, aria-label=|${t[0]} 비용|" th:value="${t[4]}"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
+          </div>
+          <dl class="mt-4 space-y-2 rounded-[14px] bg-[#f7f8f6] px-4 py-3.5 text-[14px] tabular-nums">
+            <div class="flex justify-between"><dt class="text-[#888]">옵션 합계</dt><dd class="text-[#555]"><span data-sum="option">50,000</span>원</dd></div>
+            <div class="flex justify-between"><dt class="font-semibold text-[#292929]">총 비용</dt><dd class="text-[17px] font-bold text-[#1a1a1a]"><span data-sum="total">1,420,000</span>원</dd></div>
+            <div class="flex justify-between"><dt class="text-[#888]">계약금 10%</dt><dd class="text-[#555]"><span data-sum="deposit">142,000</span>원</dd></div>
+            <div class="flex justify-between"><dt class="text-[#888]">잔금</dt><dd class="text-[#555]"><span data-sum="balance">1,278,000</span>원</dd></div>
+          </dl>
+        </section>
+      </th:block>
+
+      <!--/* ── 2. 확인·수정 (PDF): 이름 · 연락처 · 견적일 · 총 비용 ── */-->
+      <th:block th:if="${state == 'pdf-review'}">
+        <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">견적 정보를 입력해 주세요</h2>
+        <p class="mt-2 px-1 text-[14px] text-[#888]">PDF는 이름과 견적일만 있으면 등록돼요.</p>
+        <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-5 flex w-full items-center gap-3 rounded-[16px] bg-white p-3 text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <span class="relative block h-[68px] w-11 shrink-0 overflow-hidden rounded-[6px] bg-white shadow-[0_2px_6px_rgba(26,26,26,.15)]"><span inert class="pointer-events-none absolute left-0 top-0 block w-[360px] origin-top-left scale-[0.1222]"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></span></span>
+          <span class="min-w-0 flex-1"><span class="block text-[15px] font-semibold text-[#292929]">원본 PDF</span><span class="block truncate text-[13px] text-[#888]">견적서_정도현_230914.pdf</span></span>
+          <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
         </div>
-        <button type="button" data-goto-step="3" class="h-9 rounded-xl bg-[#346538] px-4 text-[11px] font-extrabold text-white">다음</button>
+        <section class="mt-3 space-y-3.5 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">이름</span>
+            <input th:class="${inp}" maxlength="20" data-pdf-required></label>
+          <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">연락처</span>
+            <input th:class="${inp}" type="tel" inputmode="numeric" maxlength="13" placeholder="010-0000-0000"></label>
+          <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">견적일</span>
+            <input th:class="${inp}" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD" data-pdf-required data-date></label>
+          <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">총 비용</span>
+            <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
+        </section>
+      </th:block>
+
+      <!--/* ── 3. 등록 ── */-->
+      <th:block th:if="${state == 'register'}">
+        <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">등록 정보를 입력해 주세요</h2>
+        <!--/* 견적서 미리보기 → 크게 보기 */-->
+        <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-5 flex w-full items-center gap-4 rounded-[20px] bg-white p-4 text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <span class="relative block h-[111px] w-[72px] shrink-0 overflow-hidden rounded-[6px] bg-white shadow-[0_3px_10px_rgba(26,26,26,.15)]"><span inert class="pointer-events-none absolute left-0 top-0 block w-[360px] origin-top-left scale-[0.2]"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></span></span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[17px] font-bold text-[#1a1a1a]" th:text="${pdf} ? '정도현' : '김민준'">김민준</span>
+            <span class="mt-1 block text-[13px] tabular-nums text-[#888]" th:text="${pdf} ? '견적일 23.09.14' : '견적일 26.09.04 · 1,420,000원'">견적일 26.09.04</span>
+            <span class="mt-2 flex items-center text-[13px] font-semibold text-[#346538]">견적서 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
+          </span>
+        </div>
+        <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+          <div class="flex items-center justify-between">
+            <span class="text-[15px] font-semibold text-[#292929]">등록 방식</span>
+            <span class="chip chip-progress" th:text="${pdf} ? 'PDF 등록' : '사진 등록'">사진 등록</span>
+          </div>
+          <div class="mt-5">
+            <span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">회원 연결</span>
+            <button type="button" data-open="#memberPicker" class="reg-input flex items-center justify-between text-left">
+              <span id="memberLinked" class="text-[#b0b4b1]">연결 안 함</span>
+              <svg class="icon text-[#888]" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+            </button>
+          </div>
+          <div class="mt-4">
+            <span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">분류</span>
+            <div class="grid grid-cols-3 gap-0.5 rounded-full bg-[#eef0ee] p-1" role="radiogroup" data-segment>
+              <button th:each="s, i : ${ {'견적 검토', '견적 승인', '견적 확정'} }" type="button" role="radio" th:attr="aria-checked=${i.first}"
+                      class="h-9 rounded-full text-[14px] font-semibold text-[#888] aria-checked:bg-white aria-checked:text-[#346538] aria-checked:shadow-[0_1px_4px_rgba(26,26,26,.1)]" th:text="${s}">견적 검토</button>
+            </div>
+          </div>
+        </section>
+      </th:block>
+    </main>
+
+    <!--/* 하단 고정 버튼 — 모든 단계 같은 자리 (하단 탭 위) */-->
+    <div th:unless="${state == 'analyzing'}" class="sticky bottom-[var(--nav)] z-10 mt-auto bg-gradient-to-t from-[#f7f8f6] from-70% to-[#f7f8f6]/0 px-4 pb-5 pt-5">
+      <div th:if="${state == ''}"><button type="button" class="btn-primary" disabled>다음</button></div>
+      <div th:if="${state == 'photo-preview' or state == 'pdf-preview'}" class="grid grid-cols-[1fr_2fr] gap-2">
+        <a th:href="'?'" class="flex h-14 items-center justify-center rounded-[14px] bg-[#eef0ee] text-[16px] font-semibold text-[#555]">다시 선택</a>
+        <a class="btn-primary" th:href="${state == 'pdf-preview'} ? '?state=pdf-review' : '?state=analyzing&auto=1'">다음</a>
       </div>
-      <div id="draftViewer"><th:block th:replace="~{admin/estimate/sheet :: viewer(download=false, action='')}"/></div>
+      <div th:if="${isReview or state == 'pdf-review'}" class="grid grid-cols-[1fr_2fr] gap-2">
+        <a th:href="${state == 'pdf-review'} ? '?state=pdf-preview' : '?state=photo-preview'"
+           class="flex h-14 items-center justify-center rounded-[14px] bg-[#eef0ee] text-[16px] font-semibold text-[#555]">이전</a>
+        <button type="button" id="reviewNext" class="btn-primary" th:disabled="${missing or state == 'pdf-review'}"
+                th:attr="data-href=${state == 'pdf-review'} ? '?state=register&source=pdf' : '?state=register'">다음</button>
+      </div>
+      <div th:if="${state == 'register'}" class="grid grid-cols-[1fr_2fr] gap-2">
+        <a th:href="${pdf} ? '?state=pdf-review' : '?state=review'"
+           class="flex h-14 items-center justify-center rounded-[14px] bg-[#eef0ee] text-[16px] font-semibold text-[#555]">이전</a>
+        <a th:href="@{/admin/estimates}" id="registerSubmit" th:attr="data-name=${pdf} ? '정도현' : '김민준', data-date=${pdf} ? '23.09.14' : '26.09.04'" class="btn-primary">견적 관리에 등록</a>
+      </div>
     </div>
+    <div class="h-[var(--nav)] shrink-0" aria-hidden="true"></div>
+  </div>
 
-    <!--/* STEP 3 견적서 미리보기 */-->
-    <div data-step="3" hidden>
-      <div class="mb-4 flex items-center justify-between">
-        <button type="button" id="previewBack" class="flex items-center gap-1 text-[10px] font-bold text-[#59625b]">
-          <svg class="icon rotate-180" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-arrowRight'"/></svg><span data-back-label>수정으로</span>
+  <!--/* 크게 보기 레이어 — 사진: 원본 사진 / PDF·등록: 견적서 문서 */-->
+  <div id="fullView" data-layer hidden class="absolute inset-x-0 bottom-0 top-[var(--hdr)] z-[60] flex flex-col bg-[#1a1a1a]">
+    <div class="flex h-14 shrink-0 items-center justify-between pl-5 pr-2 text-white">
+      <p class="truncate text-[15px] font-semibold" data-full-title>photo.jpg</p>
+      <button type="button" data-close aria-label="크게 보기 닫기" class="grid h-11 w-11 place-items-center rounded-full hover:bg-white/10">
+        <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+      </button>
+    </div>
+    <div class="min-h-0 flex-1 overflow-auto px-4 pb-8">
+      <div data-full="photo" class="lined-paper mx-auto aspect-[3/4] w-full rounded-[6px]"></div>
+      <div data-full="doc" hidden class="mx-auto w-full bg-white"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></div>
+    </div>
+  </div>
+
+  <!--/* 회원 연결 시트 (MEMBER_ID, 선택) */-->
+  <div id="memberPicker" data-layer hidden class="absolute inset-x-0 bottom-[var(--nav)] top-[var(--hdr)] z-50 flex items-end bg-[#1a1a1a]/40">
+    <div class="w-full rounded-t-[24px] bg-white p-5 pb-6 shadow-[0_-8px_30px_rgba(26,26,26,.12)] [animation:slideUp_.2s_ease-out]">
+      <div class="mb-3 flex items-center justify-between">
+        <p class="px-1 text-[17px] font-bold text-[#1a1a1a]">회원 연결</p>
+        <button type="button" aria-label="회원 연결 닫기" data-close class="grid h-10 w-10 place-items-center rounded-full text-[#888] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
         </button>
-        <h2 class="text-[16px] font-extrabold text-[#29312b]">견적서 미리보기</h2>
-        <button type="button" data-goto-step="4" class="h-9 rounded-xl bg-[#346538] px-4 text-[11px] font-extrabold text-white">다음</button>
       </div>
-      <div id="previewViewer"><th:block th:replace="~{admin/estimate/sheet :: viewer(download=true, action='')}"/></div>
-    </div>
-
-    <!--/* STEP 4 견적 등록 */-->
-    <div data-step="4" hidden>
-      <section class="rounded-[20px] bg-white p-5 shadow-[0_5px_18px_rgba(36,58,39,.06)]">
-        <p class="text-[9px] font-extrabold tracking-[.12em] text-[#7a927d]" data-step4-label>STEP 4</p>
-        <h2 class="mt-1 text-[20px] font-extrabold text-[#346538]">견적 등록</h2>
-        <!--/* 사진: 인식 정보 사용 */-->
-        <div data-photo-only>
-          <p class="mt-5 rounded-xl bg-[#f7f8f7] px-4 py-3 text-[11px] text-[#59615b]">견적서에서 인식한 담당자와 견적일이 등록 정보로 사용됩니다.</p>
-          <p id="unrecognizedNotice" hidden class="mt-2 px-1 text-[10px] font-semibold text-[#b9574f]">담당자 또는 견적일을 인식하지 못했습니다. [이전]으로 돌아가 STEP 2에서 직접 입력해 주세요.</p>
-        </div>
-        <!--/* PDF: 이름·날짜 직접 입력 */-->
-        <div data-pdf-only hidden class="mt-5 space-y-3">
-          <label class="block"><span class="mb-1.5 block text-[10px] font-bold text-[#687069]">이름</span>
-            <input id="registerName" type="text" placeholder="고객 이름을 입력하세요"
-                   class="h-11 w-full rounded-xl border border-[#dfe4df] bg-white px-3 text-[12px] font-semibold outline-none focus:border-[#346538]"></label>
-          <label class="block"><span class="mb-1.5 block text-[10px] font-bold text-[#687069]">날짜</span>
-            <input id="registerDate" type="text" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD"
-                   class="h-11 w-full rounded-xl border border-[#dfe4df] bg-white px-3 text-[12px] font-semibold outline-none focus:border-[#346538]"></label>
-        </div>
-        <label class="mt-5 block">
-          <span class="mb-2 block text-[10px] font-extrabold text-[#59615b]">분류</span>
-          <select id="registerStatus" class="h-11 w-full rounded-xl border border-[#dfe4df] bg-white px-3 text-[12px] font-semibold">
-            <option>견적 검토</option><option>견적 승인</option><option>견적 확정</option>
-          </select>
-        </label>
-      </section>
-      <div class="mt-4 grid grid-cols-[1fr_2fr] gap-2">
-        <button type="button" data-goto-step="3" class="h-12 rounded-xl border border-[#d9ded9] bg-white text-[11px] font-bold">이전</button>
-        <button type="button" id="registerSubmit" class="h-12 rounded-xl bg-[#346538] text-[12px] font-extrabold text-white disabled:opacity-40">견적 관리에 등록</button>
+      <div class="relative">
+        <svg class="icon pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+        <input type="search" value="김민" aria-label="이름 또는 휴대폰 번호 검색" class="h-12 w-full rounded-[14px] bg-white pl-11 pr-4 text-[15px] text-[#1a1a1a] outline-none ring-1 ring-[#e5e7eb] focus:ring-2 focus:ring-[#346538]">
       </div>
+      <div class="mt-3 divide-y divide-[#eef0ee]">
+        <button th:each="m : ${ {'김민준|010-4821-7735|24.05.12', '김민서|010-3302-1184|25.01.07'} }" th:with="t=${#strings.arraySplit(m, '|')}"
+                type="button" data-member th:attr="data-name=${t[0]}, data-phone=${t[1]}"
+                class="flex w-full items-center justify-between px-1 py-3 text-left hover:bg-[#f7f8f6]">
+          <span><span class="block text-[15px] font-semibold text-[#292929]" th:text="${t[0]}">김민준</span>
+            <span class="mt-0.5 block text-[13px] tabular-nums text-[#888]" th:text="${t[1]}">010-4821-7735</span></span>
+          <span class="text-[13px] tabular-nums text-[#888]" th:text="|${t[2]} 가입|">24.05.12 가입</span>
+        </button>
+      </div>
+      <button type="button" data-member data-name="" class="mt-2 h-12 w-full rounded-[14px] bg-[#f0f1ef] text-[15px] font-semibold text-[#555]">연결 안 함</button>
     </div>
   </div>
 </th:block>

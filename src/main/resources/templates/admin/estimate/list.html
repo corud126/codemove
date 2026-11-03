@@ -1,103 +1,96 @@
 <!DOCTYPE html>
-<!--/* SCR-A-001 견적 관리
-  상태: (기본) | ?state=date-search (A 날짜 검색) | ?state=empty (B 검색 결과 없음) | ?state=delete-confirm (C 삭제 확인)
-  분류 필터·날짜 검색(YY.MM.DD)·페이지(4건)·삭제·분류별 현황은 estimate.js 에서 처리 (더미 데이터) */-->
+<!--/* SCR-A-001 견적 관리 — 디자인 기준: docs/ui/관리자디자인기준.md
+  상태: (기본) | ?state=date-search (A 검색 열림) | ?state=empty (B 검색 결과 없음) | ?state=delete-confirm (C 삭제 확인)
+  분류 필터 · 검색(이름·날짜 YY.MM.DD) · 페이지(8건) · 삭제 · 분류별 현황은 estimate.js 에서 처리 (더미 데이터) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='견적 관리', active='estimate', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
-  <div id="estimateList" class="space-y-5 px-4 pb-28 pt-6" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}">
-    <h2 class="px-1 text-[24px] font-extrabold tracking-[-0.04em] text-[#346538]">견적 관리</h2>
+  <div id="estimateList" class="px-4 pb-28 pt-5" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}">
+    <!--/* 1행: 페이지 제목만 */-->
+    <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">견적 관리</h2>
 
-    <!--/* 견적 기록 목록 */-->
-    <section class="rounded-[20px] bg-white shadow-[0_5px_18px_rgba(36,58,39,.06)]">
-      <div class="flex items-center justify-between px-5 pb-4 pt-5">
-        <h3 class="text-[16px] font-extrabold text-[#29312b]">견적 기록 목록</h3>
-        <a th:href="@{/admin/estimates/new}" class="rounded-lg bg-[#346538] px-3 py-2 text-[11px] font-bold text-white">+ 등록</a>
+    <!--/* 2행: 분류 필터 · 검색 · 등록 */-->
+    <div class="mt-5 flex items-center gap-1">
+      <div id="estimateFilter" class="inline-flex gap-0.5 rounded-full bg-[#eef0ee] p-1" role="tablist" aria-label="분류 필터">
+        <button type="button" th:each="f, st : ${ {'전체|전체', '견적 검토|검토', '견적 승인|승인', '견적 확정|확정', '만료|만료'} }"
+                th:with="t=${#strings.arraySplit(f, '|')}" th:attr="data-filter=${t[0]},aria-selected=${st.first}" role="tab"
+                class="h-[30px] rounded-full px-2.5 text-[13px] font-semibold text-[#888] aria-selected:bg-white aria-selected:text-[#346538] aria-selected:shadow-[0_1px_4px_rgba(26,26,26,.1)]"
+                th:text="${t[1]}">전체</button>
       </div>
+      <button type="button" id="estimateSearchToggle" aria-label="견적 검색" aria-expanded="false"
+              class="ml-auto grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee] aria-expanded:bg-[#eef0ee]">
+        <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+      </button>
+      <a th:href="@{/admin/estimates/new}" class="flex h-9 items-center rounded-full bg-[#346538] px-4 text-[14px] font-bold text-white">등록</a>
+    </div>
 
-      <div class="relative mx-4 mb-4 flex items-center justify-between">
-        <label class="relative">
-          <span class="sr-only">분류 필터</span>
-          <select id="estimateFilter"
-                  class="h-9 appearance-none rounded-lg border border-[#dfe4df] bg-[#fafbfa] pl-3 pr-8 text-[11px] font-semibold text-[#505852] outline-none focus:border-[#346538]">
-            <option>전체</option><option>견적 검토</option><option>견적 승인</option><option>견적 확정</option>
-          </select>
-          <svg class="icon pointer-events-none absolute right-2 top-2.5 text-[#778079]" width="14" height="14"><use th:href="@{/images/admin/icons.svg} + '#i-chevron'"/></svg>
-        </label>
-        <button type="button" id="dateSearchToggle" aria-label="날짜 검색" aria-expanded="false"
-                class="grid h-9 w-9 place-items-center rounded-lg border border-[#dfe4df] bg-[#fafbfa] text-[#6f7871] transition aria-expanded:border-[#346538] aria-expanded:bg-[#edf3ed] aria-expanded:text-[#346538]">
-          <svg class="icon" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-calendar'"/></svg>
-        </button>
-        <!--/* A 날짜 검색 팝오버 */-->
-        <div id="datePopover" hidden class="absolute bottom-11 right-0 z-10 rounded-xl border border-[#e1e5e1] bg-white p-3 shadow-[0_10px_28px_rgba(36,58,39,.15)]">
-          <label for="dateSearchInput" class="block text-[9px] font-bold text-[#828a84]">날짜 직접 입력</label>
-          <div class="mt-1.5 flex items-center gap-2">
-            <input id="dateSearchInput" type="text" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD" autocomplete="off"
-                   th:value="${state == 'empty'} ? '99.01.01' : ''"
-                   class="h-9 w-28 rounded-lg border border-[#dfe4df] bg-[#f8f9f8] px-3 text-[11px] font-semibold text-[#434b45] outline-none placeholder:text-[#adb3ae] focus:border-[#346538]">
-            <button type="button" id="dateSearchSubmit" aria-label="입력한 날짜 조회"
-                    class="grid h-9 w-9 place-items-center rounded-lg bg-[#346538] text-white transition hover:bg-[#2b582f]">
-              <svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
+    <!--/* A 검색창 (이름 또는 날짜) */-->
+    <div id="estimateSearchBar" hidden class="relative mt-3">
+      <svg class="icon pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+      <input id="estimateSearchInput" type="search" autocomplete="off" placeholder="이름 또는 날짜 검색"
+             th:value="${state == 'empty'} ? '99.01.01' : ''"
+             class="h-12 w-full rounded-[14px] bg-white pl-11 pr-11 text-[15px] text-[#1a1a1a] outline-none ring-1 ring-[#e5e7eb] placeholder:text-[#b0b4b1] focus:ring-2 focus:ring-[#346538] [&::-webkit-search-cancel-button]:hidden">
+      <button type="button" id="estimateSearchClear" aria-label="검색어 지우기" class="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-[#888] hover:bg-[#f0f1ef]">
+        <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+      </button>
+    </div>
 
-      <div class="grid grid-cols-[25px_72px_1fr_58px_40px] items-center gap-1 bg-[#f7f8f7] px-3 py-2.5 text-center text-[9px] font-bold text-[#8a918c]">
-        <span>번호</span><span>분류</span><span>이름</span><span>날짜</span><span>삭제</span>
+    <!--/* 견적 기록 (한 줄 리스트) — 행: id|분류|이름|날짜 (날짜 내림차순) */-->
+    <section class="mt-4 overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+      <div class="grid grid-cols-[84px_1fr_0.9fr_40px] items-center gap-2 border-b border-[#eef0ee] bg-[#f7f8f6] px-4 py-2.5 text-[12px] font-semibold text-[#888]">
+        <span>분류</span><span>이름</span><span>날짜</span><span class="text-center">삭제</span>
       </div>
-      <!--/* 행: id|분류|이름|날짜 (날짜 내림차순) */-->
-      <div class="px-3" id="estimateRows">
+      <div id="estimateRows">
         <div th:each="e : ${ {'1|견적 검토|홍길동|26.03.25', '2|견적 승인|김명품|25.11.08', '3|견적 확정|이서준|25.04.17', '4|견적 검토|박서준|24.12.02',
                               '5|견적 승인|최유진|24.06.21', '6|견적 확정|정도현|23.09.14', '7|견적 검토|한지민|23.02.28', '8|견적 승인|윤서아|22.10.05',
-                              '9|견적 확정|강민준|22.01.19', '10|견적 검토|송하윤|21.07.30', '11|견적 승인|임지호|21.03.12'} }"
+                              '9|견적 확정|강민준|22.01.19', '10|견적 검토|송하윤|21.07.30', '11|견적 승인|임지호|21.03.12',
+                              '12|만료|오지훈|25.08.22', '13|만료|배수아|24.03.07'} }"
              th:with="t=${#strings.arraySplit(e, '|')}"
              th:attr="data-row=${t[0]}, data-status=${t[1]}, data-name=${t[2]}, data-date=${t[3]}, data-href=@{/admin/estimates/{id}(id=${t[0]})}"
              role="link" tabindex="0"
-             class="grid cursor-pointer grid-cols-[25px_72px_1fr_58px_40px] items-center gap-1 border-b border-[#edf0ed] py-3.5 text-[11px] transition last:border-none hover:bg-[#f7f9f7]">
-          <span class="text-center text-[10px] font-semibold text-[#8a918c]" data-no th:text="${eStat.count}">1</span>
-          <span class="justify-self-center rounded-full px-2 py-1 text-[9px] font-bold"
-                th:classappend="${t[1] == '견적 검토'} ? 'bg-[#fbefed] text-[#b9574f]' : (${t[1] == '견적 승인'} ? 'bg-[#edf3f8] text-[#4b759b]' : 'bg-[#edf4ed] text-[#346538]')"
+             class="grid cursor-pointer grid-cols-[84px_1fr_0.9fr_40px] items-center gap-2 border-b border-[#eef0ee] px-4 py-2 transition last:border-none hover:bg-[#f7f8f6]">
+          <span class="chip" data-chip
+                th:classappend="${t[1] == '견적 검토'} ? 'chip-review' : (${t[1] == '견적 승인'} ? 'chip-progress' : (${t[1] == '만료'} ? 'chip-expired' : 'chip-done'))"
                 th:text="${t[1]}">견적 검토</span>
-          <span class="truncate px-1 font-semibold text-[#464e48]" th:text="${t[2]}">홍길동</span>
-          <span class="text-center text-[10px] font-medium text-[#7f8781]" th:text="${t[3]}">26.03.25</span>
+          <span class="truncate text-[15px] font-semibold text-[#292929]" data-name-cell th:text="${t[2]}">홍길동</span>
+          <span class="text-[13px] tabular-nums text-[#888]" data-date-cell th:text="${t[3]}">26.03.25</span>
           <button type="button" data-delete th:attr="aria-label=|${t[2]} 삭제|"
-                  class="grid h-7 w-7 place-items-center justify-self-center rounded-lg text-[#c7635a] hover:bg-[#fbefed]">
-            <svg class="icon" width="15" height="15"><use th:href="@{/images/admin/icons.svg} + '#i-trash'"/></svg>
+                  class="grid h-10 w-10 place-items-center rounded-full text-[#888] hover:bg-[#fff1e9] hover:text-[#d8663d]">
+            <svg class="icon" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-trash'"/></svg>
           </button>
         </div>
-        <p id="estimateEmpty" hidden class="py-8 text-center text-[11px] text-[#929994]">검색 조건에 맞는 견적 기록이 없습니다.</p>
+        <p id="estimateEmpty" hidden class="py-12 text-center text-[14px] text-[#888]">검색 결과가 없습니다.</p>
       </div>
-      <div id="estimatePager" class="flex items-center justify-center gap-1 border-t border-[#edf0ed] px-4 py-4"></div>
     </section>
 
+    <!--/* 페이지 */-->
+    <div id="estimatePager" class="mt-4 flex justify-center gap-1"></div>
+
     <!--/* 분류별 현황 */-->
-    <section class="rounded-[20px] bg-white p-5 shadow-[0_5px_18px_rgba(36,58,39,.06)]">
-      <h3 class="text-[16px] font-extrabold text-[#29312b]">분류별 현황</h3>
-      <div class="mt-5 space-y-5">
-        <div th:each="s : ${ {'견적 검토|#d96c62|4건 (36%)|36', '견적 승인|#d3904b|4건 (36%)|36', '견적 확정|#4f8b55|3건 (27%)|27'} }"
-             th:with="t=${#strings.arraySplit(s, '|')}" th:attr="data-stat=${t[0]}">
-          <div class="mb-2 flex items-center justify-between text-[11px]">
-            <span class="font-semibold text-[#5e665f]" th:text="${t[0]}">견적 검토</span>
-            <span class="font-bold text-[#414943]" data-stat-text th:text="${t[2]}">4건 (36%)</span>
-          </div>
-          <div class="h-2 overflow-hidden rounded-full bg-[#edf0ed]">
-            <div class="h-full rounded-full transition-[width]" data-stat-bar th:style="|background-color:${t[1]};width:${t[3]}%|"></div>
-          </div>
+    <section class="mt-5 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+      <h3 class="text-[17px] font-bold text-[#1a1a1a]">분류별 현황</h3>
+      <div th:each="s : ${ {'견적 검토|bar-orange|4건 (31%)|31', '견적 승인|bar-sage|4건 (31%)|31', '견적 확정|bar-green|3건 (23%)|23', '만료|bar-muted|2건 (15%)|15'} }"
+           th:with="t=${#strings.arraySplit(s, '|')}" th:attr="data-stat=${t[0]}" class="mt-4">
+        <div class="flex items-center justify-between text-[14px]">
+          <span class="font-semibold text-[#555]" th:text="${t[0]}">견적 검토</span>
+          <span class="font-bold text-[#1a1a1a]" data-stat-text th:text="${t[2]}">4건 (36%)</span>
+        </div>
+        <div class="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0ee]">
+          <div class="h-full rounded-full transition-[width]" data-stat-bar th:classappend="${t[1]}" th:style="|width:${t[3]}%|"></div>
         </div>
       </div>
     </section>
   </div>
 
   <!--/* C 삭제 확인 팝업 */-->
-  <div id="deleteConfirm" data-layer hidden class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 grid place-items-center bg-[#1f2d21]/45 p-6 backdrop-blur-[2px]">
-    <div class="w-full rounded-[20px] bg-white p-6 text-center shadow-2xl [animation:slideUp_.2s_ease-out]">
-      <p class="text-[17px] font-extrabold text-[#29312b]">정말 삭제하시겠습니까?</p>
-      <p class="mt-2 text-[10px] text-[#8b928d]">삭제된 데이터는 복구할 수 없습니다.</p>
+  <div id="deleteConfirm" data-layer hidden class="absolute inset-x-0 bottom-[var(--nav)] top-[var(--hdr)] z-50 grid place-items-center bg-[#1a1a1a]/40 p-6">
+    <div class="w-full rounded-[20px] bg-white p-6 text-center shadow-[0_18px_50px_rgba(26,26,26,.18)] [animation:slideUp_.2s_ease-out]">
+      <p class="text-[18px] font-bold text-[#1a1a1a]">정말 삭제하시겠습니까?</p>
+      <p class="mt-2 text-[14px] text-[#888]">삭제된 데이터는 복구할 수 없습니다.</p>
       <div class="mt-6 grid grid-cols-2 gap-2">
-        <button type="button" data-close class="h-11 rounded-xl border border-[#d9ded9] bg-white text-[11px] font-bold text-[#69716b]">취소</button>
-        <button type="button" id="deleteConfirmOk" class="h-11 rounded-xl bg-[#c75f56] text-[11px] font-bold text-white">삭제</button>
+        <button type="button" data-close class="h-12 rounded-[14px] bg-[#f0f1ef] text-[15px] font-semibold text-[#555]">취소</button>
+        <button type="button" id="deleteConfirmOk" class="h-12 rounded-[14px] bg-[#d8663d] text-[15px] font-semibold text-white">삭제</button>
       </div>
     </div>
   </div>

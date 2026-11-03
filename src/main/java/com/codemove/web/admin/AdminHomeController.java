@@ -1,6 +1,9 @@
 package com.codemove.web.admin;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -15,13 +18,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/admin")
 public class AdminHomeController {
 
+	private static final DateTimeFormatter TODAY = DateTimeFormatter.ofPattern("yyyy년 M월 d일 (E)", Locale.KOREAN);
+
 	@GetMapping
 	public String home(Model model) {
+		model.addAttribute("today", LocalDate.now().format(TODAY));
+		// tone: 조치가 필요한 항목(견적 검토)만 tone-orange, 나머지는 초록 계열 (docs/ui/관리자디자인기준.md)
 		model.addAttribute("stats", List.of(
-				new Stat("전체 예약 신청", 30, "calendar", "/admin/reservations"),
-				new Stat("리뷰 등록 현황", 12, "star", "/admin/reviews"),
-				new Stat("견적 검토", 4, "document", "/admin/estimates"),
-				new Stat("예약 완료", 25, "truck", "/admin/reservations")));
+				new Stat("전체 예약 신청", 30, "calendar", "tone-green", "/admin/reservations"),
+				new Stat("리뷰 등록", 12, "star", "tone-sage", "/admin/reviews"),
+				new Stat("견적 검토", 4, "document", "tone-orange", "/admin/estimates?status=review"),
+				new Stat("예약 완료", 25, "calendarCheck", "tone-green", "/admin/reservations?status=done")));
 		model.addAttribute("weeklyTotal", 10);
 		model.addAttribute("recentReservations", List.of(
 				new RecentReservation("홍길동", "26.09.27", "서울 강남구 테헤란로 521", "서울 서초구 남부순환로 2406", "예약 취소"),
@@ -30,7 +37,7 @@ public class AdminHomeController {
 		return "admin/home";
 	}
 
-	record Stat(String label, int value, String icon, String link) {
+	record Stat(String label, int value, String icon, String tone, String link) {
 	}
 
 	record RecentReservation(String name, String movingDate, String origin, String destination, String status) {
