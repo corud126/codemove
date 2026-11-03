@@ -2,8 +2,8 @@
  * 예약 일정(SCR-A-020) · 일정 관리(SCR-A-022 설정 · 연동) — 더미 데이터 (templates/admin/schedule/calendar.html · manage.html)
  * 역할 분리
  *  - 예약 일정: 예약을 확인하는 뷰어 (보기 전용). 월 달력(접기 가능) + 고른 날 예약 — 박스 목록 하나, 오늘이면 지난 이사 흐리게 · 다음 이사에 남은 시간 꼬리표. 예약을 누르면 간단한 예약 정보 시트 (결제 상태는 시트에만)
- *    TBL_RESERVATION 예약 완료(01)·이사 완료(02)만, 휴무일(TBL_DAY_STATUS)은 표시만
- *  - 일정 관리: 탭 [휴무일 | 공휴일] — 휴무일(TBL_DAY_STATUS) 목록 + 추가·수정·삭제(예약 있는 날이면 경고) / 공휴일·손 없는 날(외부 API) 확인·다시 불러오기
+ *    TBL_RESERVATION 예약 완료(01)·이사 완료(02)만, 휴무일(정기 · 공휴일 · 임시 TBL_CLOSED_DAY)은 표시만
+ *  - 일정 관리: 글자 탭 [설정 | 연동] — 설정: 하루 최대 예약 · 정기 휴무 · 공휴일에 쉬기(TBL_RESERVATION_SETTING) · 임시 휴무(TBL_CLOSED_DAY) / 연동: 공휴일 · 손 없는 날(외부 API, 저장 안 함)
  *    (예약 있는 날을 휴무로 지정하면 경고, 자동 알림 없음 Q23)
  *  - 오늘 = 26.09.27 가정 → 이사일이 지난 예약은 이사 완료 (Q7) · 더미 단계에서는 휴무일·설정을 sessionStorage 로 두 화면이 공유
  *  - 번호: 견적 QT-YYYYMMDD-NNNN(견적일) · 예약 ME-YYYYMMDD-NNNN(이사일)
@@ -65,7 +65,7 @@
   const HOLIDAY_NAMES = { '01-01': '신정', '03-01': '삼일절', '05-05': '어린이날', '06-06': '현충일', '08-15': '광복절', '10-03': '개천절', '10-09': '한글날', '12-25': '성탄절',
     '09-24': '추석 연휴', '09-25': '추석', '09-26': '추석 연휴', '10-05': '대체공휴일', '08-17': '대체공휴일', '02-16': '설날 연휴', '02-17': '설날', '02-18': '설날 연휴', '03-02': '대체공휴일', '05-24': '부처님오신날', '05-25': '대체공휴일', '06-03': '지방선거' };
 
-  // TBL_DAY_STATUS: 날짜 → { status (01 이사 예약 불가능 · 02 업체 휴무일) } — UPDATED_AT·ADMIN_ID 는 감사용, 화면에 표시하지 않음
+  // TBL_CLOSED_DAY: 임시 휴무 날짜 (하루 1건, 종류 구분 없음) — UPDATED_AT·ADMIN_ID 는 감사용, 화면에 표시하지 않음
   const DEFAULT_STATUS = { '26.09.11': { status: 'closed' }, '26.09.20': { status: 'closed' }, '26.10.09': { status: 'closed' }, '26.10.15': { status: 'closed' } };
   function loadStatuses() {
     try { const raw = sessionStorage.getItem(STATUS_KEY); if (raw) return JSON.parse(raw); } catch (e) { /* 기본값 */ }
@@ -79,7 +79,7 @@
     return { weekdays: [], holiday: false, daily: 3 };
   }
   function saveConfig(v) { try { sessionStorage.setItem(CONFIG_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ } }
-  // 그날 쉬는지: 임시 휴무(TBL_DAY_STATUS) · 정기 휴무 요일 · 공휴일 휴무
+  // 그날 쉬는지: 임시 휴무(TBL_CLOSED_DAY) · 정기 휴무 요일 · 공휴일 휴무
   const isClosed = (key, statuses, cfg) => {
     const dt = dateOf(key);
     return Boolean(statuses[key]) || cfg.weekdays.includes(dt.getDay()) || (cfg.holiday && holidaysOf(dt.getFullYear(), dt.getMonth() + 1).includes(dt.getDate()));
@@ -275,7 +275,7 @@
       if (b) { const i = Number(b.dataset.weekday); wdDraft = wdDraft.includes(i) ? wdDraft.filter((x) => x !== i) : [...wdDraft, i]; renderWeekdays(); return; }
       if (e.target.closest('[data-wd-save]')) { cfg = { ...cfg, weekdays: wdDraft }; saveConfig(cfg); wdSheet.hidden = true; render(); showToast('저장되었습니다'); }
     });
-    // 공휴일 · 손 없는 날 — 외부 API 값, 확인 · 다시 불러오기만
+    // 공휴일 · 손 없는 날 — 외부 API 값을 그때그때 불러와 보여 줌(DB 저장 없음, Q17), 확인만
     function renderHolidays() {
       const { hy: y, hm: m } = s;
       const items = [
@@ -294,7 +294,7 @@
             <b class="min-w-[92px] text-center text-[15px] font-bold text-[#292929]">${y}년 ${m}월</b>
             <button type="button" data-hstep="1" aria-label="다음 달" class="grid h-9 w-9 place-items-center rounded-full text-[#555] hover:bg-[#eef0ee]">${icon('chevronRight', 19)}</button>
           </div>
-          <button type="button" data-refresh class="-mr-1 flex h-9 items-center gap-1 rounded-full px-2 text-[14px] font-semibold text-[#346538] hover:bg-[#eef4f0]">${icon('refresh', 16)}다시 불러오기</button></div>
+          </div>
         <div class="mt-3">${card(rows || '<p class="py-10 text-center text-[14px] text-[#888]">공휴일 · 손 없는 날이 없습니다</p>')}</div>`;
     }
     function render() {
@@ -307,7 +307,6 @@
       if (e.target.closest('[data-toggle-past]')) { s.showPast = !s.showPast; render(); return; }
       const st = e.target.closest('[data-hstep]');
       if (st) { const d = new Date(s.hy, s.hm - 1 + Number(st.dataset.hstep), 1); s.hy = d.getFullYear(); s.hm = d.getMonth() + 1; render(); return; }
-      if (e.target.closest('[data-refresh]')) { showToast('최신 정보로 불러왔습니다'); return; }
       const dk = e.target.closest('[data-daykey]');
       if (e.target.closest('[data-add-day]')) { openDay(); return; }
       if (e.target.closest('[data-open-daily]')) { openDaily(); return; }
@@ -317,7 +316,7 @@
     });
 
 
-    /* ----- 휴무일 추가·수정 시트 (TBL_DAY_STATUS 하루 1건) — 작은 달력에서 날짜를 누름 · 예약 있는 날이면 경고, 자동 알림 없음 (Q23) ----- */
+    /* ----- 휴무일 추가·수정 시트 (TBL_CLOSED_DAY 하루 1건) — 작은 달력에서 날짜를 누름 · 예약 있는 날이면 경고, 자동 알림 없음 (Q23) ----- */
     const day = root.querySelector('#dayStatus');
     const miniCal = day.querySelector('[data-mini-cal]');
     let editingKey = null, pick = '', miniCursor = dateOf(TODAY);

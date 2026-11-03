@@ -2,6 +2,7 @@
  * SCR-A-011 예약 관리 (templates/admin/reservation/list.html) — 더미 데이터
  *  분류 필터(전체 · 예약 완료 · 예약 취소 — 이사 완료는 예약 완료에 포함) · 검색(이름·휴대폰·예약 번호·예약일)
  *  페이지(8건, 예약일 내림차순) · 상세 팝업(상태·금액·결제·취소 정보) · [결제 완료] → 결제 상태·결제일 변경(A→B) · 분류별 현황
+ *  [일정 변경] 예약일 입력 + 예약 시간은 고정 시간대(오전 8:00 · 10:00 / 오후 1:00 · 3:00 · 5:00) 중 선택
  */
 (function () {
   const root = document.getElementById('reservationList');
@@ -201,35 +202,36 @@
     if (d.length === 2 && !deleting) return `${d}.`;
     return d;
   }
-  function formatTime(value, deleting) {
-    const d = value.replace(/\D/g, '').slice(0, 4);
-    if (d.length >= 3) return `${d.slice(0, 2)}:${d.slice(2)}`;
-    if (d.length === 2 && !deleting) return `${d}:`;
-    return d;
-  }
   const validDate = (v) => {
     const m = /^(\d{2})\.(\d{2})\.(\d{2})$/.exec(v);
     if (!m) return false;
     const dt = new Date(2000 + Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     return dt.getMonth() === Number(m[2]) - 1 && dt.getDate() === Number(m[3]) && v >= TODAY; // 오늘 이후만
   };
-  const validTime = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 
+  // 예약 시간: 고정 시간대(08:00 · 10:00 · 13:00 · 15:00 · 17:00) 중 하나를 고름
   const reschedule = $('#rescheduleDialog');
   const dateInput = $('#rescheduleDate');
-  const timeInput = $('#rescheduleTime');
+  const timeBox = $('#rescheduleTime');
   const saveBtn = $('#rescheduleSave');
-  const validate = () => {
-    const changed = selected && (dateInput.value !== selected.dataset.movingDate || timeInput.value !== selected.dataset.movingTime);
-    saveBtn.disabled = !(validDate(dateInput.value) && validTime(timeInput.value) && changed);
+  let pickedTime = '';
+  const setTime = (v) => {
+    pickedTime = v;
+    $$('[data-time]', timeBox).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.time === v)));
   };
-  [[dateInput, formatShortDate], [timeInput, formatTime]].forEach(([el, fmt]) => {
-    el.addEventListener('input', (e) => { el.value = fmt(el.value, (e.inputType || '').startsWith('delete')); validate(); });
+  const validate = () => {
+    const changed = selected && (dateInput.value !== selected.dataset.movingDate || pickedTime !== selected.dataset.movingTime);
+    saveBtn.disabled = !(validDate(dateInput.value) && pickedTime && changed);
+  };
+  dateInput.addEventListener('input', (e) => { dateInput.value = formatShortDate(dateInput.value, (e.inputType || '').startsWith('delete')); validate(); });
+  timeBox.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-time]');
+    if (b) { setTime(b.dataset.time); validate(); }
   });
   function openReschedule() {
     if (!selected) return;
     dateInput.value = selected.dataset.movingDate;
-    timeInput.value = selected.dataset.movingTime;
+    setTime(selected.dataset.movingTime);
     validate();
     layer.open(reschedule);
   }
@@ -239,10 +241,10 @@
     if (saveBtn.disabled || !selected) return;
     reservationNo(selected); // 번호 고정
     selected.dataset.movingDate = dateInput.value;
-    selected.dataset.movingTime = timeInput.value;
+    selected.dataset.movingTime = pickedTime;
     $('[data-date-cell]', selected).textContent = dateInput.value;
     $('[data-d="movingDate"]', detail).textContent = dateInput.value;
-    $('[data-d="movingTime"]', detail).textContent = timeInput.value;
+    $('[data-d="movingTime"]', detail).textContent = pickedTime;
     layer.close(reschedule);
     render(); // 예약일 정렬 유지
     toast('일정 변경 알림', '일정이 변경되었습니다');

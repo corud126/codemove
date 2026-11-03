@@ -2,8 +2,8 @@
 <!--/* SCR-A-022 일정 관리 — 휴무일 지정 · 공휴일 확인 (개인 일정 등록 SCR-A-021 은 뺌). 디자인 기준: docs/ui/관리자디자인기준.md
   예약 확인은 예약 일정(/admin/schedule)
   1행 제목 / 2행 글자 탭 [설정 | 연동]
-    설정(채팅 설정과 같은 묶음 목록): 예약 받기 — 하루 최대 예약 'N건 ›' → 휠 시트(1~10) / 쉬는 날 — 정기 휴무 '매주 월요일 ›' → 요일 시트 · 공휴일에 쉬기 토글 / 임시 휴무 N + 추가 / 휴무 카드(정기 휴무 요일 동그라미 7개 · 공휴일에 쉬기 토글) — ERD 반영 대기 / 임시 휴무 + [날짜 추가](TBL_DAY_STATUS 하루 1건, 종류 구분 없음): 다가오는 날짜 목록(예약 있으면 '이 날 예약 N건') → 추가·수정 시트(날짜만, 예약 있는 날이면 경고) · 삭제
-    연동: 공휴일 · 손 없는 날 — 외부 API(공공데이터 특일 정보 · 음력)에서 불러온 값, 월별 확인 + [다시 불러오기]만
+    설정(채팅 설정과 같은 묶음 목록): 예약 받기 — 하루 최대 예약 'N건 ›' → 휠 시트(1~10) / 쉬는 날 — 정기 휴무 '매주 월요일 ›' → 요일 시트 · 공휴일에 쉬기 토글 / 임시 휴무 N + 추가 / 휴무 카드(정기 휴무 요일 동그라미 7개 · 공휴일에 쉬기 토글) (TBL_RESERVATION_SETTING) / 임시 휴무 + [날짜 추가](TBL_CLOSED_DAY 하루 1건, 종류 구분 없음): 다가오는 날짜 목록(예약 있으면 '이 날 예약 N건') → 추가·수정 시트(날짜만, 예약 있는 날이면 경고) · 삭제
+    연동: 공휴일 · 손 없는 날 — 외부 API(공공데이터 특일 정보 · 음력)에서 불러온 값, 월별 확인만 (DB 저장 없음, Q17)
   감사용 UPDATED_AT · ADMIN_ID 는 표시하지 않음 · 자동 알림 없음(Q23) · 저장 후 토스트
   state: (기본) 휴무일 · weekly(매주 월 + 공휴일 휴무) · past · day-add · day-edit · day-warning · holidays · saved
   더미 데이터·동작: js/admin/schedule.js (오늘 = 26.09.27 가정) */-->
@@ -70,7 +70,7 @@
       </div>
     </div>
 
-    <!--/* 휴무일 추가·수정 시트 (TBL_DAY_STATUS) */-->
+    <!--/* 휴무일 추가·수정 시트 (TBL_CLOSED_DAY) */-->
     <div id="dayStatus" data-layer hidden class="absolute inset-0 z-50 flex items-end bg-[#1a1a1a]/40">
       <div role="dialog" aria-modal="true" aria-label="휴무일" class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
         <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>

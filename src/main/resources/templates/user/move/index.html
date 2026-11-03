@@ -43,7 +43,7 @@
         <th:block th:unless="${state == 'none'}">
           <div class="mv-booking-card">
             <div class="mv-booking-head">
-              <div><span class="mv-booking-badge">예약 확정</span><span class="mv-booking-type">원룸 · 일반포장</span></div>
+              <div><span class="mv-booking-badge">예약 확정</span><span class="mv-booking-type">원룸 / 오피스텔 · 일반포장</span></div>
               <b class="mv-booking-dday">D-30</b>
             </div>
             <div class="mv-booking-body">
@@ -97,18 +97,18 @@
               <span class="mv-card-date" th:if="${state == 'confirmed'}">10.27 확정</span>
             </div>
             <b class="mv-price">410,000원</b>
-            <span class="mv-card-meta">원룸 · 일반포장 · 3월 18일</span>
+            <span class="mv-card-meta">원룸 / 오피스텔 · 일반포장 · 3월 18일</span>
             <a class="action mv-primary" th:unless="${state == 'confirmed'}" href="?tab=estimate&amp;state=confirmed">견적 확정</a>
           </div>
 
           <div class="receipt-wrap">
             <section class="mv-receipt">
               <div class="mv-receipt-brand">명품익스프레스</div>
-              <div class="mv-receipt-sub">견적번호 No. 20260318-0412</div>
+              <div class="mv-receipt-sub">견적번호 QT-20260310-0042</div>
               <div class="mv-receipt-rows">
-                <div class="mv-receipt-row"><div><span>기본 운송비</span><small>기본 거리 10km 포함</small></div><b>250,000원</b></div>
-                <div class="mv-receipt-row"><div><span>포장·인력 작업비</span></div><b>140,000원</b></div>
-                <div class="mv-receipt-row"><div><span>도착지 사다리차 (8층)</span></div><b>20,000원</b></div>
+                <div class="mv-receipt-row"><div><span>이사비용</span></div><b>370,000원</b></div>
+                <div class="mv-receipt-row"><div><span>도착지 사다리 (8층)</span></div><b>20,000원</b></div>
+                <div class="mv-receipt-row"><div><span>옵션</span><small>벽걸이TV 탈착·설치</small></div><b>20,000원</b></div>
               </div>
               <div class="mv-receipt-total"><span>합계</span><b>410,000원</b></div>
               <a class="action mv-receipt-link" th:href="${state == 'confirmed'} ? @{/estimates/1(state='confirmed')} : @{/estimates/1}">AI 분석 · 견적 상세 보기
@@ -139,7 +139,7 @@
           <strong class="mv-route-title">마포구
             <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 18 18" width="18"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>
             서대문구</strong>
-          <span class="mv-card-meta">원룸 · 반포장</span>
+          <span class="mv-card-meta">원룸 / 오피스텔 · 반포장</span>
           <a class="action mv-primary" th:unless="${state == 'reviewed'}" th:href="@{/more/reviews/new}">리뷰 작성</a>
           <a class="action mv-review-done" th:if="${state == 'reviewed'}" th:href="@{/more/reviews}">
             <svg aria-hidden="true" height="12" viewBox="0 0 14 14" width="12"><path d="m7 1 1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5L7 1Z" fill="#df8436"/></svg>

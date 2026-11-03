@@ -65,7 +65,7 @@
     addr: { from: { sel: null, detail: '' }, to: { sel: null, detail: '' } },
     view: { y: 2026, m: 2 },
     date: null,
-    time: '오전 10:00',
+    time: '오전', // 희망 시간대: 오전 · 오후 · 상관없음
     dateUnknown: false,
     voice: false,
   };
@@ -153,7 +153,7 @@
     $('[data-q-sum-date]', root).hidden = unknown;
     $('[data-q-sum-date-pick]', root).hidden = !unknown;
     if (!unknown) {
-      $('[data-q-sum-date]', root).textContent = `${dateLabel(state.date)} ${state.time === '시간 상관없음' ? '· 시간 상관없음' : state.time}`;
+      $('[data-q-sum-date]', root).textContent = `${dateLabel(state.date)} ${state.time === '상관없음' ? '· 시간 상관없음' : state.time}`;
     }
     const short = (sel) => (sel ? sel.road.split(' ').slice(1).join(' ') : '—');
     $('[data-q-sum-from]', root).textContent = short(state.addr.from.sel);
@@ -195,6 +195,18 @@
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     state.video = file.name;
+    // 첨부 카드: 첫 장면 썸네일 · 용량 · 길이
+    const card = $('[data-q-upload]', root);
+    const preview = $('[data-q-video-preview]', card);
+    const mb = `${(file.size / 1024 / 1024).toFixed(1)}MB`;
+    $('[data-q-video-meta]', card).textContent = mb;
+    if (preview.src) URL.revokeObjectURL(preview.src);
+    preview.src = URL.createObjectURL(file);
+    preview.onloadedmetadata = () => {
+      const s = Math.round(preview.duration || 0);
+      if (s) $('[data-q-video-meta]', card).textContent = `${mb} · ${s >= 60 ? `${Math.floor(s / 60)}분 ` : ''}${s % 60}초`;
+      try { preview.currentTime = Math.min(0.5, (preview.duration || 1) / 2); } catch (_) { /* 미리보기 불가 */ }
+    };
     state.analysis = 'analyzing';
     render();
   });
@@ -416,6 +428,18 @@
 
   /* ── 5. 날짜 ── */
   const sameMonth = (y, m, d) => y === d.getFullYear() && m === d.getMonth();
+  // 관리자 일정 관리와 연결되는 값 (더미): 휴무일(정기 휴무 요일 · 공휴일에 쉬기 · 임시 휴무) · 마감일(그날 확정 예약이 하루 최대 예약만큼 참) → 선택 불가
+  // 손 없는 날은 휴무가 아님 — 초록 점으로 표시만 (외부 API 값, 더미는 고정)
+  const CLOSE = { weekdays: [], holiday: true, dates: ['2026-03-10'], full: ['2026-03-13', '2026-03-20'] };
+  const HOLIDAYS = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-03-01', '2026-03-02', '2026-05-05', '2026-05-24', '2026-05-25', '2026-06-03', '2026-06-06'];
+  const NO_MOVE = [7, 8, 17, 18, 27, 28];
+  const ymd = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const dayState = (y, m, d) => {
+    const key = ymd(y, m, d), wd = new Date(y, m, d).getDay(), holiday = HOLIDAYS.includes(key);
+    if (CLOSE.weekdays.includes(wd) || (CLOSE.holiday && holiday) || CLOSE.dates.includes(key)) return { off: '휴무', holiday };
+    if (CLOSE.full.includes(key)) return { off: '마감', holiday };
+    return { off: '', holiday, noMove: NO_MOVE.includes(d) };
+  };
 
   function renderCalendar() {
     const { y, m } = state.view;
@@ -423,7 +447,6 @@
     $('[data-q-cal-prev]', root).disabled = y < TODAY.getFullYear() || sameMonth(y, m, TODAY) || (y === TODAY.getFullYear() && m < TODAY.getMonth());
     const first = new Date(y, m, 1).getDay();
     const days = new Date(y, m + 1, 0).getDate();
-    const prevDays = new Date(y, m, 0).getDate();
     const cells = Math.ceil((first + days) / 7) * 7;
     const nodes = [];
     for (let i = 0; i < cells; i += 1) {
@@ -431,18 +454,23 @@
       const d = i - first + 1;
       if (d < 1 || d > days) {
         span.className = 'muted';
-        span.textContent = d < 1 ? prevDays + d : d - days;
+        span.innerHTML = '<b class="q-day-num"></b><span class="q-day-mark"></span>'; // 앞뒤 달 날짜는 빈칸 (흐린 숫자 = 고를 수 없는 날 하나만 뜻하게)
         span.setAttribute('aria-hidden', 'true');
       } else {
         const past = sameMonth(y, m, TODAY) && d < TODAY.getDate();
-        const picked = state.date && state.date.y === y && state.date.m === m && state.date.d === d;
-        span.className = picked ? 'picked' : past ? 'muted' : 'selectable';
-        span.textContent = d;
-        if (!past) {
+        const ds = dayState(y, m, d);
+        const blocked = past || !!ds.off;
+        const picked = !blocked && state.date && state.date.y === y && state.date.m === m && state.date.d === d;
+        span.className = picked ? 'picked' : blocked ? 'muted' : 'selectable';
+        if (ds.holiday || new Date(y, m, d).getDay() === 0) span.classList.add('is-red');
+        // 칸 = 숫자 동그라미 + 그 아래 고정된 표시 줄(휴무 · 마감 회색 / 손없음 초록 글자) — 점 대신 글자로 바로 읽히게
+        span.innerHTML = `<b class="q-day-num">${d}</b><span class="q-day-mark">${!past && ds.off ? `<small class="q-day-tag">${ds.off}</small>` : !blocked && ds.noMove ? '<small class="q-day-tag is-nomove">손없음</small>' : ''}</span>`;
+        if (!past && ds.off) span.setAttribute('aria-label', `${m + 1}월 ${d}일 ${ds.off}`);
+        if (!blocked) {
           span.dataset.day = d;
           span.setAttribute('role', 'button');
           span.tabIndex = 0;
-          span.setAttribute('aria-label', `${m + 1}월 ${d}일`);
+          span.setAttribute('aria-label', `${m + 1}월 ${d}일${ds.noMove ? ' 손 없는 날' : ''}`);
           if (picked) span.setAttribute('aria-pressed', 'true');
         }
       }
@@ -451,7 +479,7 @@
     $('[data-q-days]', root).replaceChildren(...nodes);
     const timeRow = $('[data-q-time-row]', root);
     timeRow.hidden = !state.date;
-    $('[data-q-time-label]', root).textContent = state.time;
+    $('[data-q-time-label]', root).textContent = state.date ? `${dateLabel(state.date)} ${state.time === '상관없음' ? '· 시간 상관없음' : state.time}` : state.time; // 고른 날짜 + 희망 시간대를 함께 확인
   }
 
   $('[data-q-days]', root).addEventListener('click', (e) => {

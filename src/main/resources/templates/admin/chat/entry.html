@@ -48,7 +48,8 @@
         <!--/* 칸이 하나뿐이라 바깥 카드 없이 입력칸 자체를 카드 모양으로 */-->
         <span class="group/f relative mt-3 block">
           <textarea data-greeting data-grow maxlength="500" rows="2" aria-label="인사말" placeholder="예: 안녕하세요! 궁금한 내용을 편하게 물어보세요."
-                    class="block min-h-14 w-full resize-none overflow-hidden rounded-[20px] bg-white/90 px-5 pb-7 pt-4 text-[16px] leading-6 text-[#1a1a1a] outline-none ring-1 ring-inset ring-[#e5e8e4] transition-colors placeholder:text-[#a9aea9] focus:bg-white focus:ring-2 focus:ring-[#346538]">안녕하세요! 명품익스프레스 AI 상담 챗봇입니다. 이사와 관련해 궁금한 내용을 편하게 물어보세요.</textarea>
+                    class="block min-h-14 w-full resize-none overflow-hidden rounded-[20px] bg-white/90 px-5 pb-7 pt-4 text-[16px] leading-6 text-[#1a1a1a] outline-none ring-1 ring-inset ring-[#e5e8e4] transition-colors placeholder:text-[#a9aea9] focus:bg-white focus:ring-2 focus:ring-[#346538]">안녕하세요, 명품익스프레스입니다.
+궁금하신 내용을 선택해주세요.</textarea>
           <span class="pointer-events-none absolute bottom-2 right-4 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-greeting-count>0/500</span>
         </span>
       </section>
@@ -131,12 +132,22 @@
         { id: 4, title: '사다리차 이용', intro: '사다리차 필요 여부와 추가 비용을 안내합니다.', inactive: true },
         { id: 5, title: '내 예약 확인', intro: '예약 일정과 진행 상태를 알려 드립니다.' },
         { id: 6, title: '내 견적 확인', intro: '견적 진행 상태를 알려 드립니다.' },
+        { id: 7, title: '영상 분석 견적', intro: '영상으로 짐 부피를 분석하는 견적을 안내합니다.' },
+        { id: 8, title: '이사 준비', intro: '이사 전에 챙길 준비 사항을 안내합니다.' },
+        { id: 9, title: '결제 · 환불', intro: '계약금 결제와 취소·환불 기준을 안내합니다.' },
       ];
       const MAX = 5;
       const topic = (id) => TOPICS.find((t) => t.id === id);
-      // 퀵메뉴 (TBL_QUICK_MENU): TOPIC_ID · MENU_NAME · SORT_ORDER(배열 순서) · IS_ACTIVE
-      let menus = [{ id: 1, topicId: 1, label: '이사 견적 알아보기', active: true }, { id: 2, topicId: 5, label: '예약 및 일정 확인', active: true }];
-      if (state === 'full' || state === 'drag') menus = menus.concat([{ id: 3, topicId: 6, label: '내 견적 확인', active: true }, { id: 4, topicId: 3, label: '포장 이사 안내', active: false }, { id: 5, topicId: 2, label: '예약 방법 안내', active: true }]);
+      // 퀵메뉴 (TBL_QUICK_MENU): TOPIC_ID · MENU_NAME · SORT_ORDER(배열 순서) · IS_ACTIVE — 고객 채팅 첫 화면의 5개와 같은 글자·순서
+      let menus = [
+        { id: 1, topicId: 6, label: '이사 견적 알아보기', active: true },
+        { id: 2, topicId: 5, label: '예약 및 일정 확인', active: true },
+        { id: 3, topicId: 7, label: '영상 분석 견적', active: true },
+        { id: 4, topicId: 8, label: '이사 준비 체크리스트', active: true },
+        { id: 5, topicId: 9, label: '결제 및 환불 문의', active: true },
+      ];
+      if (state === 'full') menus[3] = { ...menus[3], active: false };   // 검토용: 숨긴 버튼
+      if (state === 'menu' || state === 'added') menus = menus.slice(0, 4);   // 검토용: 빈자리가 있어야 추가 가능
       let selected = 'greeting';   // 'greeting' | 퀵메뉴 id
 
       const rows = $('[data-menu-rows]', root);
@@ -285,7 +296,7 @@
       if (state === 'menu') openTopics('add');
       if (state === 'topic') { select(menus[0].id); openTopics('change'); }
       if (state === 'added') pickTopic(3);
-      if (state === 'drag') { startDrag(rows.children[2], 0); moveDrag(-62); }   // 검토용: '내 견적 확인'을 끌어 올리는 중
+      if (state === 'drag') { startDrag(rows.children[2], 0); moveDrag(-62); }   // 검토용: '영상 분석 견적'을 끌어 올리는 중
       if (state === 'delete') { select(menus[0].id); delModal.hidden = false; }
       if (state === 'saved') { greeting.value += ' '; render(); saveBtn.click(); clearTimeout(timer); }
     })();

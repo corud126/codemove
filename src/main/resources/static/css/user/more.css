@@ -136,6 +136,12 @@ input.field::placeholder { color: #d9d9d9; }
 .my-review-copy { margin-top: 10px; }
 .my-review-copy > p { line-height: 1.7; }
 .my-review-type { margin-top: 10px; }
+/* 관리자 답변 (회색 칸) */
+.my-review-reply { margin: 12px 8px 0 0; padding: 12px 14px; border-radius: 12px; background: #f7f8f6; }
+.my-review-reply-head { display: flex; align-items: center; gap: 8px; }
+.my-review-reply-head > strong { color: #555; font-family: "Pretendard:SemiBold"; font-size: var(--text-caption); }
+.my-review-reply-head > small { color: var(--muted); font-size: var(--text-caption); }
+.my-review-reply > p { margin: 6px 0 0; color: #666; font-size: var(--text-supporting); line-height: 1.6; word-break: keep-all; }
 .easy-mode .review-prompt > p { margin-top: 12px; }
 .easy-mode .review-history-label { min-height: 56px; margin-top: 25px; }
 .easy-mode .my-review-head > span { font-size: 17px; }

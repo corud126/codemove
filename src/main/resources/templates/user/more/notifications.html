@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U-08x 알림 (G-H13 / E-H13) — 11/02 시안(05_notifications) 기준
-  탭: 전체 / 내 이사(예약·일정·견적·결제) / 공지(이야기·이사 팁). ?tab=move|notice 로 탭 지정 가능
+  탭: 전체 / 내 이사(예약·일정·견적·결제). ?tab=move 로 탭 지정 가능 (공지는 범위 밖)
   읽지 않은 알림: 연녹색 배경 + 오른쪽 주황 점. 행 클릭 시 읽음, '모두 읽음' 은 전체 읽음 (more.js)
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='알림', links=~{::link})}">
@@ -18,7 +18,6 @@
     <div class="notification-tabs" role="tablist" aria-label="알림 종류">
       <button type="button" class="active" role="tab" aria-selected="true" data-noti-tab="all">전체</button>
       <button type="button" role="tab" aria-selected="false" data-noti-tab="move">내 이사</button>
-      <button type="button" role="tab" aria-selected="false" data-noti-tab="notice">공지</button>
     </div>
     <div class="notification-feed" id="notificationFeed">
       <div class="action notification-row unread" role="button" tabindex="0" data-tab="move" th:attr="data-href=@{/reservations/1}">
@@ -30,47 +29,21 @@
         </div>
         <i aria-label="읽지 않음"></i>
       </div>
-      <div class="action notification-row" role="button" tabindex="0" data-tab="notice">
-        <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('story')}"></svg></div>
-        <div class="notification-copy">
-          <strong>새로운 이야기가 등록됐어요</strong>
-          <p>이사 전날 꼭 확인해야 할 준비 체크리스트를 살펴보세요.</p>
-          <small>하루 전</small>
-        </div>
-      </div>
       <div class="action notification-row" role="button" tabindex="0" data-tab="move" th:attr="data-href=@{/estimates/1}">
         <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('estimate')}"></svg></div>
         <div class="notification-copy">
-          <strong>새로운 견적이 도착했어요</strong>
-          <p>회원님의 이사 조건에 맞는 업체 견적을 비교해보세요.</p>
+          <strong>견적서가 도착했어요</strong>
+          <p>담당자가 확인한 견적 금액과 작업 내용을 확인해주세요.</p>
           <small>2일 전</small>
         </div>
-      </div>
-      <div class="action notification-row unread" role="button" tabindex="0" data-tab="move" th:attr="data-href=@{/reservations/1}">
-        <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('schedule')}"></svg></div>
-        <div class="notification-copy">
-          <strong>이사 일정이 가까워지고 있어요</strong>
-          <p>이사까지 30일 남았어요. 준비 체크리스트를 확인해주세요.</p>
-          <small>3일 전</small>
-        </div>
-        <i aria-label="읽지 않음"></i>
       </div>
       <div class="action notification-row" role="button" tabindex="0" data-tab="move" th:attr="data-href=@{/reservations/1}">
         <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('payment')}"></svg></div>
         <div class="notification-copy">
-          <strong>예약금 결제가 완료되었어요</strong>
-          <p>결제 내역과 남은 결제 일정을 확인할 수 있어요.</p>
+          <strong>계약금 결제가 완료되었어요</strong>
+          <p>결제 내역과 이사 당일 잔금을 확인할 수 있어요.</p>
           <small>5일 전</small>
         </div>
-      </div>
-      <div class="action notification-row unread" role="button" tabindex="0" data-tab="notice">
-        <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('story')}"></svg></div>
-        <div class="notification-copy">
-          <strong>새로운 이사 팁이 도착했어요</strong>
-          <p>주소 이전과 공과금 정산을 미리 준비해보세요.</p>
-          <small>7일 전</small>
-        </div>
-        <i aria-label="읽지 않음"></i>
       </div>
       <div class="notification-empty" id="notificationEmpty" hidden>해당하는 알림이 없어요.</div>
     </div>

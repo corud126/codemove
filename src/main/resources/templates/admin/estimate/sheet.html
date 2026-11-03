@@ -109,7 +109,8 @@
       <b>TEL</b><span><input readonly data-field="phone" aria-label="연락처" value="010-1234-5678"></span>
       <b>견적일</b><span><input readonly data-field="estimateDate" aria-label="견적일" value="26.03.25"></span>
       <b>출발지</b><span><input readonly data-field="origin" aria-label="출발지" value="서울 강남구 테헤란로 123, 101동 1203호"></span>
-      <b>작업일</b><span><input readonly data-field="moveDate" aria-label="작업일" placeholder="미정" th:value="${noDate == true} ? '' : '26.04.12'"></span>
+      <!--/* 작업일 = WORK_DATE + WORK_TIME(고정 시간대 08:00·10:00·13:00·15:00·17:00 중 하나, 고객 희망 시간대를 보고 정함) */-->
+      <b>작업일</b><span><input readonly data-field="moveDate" aria-label="작업일" placeholder="미정" th:value="${noDate == true} ? '' : '26.04.12 08:00'"></span>
       <b>도착지</b><span><input readonly data-field="destination" aria-label="도착지" value="경기 성남시 분당구 판교로 45, 2층"></span>
       <b>운송일</b><span><input readonly data-field="transportDate" aria-label="운송일" value="26.04.12"></span>
     </div>
@@ -147,7 +148,7 @@
               <span th:text="${t[k]}">일반</span><span data-box th:text="${t[k + 2] == 'Y'} ? '■' : '□'">□</span>
             </button>
           </span>
-          <span class="cost">₩<input readonly inputmode="numeric" th:attr="data-field='option' + ${s.index}, aria-label=|${t[0]} 옵션 비용|" th:value="${t[5]}"></span>
+          <span class="cost">₩<input readonly inputmode="numeric" th:attr="data-field='option' + ${s.index}, data-money=true, aria-label=|${t[0]} 옵션 비용|" th:value="${t[5]}"></span>
         </div>
       </div>
       <div class="qs-details">
@@ -170,11 +171,11 @@
       </div>
     </div>
 
-    <!--/* A. 작업 비용 · B. 별도 비용 (사다리 층수 입력) */-->
+    <!--/* A. 작업 비용(총 비용 = 이사비용 + 사다리비용 + 옵션비용) · B. 별도 비용 (사다리 층수 입력) */-->
     <div class="qs-cost">
       <div class="qs-col">
         <b>A. 작업 비용</b>
-        <div th:each="m : ${ {'이사비용|movingCost|1,050,000|', '사다리비용|extraCost|270,000|', '총 비용|total|1,320,000|total'} }" th:with="t=${#strings.arraySplit(m + ' ', '|')}"
+        <div th:each="m : ${ {'이사비용|movingCost|1,050,000|', '사다리비용|extraCost|270,000|', '옵션비용|optionCost|20,000|', '총 비용|total|1,340,000|total'} }" th:with="t=${#strings.arraySplit(m + ' ', '|')}"
              th:classappend="${#strings.trim(t[3]) == 'total'} ? 'total'">
           <span th:text="${t[0]}">이사비용</span><strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=${t[0]}" th:value="${t[2]}"></strong>
         </div>
@@ -185,12 +186,13 @@
           <span><th:block th:text="${t[0]}">출발지</th:block>&nbsp;사다리(<input readonly inputmode="numeric" maxlength="3" th:attr="data-field=${t[3]}, aria-label=|${t[0]} 사다리 층수|" th:value="${t[4]}">)층</span>
           <strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=|${t[0]} 사다리 비용|" th:value="${t[2]}"></strong>
         </div>
+        <div aria-hidden="true"><span></span><strong></strong></div><!--/* A칸과 줄 높이 맞춤 */-->
         <div class="total"><span>사다리 소계</span><strong>₩<input readonly inputmode="numeric" data-field="ladderSubtotal" data-money="true" aria-label="사다리 소계" value="270,000"></strong></div>
       </div>
     </div>
     <div class="qs-pay">
-      <b>계약금 10%</b><span>₩<input readonly inputmode="numeric" data-field="deposit" data-money="true" aria-label="계약금" value="132,000"></span>
-      <b class="bal">잔금</b><span class="bal">₩<input readonly inputmode="numeric" data-field="balance" data-money="true" aria-label="잔금" value="1,188,000"></span>
+      <b>계약금 10%</b><span>₩<input readonly inputmode="numeric" data-field="deposit" data-money="true" aria-label="계약금" value="134,000"></span>
+      <b class="bal">잔금</b><span class="bal">₩<input readonly inputmode="numeric" data-field="balance" data-money="true" aria-label="잔금" value="1,206,000"></span>
       <div class="note">※ 현장 상황 및 요청사항 변경 시 비용이 조정될 수 있습니다.</div>
     </div>
 

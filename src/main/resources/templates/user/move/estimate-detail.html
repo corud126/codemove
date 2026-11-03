@@ -48,12 +48,12 @@
               <div class="mv-receipt-brand">명품익스프레스</div>
               <div class="mv-receipt-sub">
                 <svg aria-hidden="true" fill="none" height="12" viewBox="0 0 12 12" width="12"><path d="m6 1 4.5 2.5v5L6 11 1.5 8.5v-5L6 1Z M1.5 3.5 6 6l4.5-2.5M6 6v5" stroke="currentColor" stroke-linejoin="round" stroke-width="1"/></svg>
-                CBM 기반 자동 산출 · 7.7 CBM
+                이사물량 1.5톤
               </div>
               <div class="mv-receipt-rows">
-                <div class="mv-receipt-row"><div><span>기본 운송비</span><small>기본 거리 10km 포함</small></div><b>250,000원</b></div>
-                <div class="mv-receipt-row"><div><span>포장·인력 작업비</span></div><b>140,000원</b></div>
-                <div class="mv-receipt-row"><div><span>도착지 사다리차 (8층)</span></div><b>20,000원</b></div>
+                <div class="mv-receipt-row"><div><span>이사비용</span></div><b>370,000원</b></div>
+                <div class="mv-receipt-row"><div><span>도착지 사다리 (8층)</span></div><b>20,000원</b></div>
+                <div class="mv-receipt-row"><div><span>옵션</span><small>벽걸이TV 탈착·설치</small></div><b>20,000원</b></div>
               </div>
               <div class="mv-receipt-total"><span>합계</span><b>410,000원</b></div>
               <div class="action mv-receipt-link" role="button" tabindex="0" data-open="#quoteDoc">견적서 원본 보기
@@ -73,7 +73,7 @@
               <div><span>도착지</span><strong>서울 서초구 서초대로 456, 804호</strong></div>
             </div>
             <div class="reservation-info-row"><span>이사 일시</span><b>2026. 03. 18 (수) 오전 10:00</b></div>
-            <div class="reservation-info-row"><span>이사 유형</span><b>원룸 · 일반포장</b></div>
+            <div class="reservation-info-row"><span>이사 유형</span><b>원룸 / 오피스텔 · 일반포장</b></div>
           </div>
         </div>
 
@@ -147,8 +147,8 @@
           </div>
           <div class="vendor-customer-grid">
             <b>업체명</b><span>명품 익스프레스</span>
-            <b>담당자</b><span>김선국 (님)</span>
-            <b>TEL</b><span>010-9445-8224</span>
+            <b>담당자</b><span>김무브 (님)</span>
+            <b>TEL</b><span>010-1234-5678</span>
             <b>견적일</b><span>2026. 03. 10.</span>
             <b>출발지</b><span>서울 강남구 테헤란로 123, 301호</span>
             <b>작업일</b><span>2026. 03. 18.</span>
@@ -156,7 +156,7 @@
             <b>운송일</b><span>2026. 03. 18.</span>
           </div>
           <div class="vendor-items">
-            <div class="vendor-items-groups"><b>전자기기</b><b>가구</b><b>생활용품</b><b>기타</b></div>
+            <div class="vendor-items-groups"><b>가전</b><b>가구</b><b>생활용품</b><b>기타</b></div>
             <div class="vendor-items-head">
               <th:block th:each="i : ${#numbers.sequence(1, 4)}"><b>품목</b><b>수량</b></th:block>
             </div>
@@ -169,30 +169,40 @@
           </div>
           <div class="vendor-work-grid">
             <b class="vendor-vertical-label">작업 정보</b>
+            <!--/* 옵션 8종(QUOTE_OPTION) × 선택 2 + 비용 */-->
             <div class="vendor-options">
-              <span>벽걸이TV　탈착 ■ / 설치 ■　₩ 20,000</span>
-              <span>에어컨　탈착 □ / 설치 □　₩ 0</span>
-              <span>파손주의 품목 별도 포장</span>
+              <span class="vendor-option" th:each="o : ${ {'피아노|일반|그랜드|N|N|0', '돌침대|분해|조립|N|N|0', '조립장|분해|조립|N|N|0', '벽걸이TV|탈착|설치|Y|Y|20,000',
+                                                           '홈씨어터|분리|설치|N|N|0', '수작업|계단|승강기|N|N|0', '안마의자|분리|설치|N|N|0', '에어컨|탈착|설치|N|N|0'} }"
+                    th:with="t=${#strings.arraySplit(o, '|')}">
+                <em th:text="${t[0]}">피아노</em>
+                <i th:text="|${t[1]} ${t[3] == 'Y' ? '■' : '□'} / ${t[2]} ${t[4] == 'Y' ? '■' : '□'}|">일반 □ / 그랜드 □</i>
+                <b th:text="|₩ ${t[5]}|">₩ 0</b>
+              </span>
             </div>
             <div class="vendor-work-details">
-              <div><b>작업내용</b><span>일반포장</span></div>
-              <div><b>운반방법</b><span>승강기 전 ■ / 후 ■</span></div>
-              <div><b>이사물량</b><span>7.7 CBM</span></div>
-              <div><b>비고</b><span>현장 확인 후 조정 가능</span></div>
+              <div><b>작업내용</b><span class="vendor-checks"><i th:each="m : ${ {'포장', '반포장', '일반', '보관'} }" th:text="|${m} ${m == '일반' ? '■' : '□'}|">포장 □</i></span></div>
+              <div><b>운반방법</b><span class="vendor-transport">
+                <i th:each="m : ${ {'사다리차|N|Y', '승강기|Y|N', '계단작업|N|N'} }" th:with="t=${#strings.arraySplit(m, '|')}"
+                   th:text="|${t[0]}　전 ${t[1] == 'Y' ? '■' : '□'} / 후 ${t[2] == 'Y' ? '■' : '□'}|">사다리차　전 □ / 후 ■</i>
+              </span></div>
+              <div><b>이사물량</b><span>1.5톤</span></div>
+              <div><b>비고</b><span>파손 주의 물품 별도 포장</span></div>
             </div>
           </div>
           <div class="vendor-cost-grid">
             <div class="vendor-cost-column">
               <b>A. 작업 비용</b>
-              <div><span>이사비용</span><strong>₩ 390,000</strong></div>
-              <div><span>사다리비용</span><strong>₩ 0</strong></div>
+              <div><span>이사비용</span><strong>₩ 370,000</strong></div>
+              <div><span>사다리비용</span><strong>₩ 20,000</strong></div>
+              <div><span>옵션비용</span><strong>₩ 20,000</strong></div>
               <div class="vendor-cost-total"><span>총 비용</span><strong>₩ 410,000</strong></div>
             </div>
             <div class="vendor-cost-column">
               <b>B. 별도 비용</b>
-              <div><span>출발지 사다리(3)층</span><strong>₩ 0</strong></div>
+              <div><span>출발지 사다리(　)층</span><strong>₩ 0</strong></div>
               <div><span>도착지 사다리(8)층</span><strong>₩ 20,000</strong></div>
               <div class="vendor-cost-total"><span>사다리 소계</span><strong>₩ 20,000</strong></div>
+              <div><span></span><strong></strong></div>
             </div>
           </div>
           <div class="vendor-payment-grid">

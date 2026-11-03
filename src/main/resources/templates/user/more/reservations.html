@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U-08x 예약내역 (G-H07~H08 / E-H07~H08)
   state: (없음) 예약내역 H07 | filter 필터 바텀시트 H08
-  필터(전체·완료·취소)는 more.js 에서 동작 (해당 항목이 없는 연도는 숨김)
+  필터(전체·이사 완료·취소)는 more.js 에서 동작 (해당 항목이 없는 연도는 숨김)
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='예약내역', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/more.css}">
@@ -16,12 +16,12 @@
     </div>
     <div class="form-content reservation-history-page">
       <a class="action upcoming-reservation-card" th:href="@{/reservations/1}" aria-label="다가오는 예약 상세">
-        <div class="upcoming-reservation-top"><div><span>확정</span><b>D-30</b></div></div>
+        <div class="upcoming-reservation-top"><div><span>예약 확정</span><b>D-30</b></div></div>
         <div class="upcoming-reservation-route">
           <strong>강남구 → 서초구</strong>
           <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
         </div>
-        <small>3월 18일 (수) 오전 10:00 · 원룸 일반포장</small>
+        <small>3월 18일 (수) 오전 10:00 · 원룸 / 오피스텔 · 일반포장</small>
       </a>
 
       <div class="reservation-past-head">
@@ -40,17 +40,17 @@
           <div class="past-reservation-year-label">2025년</div>
           <a class="action past-booking completed" data-status="completed" th:href="@{/reservations/1}" aria-label="2025. 11. 02 송파구 → 성동구 예약 상세">
             <div class="past-booking-main">
-              <div class="past-booking-meta"><span>완료</span><small>2025. 11. 02</small></div>
+              <div class="past-booking-meta"><span>이사 완료</span><small>2025. 11. 02</small></div>
               <strong>송파구 → 성동구</strong>
-              <small>원룸 · 반포장</small>
+              <small>원룸 / 오피스텔 · 반포장</small>
             </div>
             <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
           </a>
           <a class="action past-booking completed" data-status="completed" th:href="@{/reservations/1}" aria-label="2025. 02. 14 마포구 → 용산구 예약 상세">
             <div class="past-booking-main">
-              <div class="past-booking-meta"><span>완료</span><small>2025. 02. 14</small></div>
+              <div class="past-booking-meta"><span>이사 완료</span><small>2025. 02. 14</small></div>
               <strong>마포구 → 용산구</strong>
-              <small>원룸 · 일반포장</small>
+              <small>원룸 / 오피스텔 · 일반포장</small>
             </div>
             <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
           </a>
@@ -61,7 +61,7 @@
             <div class="past-booking-main">
               <div class="past-booking-meta"><span>취소</span><small>2024. 08. 21</small></div>
               <strong>강동구 → 광진구</strong>
-              <small>원룸</small>
+              <small>원룸 / 오피스텔 · 일반포장</small>
             </div>
             <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
           </a>
@@ -78,7 +78,7 @@
       <div class="reservation-filter-handle" role="button" tabindex="0" aria-label="필터 선택 화면 닫기" data-close><span></span></div>
       <div class="reservation-filter-options">
         <div class="action selected" role="menuitem" tabindex="0" data-filter="all">전체<span>✓</span></div>
-        <div class="action" role="menuitem" tabindex="0" data-filter="completed">완료<span hidden>✓</span></div>
+        <div class="action" role="menuitem" tabindex="0" data-filter="completed">이사 완료<span hidden>✓</span></div>
         <div class="action" role="menuitem" tabindex="0" data-filter="cancelled">취소<span hidden>✓</span></div>
       </div>
     </div>

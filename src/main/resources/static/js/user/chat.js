@@ -46,8 +46,8 @@
       return { text: '이사 전에는 귀중품 별도 보관, 냉장고 음식 정리, 주소 이전, 가전 설치 일정을 먼저 확인해주세요.\n이사 전날에는 주차 공간과 엘리베이터 예약도 확인하는 것이 좋아요.',
         actions: [{ label: '예약 일정 확인', prompt: '내 예약 일정 확인' }, { label: '추가 준비 팁', prompt: '이사 당일 준비 팁도 알려주세요' }] };
     }
-    if (value.includes('결제') || value.includes('환불') || value.includes('예약금')) {
-      return { text: '견적 확정 후 안내된 예약금을 결제하면 예약이 최종 접수돼요.\n취소·환불 가능 금액은 작업일과 취소 시점에 따라 달라질 수 있어 상담사 확인이 필요합니다.',
+    if (value.includes('결제') || value.includes('환불') || value.includes('계약금')) {
+      return { text: '견적을 확정하면 바로 예약이 확정되고, 계약금은 결제 대기 상태로 안내돼요.\n안내된 계약금을 결제하면 결제가 완료됩니다.\n취소·환불 가능 금액은 작업일과 취소 시점에 따라 달라질 수 있어 상담사 확인이 필요합니다.',
         actions: [{ label: '상담사에게 문의', prompt: '결제 및 환불 상담사 연결 요청' }, { label: '예약 정보 보기', href: '/move?tab=booking' }] };
     }
     if (value.includes('자주 묻는')) {

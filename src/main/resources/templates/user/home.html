@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U-001~002 홈 (일반 G-B01~B06), SCR-U-028 쉬운 모드 홈 (E-B01~B06, E-B08 사용법)
-  state: guest(비회원) | none(견적 없음) | reviewing(검토 중) | arrived(견적 도착) | booked(예약 완료)
+  state: guest(비회원) | none(견적 없음) | reviewing(검토 중) | arrived(견적 도착) | booked(예약 확정)
   mode : ?mode=easy 로 쉬운 모드 확인
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='홈', links=~{::link})}">
@@ -40,13 +40,13 @@
         </a>
       </div>
 
-      <!--/* 견적 검토 중 · 견적 도착 · 예약 완료 */-->
+      <!--/* 견적 검토 중 · 견적 도착 · 예약 확정 */-->
       <div th:if="${state == 'reviewing' or state == 'arrived' or state == 'booked'}"
            th:with="s=${state == 'booked'
-                      ? {'confirmed', '예약 완료', '3월 18일 오전 10시에 이사해요', '원룸 · 일반포장', '예약 자세히 보기', '/reservations/1', 'reservation-confirmed-illustration.svg'}
+                      ? {'confirmed', '예약 확정', '3월 18일 오전 10시에 이사해요', '원룸 / 오피스텔 · 일반포장', '예약 자세히 보기', '/reservations/1', 'reservation-confirmed-illustration.svg'}
                       : (state == 'arrived'
                       ? {'approved', '견적 도착', '이사 견적이 준비됐어요', '비용과 작업 내용을 확인해주세요.', '견적서 보기', '/move?tab=estimate', 'estimate-approved-illustration.svg'}
-                      : {'waiting-approval', '관리자 확인 중', '견적 요청이 접수됐어요', '담당자 확인이 끝나면 견적 정보를 알려드려요.', '진행 상황 보기', '/more/estimates', 'estimate-requested-illustration.svg'})}"
+                      : {'waiting-approval', '검토 중', '견적 요청이 접수됐어요', '담당자 확인이 끝나면 견적 정보를 알려드려요.', '진행 상황 보기', '/more/estimates', 'estimate-requested-illustration.svg'})}"
            class="easy-status-card" th:classappend="'status-' + ${s[0]}">
         <div class="easy-status-main">
           <div class="easy-status-illustration"><img alt="" th:src="@{'/images/user/' + ${s[6]}}"></div>
@@ -148,7 +148,7 @@
           <div class="home-estimate-main">
             <div class="home-estimate-visual"><img alt="" th:src="@{/images/user/estimate-requested-illustration.svg}"></div>
             <div class="home-estimate-copy">
-              <span>관리자 확인 중</span>
+              <span>검토 중</span>
               <strong>견적 요청이 접수됐어요</strong>
               <small>담당자 확인이 끝나면 견적 정보를 알려드려요.</small>
             </div>
@@ -172,13 +172,13 @@
           </div>
         </a>
 
-        <!--/* 예약 완료 */-->
+        <!--/* 예약 확정 */-->
         <div class="my-booking-card" th:if="${state == 'booked'}">
           <div class="my-booking-head">
             <div class="my-booking-top">
               <div class="my-booking-status-wrap">
-                <span class="my-booking-badge">예약 완료</span>
-                <span class="my-booking-type">원룸 · 일반포장</span>
+                <span class="my-booking-badge">예약 확정</span>
+                <span class="my-booking-type">원룸 / 오피스텔 · 일반포장</span>
               </div>
               <span class="my-booking-dday">D-30</span>
             </div>

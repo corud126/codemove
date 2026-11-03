@@ -55,10 +55,17 @@
             </strong>
             <small>5분 이내</small>
           </span>
+          <!--/* 선택 후: 첨부 카드 — 왼쪽 영상 썸네일(첫 장면, ▶) · 오른쪽 파일 이름 한 줄 · 용량·길이 · 다른 영상 선택 */-->
           <span class="q-upload-done" hidden>
-            <strong data-q-video-name>우리집_촬영영상.mp4</strong>
-            <small>영상 업로드가 완료됐어요</small>
-            <span class="q-upload-change">다른 영상 선택</span>
+            <span class="q-upload-thumb">
+              <video muted playsinline preload="metadata" data-q-video-preview aria-hidden="true"></video>
+              <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="rgb(0 0 0 / .45)"/><path d="M10 8.2v7.6l6-3.8Z" fill="#fff"/></svg>
+            </span>
+            <span class="q-upload-info">
+              <strong data-q-video-name>우리집_촬영영상.mp4</strong>
+              <small data-q-video-meta>48.2MB · 2분 14초</small>
+              <span class="q-upload-change">다른 영상 선택</span>
+            </span>
           </span>
         </label>
 
@@ -274,7 +281,7 @@
             <span class="muted" th:each="d : ${#numbers.sequence(1, 4)}" th:text="${d}">1</span>
           </div>
           <button type="button" class="action time-row" data-q-time-row hidden>
-            <b data-q-time-label>오전 10:00</b>
+            <b data-q-time-label>오전</b>
             <span>시간 변경 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="m6 3.5 4.5 4.5L6 12.5" stroke="#555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           </button>
         </div>
@@ -289,7 +296,7 @@
           <div class="q-estimate-price"><strong data-q-price>410,000</strong><span>원</span></div>
           <dl class="q-estimate-rows">
             <div><dt>이사일</dt>
-              <dd data-q-sum-date>3월 18일 (수) 오전 10:00</dd>
+              <dd data-q-sum-date>3월 18일 (수) 오전</dd>
               <dd hidden data-q-sum-date-pick><button type="button" class="action q-date-pick" data-q-goto="5">날짜 선택
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="m7 3.5 4.5 4.5L7 12.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></dd>
             </div>
@@ -395,18 +402,14 @@
     <div class="q-sheet" role="dialog" aria-modal="true" aria-labelledby="qTimeTitle">
       <div class="q-handle"></div>
       <strong class="q-time-title" id="qTimeTitle" data-q-time-title>3월 18일 (수)</strong>
-      <div class="q-time-period">오전</div>
+      <div class="q-time-period">희망 시간대</div>
+      <!--/* 희망 시간대(TBL_MOVE_REQUEST.PREFER_TIME) — 정확한 시각은 관리자가 견적서(TBL_QUOTE.WORK_TIME)에 정한다 */-->
       <div class="q-time-slots">
-        <button type="button" class="action" data-q-time="오전 8:00">8:00</button>
-        <button type="button" class="action active" data-q-time="오전 10:00">10:00</button>
+        <button type="button" class="action active" data-q-time="오전">오전</button>
+        <button type="button" class="action" data-q-time="오후">오후</button>
+        <button type="button" class="action" data-q-time="상관없음">상관없음</button>
       </div>
-      <div class="q-time-period">오후</div>
-      <div class="q-time-slots">
-        <button type="button" class="action" data-q-time="오후 1:00">1:00</button>
-        <button type="button" class="action" disabled>3:00<small>마감</small></button>
-        <button type="button" class="action" data-q-time="오후 5:00">5:00</button>
-      </div>
-      <button type="button" class="action q-link q-time-any" data-q-time="시간 상관없음">시간 상관없어요</button>
+      <p class="q-time-note">정확한 시간은 견적서로 안내드려요</p>
     </div>
   </div>
 

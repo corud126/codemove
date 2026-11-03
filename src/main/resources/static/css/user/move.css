@@ -333,6 +333,13 @@
 .ed-doc-body .vendor-customer-grid > * { min-height: 26px; padding-block: 4px; }
 .ed-doc-body .vendor-items-groups > *, .ed-doc-body .vendor-items-head > *, .ed-doc-body .vendor-items-row > * { min-height: 26px; }
 .ed-doc-body .vendor-sign-grid > * { min-height: 31px; padding-block: 7px; }
+/* 작업 정보 — 관리자 견적서(admin/estimate/sheet.html .qs-opt · .qs-transport)와 같은 배치 */
+.ed-doc-body .vendor-options { padding: 4px 10px; }
+.ed-doc-body .vendor-option { display: grid; grid-template-columns: 54px 1fr 64px; align-items: center; gap: 4px; padding: 3px 0; }
+.ed-doc-body .vendor-option em, .ed-doc-body .vendor-option i, .ed-doc-body .vendor-checks i, .ed-doc-body .vendor-transport i { font-style: normal; white-space: nowrap; }
+.ed-doc-body .vendor-option b { font-weight: 400; }
+.ed-doc-body .vendor-work-details .vendor-checks { flex-wrap: wrap; gap: 2px 7px; }
+.ed-doc-body .vendor-work-details .vendor-transport { flex-direction: column; align-items: flex-start; gap: 2px; }
 .ed-doc-hint { position: absolute; z-index: 2; left: 50%; bottom: calc(var(--u) * 95); height: calc(var(--u) * 31); padding: 0 calc(var(--u) * 14); border-radius: 999px; background: #70746d; color: #f4f4f2; display: flex; align-items: center; font-size: calc(var(--u) * 14); white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
 .ed-doc-sheet.is-zoomed .ed-doc-hint { display: none; }
 .ed-doc-zoom { position: absolute; z-index: 2; top: calc(var(--u) * 78); left: 50%; height: calc(var(--u) * 34); padding: 0 calc(var(--u) * 10) 0 calc(var(--u) * 14); border-radius: 999px; background: rgb(70 74 68 / .76); color: var(--white); display: flex; align-items: center; transform: translateX(-50%); }
