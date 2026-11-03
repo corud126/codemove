@@ -1,57 +1,51 @@
 /*
  * 견적 관리 화면 그룹 (모의 동작, 백엔드 없음)
- *  SCR-A-001 견적 관리   #estimateList     분류 필터 · 날짜 검색 · 페이지(4건) · 삭제 확인 · 분류별 현황
- *  SCR-A-002 견적 수정   #estimateEdit     문서 배율/드래그 · 수정→저장 확인 · 견적 승인
- *  SCR-A-003/004 견적서 등록 #estimateRegister  첨부 → AI 인식(모의) → 수정 → 미리보기 → 등록
- *  공통 문서 뷰어 [data-viewer] (templates/admin/estimate/sheet.html)
+ *  SCR-A-001 견적 관리   #estimateList     분류 필터 · 검색(이름·날짜) · 페이지(8건) · 삭제 확인 · 분류별 현황
+ *  SCR-A-002 견적 확인   #estimateEdit     문서 확대(두 손가락·맞춤) · 수정→저장 확인 · 견적 승인 · 하단 버튼 · 견적 정보(승인일·만료 카운트다운)
+ *  SCR-A-003/004 견적서 등록 #regFlow      첨부 → (사진) 읽는 중 → 확인·수정 → 등록 / (PDF) 확인 → 정보 입력 → 등록. 단계 이동은 ?state= 주소
+ *  공통 문서 [data-viewer] + .estimate-sheet (templates/admin/estimate/sheet.html)
  */
 (function () {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-  const layer = window.CodeMoveAdmin || { open: (el) => { el.hidden = false; }, close: (el) => { el.hidden = true; } };
+  const el$ = (t) => (typeof t === 'string' ? $(t) : t);
+  const layer = window.CodeMoveAdmin || { open: (t) => { el$(t).hidden = false; }, close: (t) => { el$(t).hidden = true; } };
   const toast = (opts) => window.AdminToast && window.AdminToast.show(opts);
   const state = (root) => (root && root.dataset.state) || '';
 
   /* ---------- 공통 유틸 ---------- */
-  function formatShortDate(value, deleting) {
-    const d = value.replace(/\D/g, '').slice(0, 6);
-    if (d.length >= 5) return `${d.slice(0, 2)}.${d.slice(2, 4)}.${d.slice(4)}`;
-    if (d.length >= 3) return `${d.slice(0, 2)}.${d.slice(2)}${d.length === 4 && !deleting ? '.' : ''}`;
-    if (d.length === 2 && !deleting) return `${d}.`;
-    return d;
-  }
-  function bindShortDate(input, onChange) {
-    input.addEventListener('input', (e) => {
-      input.value = formatShortDate(input.value, (e.inputType || '').startsWith('delete'));
-      if (onChange) onChange(input.value);
-    });
-  }
-  function today() {
-    const n = new Date();
-    return `${String(n.getFullYear()).slice(2)}.${String(n.getMonth() + 1).padStart(2, '0')}.${String(n.getDate()).padStart(2, '0')}`;
-  }
   const toNumber = (v) => Number(String(v || '').replace(/\D/g, '')) || 0;
   const money = (n) => n.toLocaleString('ko-KR');
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = (d) => `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-  // 화면 하단 짧은 안내 (다운로드·저장 등)
+  // 짧은 안내 (저장·다운로드 등) — 확대 안내와 같은 회색 알약. 하단 버튼이 있으면 그 바로 위, 없으면 하단 탭 위
   function snack(message) {
-    const frame = $('#adminFrame') || document.body;
+    const bar = $$('[data-actionbar]').find((b) => !b.hidden && b.offsetParent);
     let el = $('#estimateSnack');
     if (!el) {
-      el = document.createElement('div');
+      el = document.createElement('p');
       el.id = 'estimateSnack';
-      el.className = 'pointer-events-none absolute inset-x-6 bottom-[96px] z-[120] rounded-xl bg-[#27372a]/90 px-4 py-3 text-center text-[11px] font-semibold text-white shadow-lg transition-opacity';
       el.setAttribute('role', 'status');
-      frame.appendChild(el);
+      el.style.cssText = 'position:absolute;left:50%;z-index:120;display:flex;align-items:center;height:31px;padding:0 14px;border-radius:999px;'
+        + 'background:#70746d;color:#f4f4f2;font-size:14px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);transition:opacity .4s';
+    }
+    if (bar) {
+      bar.appendChild(el);
+      Object.assign(el.style, { bottom: '100%', marginBottom: '4px' });
+      const hint = $('[data-zoom-hint]', bar);
+      if (hint) hint.style.opacity = '0';
+    } else {
+      ($('#adminFrame') || document.body).appendChild(el);
+      Object.assign(el.style, { bottom: 'calc(var(--nav) + 20px)', marginBottom: '0' });
     }
     el.textContent = message;
     el.style.opacity = '1';
-    el.hidden = false;
     clearTimeout(el._t);
-    el._t = setTimeout(() => { el.style.opacity = '0'; }, 2200);
+    el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
   }
 
-  /* ---------- 문서 뷰어 / 견적서 ---------- */
+  /* ---------- 문서 뷰어 / 견적서 (견적 확인) ---------- */
   function initViewer(viewer) {
     const viewport = $('[data-viewport]', viewer);
     const page = $('[data-page]', viewer);
@@ -107,8 +101,7 @@
     viewport.addEventListener('pointercancel', end);
 
     $('[data-download]', viewer)?.addEventListener('click', () => {
-      const id = $('#estimateEdit')?.dataset.id || 'new';
-      snack(`명품익스프레스_견적서_${id}.pdf 다운로드를 시작합니다.`);
+      snack('견적서 PDF 다운로드를 시작합니다.');
     });
 
     initSheet(viewer);
@@ -202,47 +195,19 @@
     });
   }
 
-  // 문서 값 읽기/쓰기 (등록 단계 간 복사, 인식 결과 채우기)
-  function getSheet(viewer) {
-    const data = { fields: {}, items: [], choices: [] };
-    $$('[data-field]', viewer).forEach((i) => { data.fields[i.dataset.field] = i.value; });
-    $$('[data-item-row]', viewer).forEach((row) => {
-      const names = $$('[data-item-name]', row);
-      const qtys = $$('[data-item-qty]', row);
-      names.forEach((n, i) => data.items.push([n.value, qtys[i].value]));
-    });
-    data.rows = $$('[data-item-row]', viewer).length;
-    data.choices = $$('[data-choice]', viewer).map((b) => b.getAttribute('aria-pressed') === 'true');
-    return data;
-  }
-  function setSheet(viewer, data) {
-    Object.entries(data.fields || {}).forEach(([k, v]) => {
-      const i = $(`[data-field="${k}"]`, viewer);
-      if (i) i.value = v;
-    });
-    if (data.items) {
-      setRowCount(viewer, data.rows || Math.max(8, Math.ceil(data.items.length / 4)));
-      const names = $$('[data-item-name]', viewer);
-      const qtys = $$('[data-item-qty]', viewer);
-      names.forEach((n, i) => {
-        n.value = data.items[i] ? data.items[i][0] : '';
-        qtys[i].value = data.items[i] ? data.items[i][1] : '';
-      });
-    }
-    if (data.choices) $$('[data-choice]', viewer).forEach((b, i) => pressChoice(b, !!data.choices[i]));
-  }
-
   $$('[data-viewer]').forEach(initViewer);
 
   /* ---------- SCR-A-001 견적 관리 ---------- */
   const list = $('#estimateList');
   if (list) {
-    const PER_PAGE = 4;
+    const PER_PAGE = 8;
     const rowsBox = $('#estimateRows');
-    const filter = $('#estimateFilter');
-    const dateInput = $('#dateSearchInput');
-    const popover = $('#datePopover');
-    const toggle = $('#dateSearchToggle');
+    const filterBox = $('#estimateFilter');
+    const searchBar = $('#estimateSearchBar');
+    const searchInput = $('#estimateSearchInput');
+    const toggle = $('#estimateSearchToggle');
+    const CHIP = { '견적 검토': 'chip-review', '견적 승인': 'chip-progress', '견적 확정': 'chip-done', '만료': 'chip-expired' };
+    let status = '전체';
     let query = '';
     let page = 1;
     let deleting = null;
@@ -254,36 +219,73 @@
         sessionStorage.removeItem('newEstimate');
         const first = $('[data-row]', rowsBox);
         const row = first.cloneNode(true);
-        const tone = { '견적 검토': 'bg-[#fbefed] text-[#b9574f]', '견적 승인': 'bg-[#edf3f8] text-[#4b759b]', '견적 확정': 'bg-[#edf4ed] text-[#346538]' };
         Object.assign(row.dataset, { row: 'new', status: added.status, name: added.name, date: added.date });
-        const cells = row.children;
-        cells[1].className = `justify-self-center rounded-full px-2 py-1 text-[9px] font-bold ${tone[added.status]}`;
-        cells[1].textContent = added.status;
-        cells[2].textContent = added.name;
-        cells[3].textContent = added.date;
+        const chip = $('[data-chip]', row);
+        chip.className = `chip ${CHIP[added.status] || 'chip-review'}`;
+        chip.textContent = added.status;
+        $('[data-name-cell]', row).textContent = added.name;
+        $('[data-date-cell]', row).textContent = added.date;
         rowsBox.insertBefore(row, first);
       }
     } catch (e) { /* 무시 */ }
 
     const rows = () => $$('[data-row]', rowsBox);
 
+    // 검색: 숫자만 입력하면 날짜(YY.MM.DD) 앞자리 일치, 그 외에는 이름에 포함
+    // 날짜 검색어 → 목록 날짜(YY.MM.DD)와 비교할 함수. 날짜 형태가 아니면 null
+    // 입력 중에도 결과가 따라오도록 마지막 숫자는 앞부분만 맞으면 통과시킨다.
+    // 숫자만: 2 → 26 → 2603 → 260325 / 2 → 20 → 2026 → 20260325 / 03 → 0325(월일)
+    // 구분자: 26.03.25 · 2026-03-25 · 2026.03 · 3.25 · 3월 25일 · 2025년 11월
+    function dateMatcher(q) {
+      const text = q.replace(/년|월/g, '.').replace(/일/g, '').trim();
+      if (!/^[\d.\s/-]+$/.test(text)) return null;
+
+      if (!/[.\s/-]/.test(text)) {
+        return (date) => {
+          const d = date.replace(/\D/g, '');               // YYMMDD
+          return d.startsWith(text) || `20${d}`.startsWith(text) || d.slice(2).startsWith(text)
+            || d.slice(2, 4) === `0${text}`;               // 3 → 3월 (3.25 · 3월 입력 시작)
+        };
+      }
+
+      const parts = text.split(/[.\s/-]+/).filter(Boolean);
+      const typing = !/[.\s/-]$/.test(text);              // 마지막 칸을 아직 입력 중
+      const fieldMatch = (field, value, p, last) => {
+        if (field === 'y' && p.length > 2) return p.length === 4 ? value === p.slice(2) : `20${value}`.startsWith(p);
+        if (last && typing && p.length === 1) return value === `0${p}` || value.startsWith(p);
+        return value === p.padStart(2, '0');
+      };
+      const forms = /년/.test(q) ? [['y', 'm', 'd']] : /월/.test(q) ? [['m', 'd']] : [['y', 'm', 'd'], ['m', 'd']];
+      return (date) => {
+        const [y, m, d] = date.split('.');
+        const value = { y, m, d };
+        return forms.some((form) => parts.length <= form.length
+          && parts.every((p, i) => fieldMatch(form[i], value[form[i]], p, i === parts.length - 1)));
+      };
+    }
+
+    function matchesQuery(r) {
+      const q = query.trim();
+      if (!q) return true;
+      const byDate = dateMatcher(q);
+      return byDate ? byDate(r.dataset.date) : r.dataset.name.includes(q);
+    }
+
     function render() {
-      const status = filter.value;
-      const q = query.replace(/\D/g, '');
       const matched = rows()
         .filter((r) => status === '전체' || r.dataset.status === status)
-        .filter((r) => !q || r.dataset.date.replace(/\D/g, '').startsWith(q))
+        .filter(matchesQuery)
         .sort((a, b) => b.dataset.date.localeCompare(a.dataset.date));
       const pages = Math.max(1, Math.ceil(matched.length / PER_PAGE));
       page = Math.min(page, pages);
       rows().forEach((r) => { r.hidden = true; });
-      matched.slice((page - 1) * PER_PAGE, page * PER_PAGE).forEach((r, i) => {
+      matched.slice((page - 1) * PER_PAGE, page * PER_PAGE).forEach((r) => {
         rowsBox.insertBefore(r, $('#estimateEmpty'));
         r.hidden = false;
-        $('[data-no]', r).textContent = (page - 1) * PER_PAGE + i + 1;
       });
       $('#estimateEmpty').hidden = matched.length > 0;
 
+      // 페이지: 선택만 연초록 배경 + 초록 글씨, 나머지는 회색 글씨만
       const pager = $('#estimatePager');
       pager.hidden = matched.length <= PER_PAGE;
       pager.innerHTML = '';
@@ -292,7 +294,7 @@
         b.type = 'button';
         b.textContent = p;
         b.setAttribute('aria-label', `${p}페이지로 이동`);
-        b.className = `grid h-8 w-8 place-items-center rounded-lg text-[11px] font-bold transition ${p === page ? 'bg-[#346538] text-white' : 'bg-[#f3f5f3] text-[#707871] hover:bg-[#e7ece7]'}`;
+        b.className = `grid h-9 w-9 place-items-center rounded-full text-[15px] ${p === page ? 'bg-[#eef4f0] font-bold text-[#346538]' : 'font-medium text-[#888] hover:bg-[#eef0ee]'}`;
         b.addEventListener('click', () => { page = p; render(); });
         pager.appendChild(b);
       }
@@ -307,13 +309,32 @@
       });
     }
 
-    filter.addEventListener('change', () => { page = 1; render(); });
-    const setPopover = (open) => { popover.hidden = !open; toggle.setAttribute('aria-expanded', String(open)); if (open) dateInput.focus(); };
-    toggle.addEventListener('click', () => setPopover(popover.hidden));
-    bindShortDate(dateInput, (v) => { query = v; page = 1; render(); });
-    $('#dateSearchSubmit').addEventListener('click', () => { query = dateInput.value; page = 1; render(); });
-    dateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { query = dateInput.value; page = 1; render(); } });
+    // 분류 필터 (세그먼트)
+    filterBox.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-filter]');
+      if (!btn) return;
+      status = btn.dataset.filter;
+      $$('[data-filter]', filterBox).forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+      page = 1;
+      render();
+    });
 
+    // 검색창 열기/닫기 · 입력하는 대로 검색
+    const setSearch = (open) => {
+      searchBar.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) searchInput.focus();
+      else if (query) { searchInput.value = ''; query = ''; page = 1; render(); }
+    };
+    toggle.addEventListener('click', () => setSearch(searchBar.hidden));
+    searchInput.addEventListener('input', () => { query = searchInput.value; page = 1; render(); });
+    $('#estimateSearchClear').addEventListener('click', () => {
+      if (searchInput.value) { searchInput.value = ''; query = ''; page = 1; render(); searchInput.focus(); }
+      else setSearch(false);
+    });
+
+    // 견적 승인·견적 확정은 고객에게 보낸 견적서를 바로 보도록 견적서 탭으로 연다 (그 외는 견적 정보 탭)
+    const openHref = (row) => (['견적 승인', '견적 확정'].includes(row.dataset.status) ? `${row.dataset.href}?tab=doc` : row.dataset.href);
     rowsBox.addEventListener('click', (e) => {
       const row = e.target.closest('[data-row]');
       if (!row) return;
@@ -322,11 +343,11 @@
         layer.open('#deleteConfirm');
         return;
       }
-      if (row.dataset.href && row.dataset.row !== 'new') location.href = row.dataset.href;
+      if (row.dataset.href && row.dataset.row !== 'new') location.href = openHref(row);
     });
     rowsBox.addEventListener('keydown', (e) => {
       const row = e.target.closest('[data-row]');
-      if (row && e.key === 'Enter' && row.dataset.href) location.href = row.dataset.href;
+      if (row && e.key === 'Enter' && row.dataset.href) location.href = openHref(row);
     });
     $('#deleteConfirmOk').addEventListener('click', () => {
       if (deleting) {
@@ -339,29 +360,84 @@
       layer.close('#deleteConfirm');
     });
 
+    // 대시보드 등에서 ?status=review|approved|confirmed|expired 로 들어오면 그 분류 필터를 선택
+    const preset = { review: '견적 검토', approved: '견적 승인', confirmed: '견적 확정', expired: '만료' }[new URLSearchParams(location.search).get('status')];
+    if (preset) $(`[data-filter="${preset}"]`, filterBox)?.click();
+
     // 상태 미리보기
     const s = state(list);
-    if (s === 'date-search') setPopover(true);
-    if (s === 'empty') { setPopover(true); query = dateInput.value; }
+    if (s === 'date-search') setSearch(true);
+    if (s === 'empty') { setSearch(true); query = searchInput.value; }
     if (s === 'delete-confirm') { deleting = rows()[0]; layer.open('#deleteConfirm'); }
     render();
   }
 
-  /* ---------- SCR-A-002 견적 수정 ---------- */
+
+  /* ---------- SCR-A-002 견적 확인 ---------- */
   const edit = $('#estimateEdit');
   if (edit) {
     const viewer = $('[data-viewer]', edit);
+    const toggle = $('[data-edit-toggle]', viewer);
     const approveBtn = $('#approveButton');
+    const cancel = $('#editCancel');
+    const notice = $('#noDateNotice');
+    const bar = $('[data-actionbar]', edit);
+    const moveDate = $('[data-field="moveDate"]', edit);
     const approveHiddenByStatus = approveBtn.hidden;
+    const SECONDARY = 'h-14 flex-1 rounded-[14px] bg-[#eef0ee] text-[16px] font-semibold text-[#555]';
+    const PRIMARY = 'btn-primary flex-[2]';
 
+    // 하단 버튼: 보기 [수정][견적 승인] · 수정 중 [취소][저장] · 승인 후 [수정]만(초록) · 작업일이 비면 승인 비활성 (ERD Q6)
+    function syncBar() {
+      const editing = viewer.classList.contains('is-editing');
+      cancel.hidden = !editing;
+      toggle.className = editing || approveBtn.hidden ? PRIMARY : SECONDARY;
+      approveBtn.disabled = !moveDate.value.trim();
+      notice.hidden = !approveBtn.disabled || approveBtn.hidden;
+      bar.hidden = toggle.hidden && approveBtn.hidden;
+    }
     const applyEditing = (on) => {
       setEditing(viewer, on);
       approveBtn.hidden = on || approveHiddenByStatus || edit.dataset.approved === 'true';
+      syncBar();
     };
-    $('[data-edit-toggle]', viewer).addEventListener('click', () => {
+    moveDate.addEventListener('input', syncBar);
+    toggle.addEventListener('click', () => {
       if (viewer.classList.contains('is-editing')) layer.open('#saveConfirm');
       else applyEditing(true);
     });
+    // [취소]: 고친 내용을 버리고 보기 상태로
+    cancel.addEventListener('click', () => {
+      const p = new URLSearchParams(location.search);
+      p.delete('state');
+      location.href = `${location.pathname}${p.toString() ? `?${p}` : ''}`;
+    });
+
+    // 견적 정보: 승인일 · 만료 줄 (수정 일시·관리자 같은 기록은 화면에 표시 안 함)
+    function setSum(key, text) {
+      const row = $(`[data-sum="${key}"]`, edit);
+      row.hidden = false;
+      const v = $('[data-sum-value]', row);
+      if (text) v.textContent = text;
+      return v;
+    }
+    // 만료까지 남은 시간 (24시간 미만 HH:MM:SS, 이상 N일 N시간)
+    let timer;
+    function countdown(dd) {
+      clearInterval(timer);
+      let left = Number(dd.dataset.countdown);
+      const draw = () => {
+        dd.textContent = left >= 86400
+          ? `${Math.floor(left / 86400)}일 ${Math.floor((left % 86400) / 3600)}시간 후 만료`
+          : `${pad(Math.floor(left / 3600))}:${pad(Math.floor((left % 3600) / 60))}:${pad(left % 60)} 후 만료`;
+        left = Math.max(0, left - 1);
+      };
+      draw();
+      timer = setInterval(draw, 1000);
+    }
+    const cd = $('[data-countdown]', edit);
+    if (cd && !$('[data-sum="expires"]', edit).hidden) countdown(cd);
+
     $('#saveConfirmOk').addEventListener('click', () => {
       layer.close('#saveConfirm');
       applyEditing(false);
@@ -370,200 +446,164 @@
     $('#approveConfirmOk').addEventListener('click', () => {
       layer.close('#approveConfirm');
       const badge = $('#approvalBadge');
-      badge.textContent = `승인일 ${today()}`;
-      badge.classList.remove('bg-[#fff4e8]', 'text-[#ad6d32]');
-      badge.classList.add('bg-[#edf4ed]', 'text-[#346538]');
+      badge.className = 'chip chip-progress';
+      badge.textContent = '견적 승인';
       edit.dataset.approved = 'true';
       approveBtn.hidden = true;
+      syncBar();
+      const now = new Date();
+      setSum('approved', stamp(now));
+      if (edit.dataset.source === 'request') {   // 만료는 견적 요청(01)만: 승인 + 72시간
+        const v = setSum('expires');
+        v.className = 'font-semibold tabular-nums text-[#d9701a]';
+        v.dataset.countdown = String(72 * 3600);
+        countdown(v);
+      }
       toast({ title: '견적 승인 알림', message: `${edit.dataset.name} 고객님의 견적이 '견적 승인'으로 변경되었습니다.`, href: '/admin/estimates' });
     });
-    $$('[data-goto-doc]', edit).forEach((b) => b.addEventListener('click', () => $('[data-tab="doc"]', edit).click()));
 
+    // 문서 확대: 확대하면 배율·맞춤 알약, 처음 만지면 '두 손가락' 안내가 사라짐
+    const zoomLabel = $('[data-zoom-pill] [data-zoom="0"]', edit);
+    const zoomPill = $('[data-zoom-pill]', edit);
+    const hint = $('[data-zoom-hint]', edit);
+    new MutationObserver(() => {
+      zoomPill.hidden = zoomLabel.textContent.trim() === '100%';
+      if (!zoomPill.hidden) hint.style.opacity = '0';
+    }).observe(zoomLabel, { childList: true, characterData: true, subtree: true });
+    $('[data-viewport]', edit).addEventListener('pointerdown', () => { hint.style.opacity = '0'; }, { once: true });
+
+    // 제목 줄 다운로드는 견적서 탭에서만
+    $$('[data-tab]', edit).forEach((t) => t.addEventListener('click', () => {
+      $$('[data-doc-only]', edit).forEach((el) => { el.hidden = t.dataset.tab !== 'doc'; });
+    }));
+
+    // 고객 영상 탭 '견적서 수정 ›': 견적서 탭으로 넘어가 수정 시작
+    $('[data-video-edit]', edit)?.addEventListener('click', () => {
+      $('[data-tab="doc"]', edit).click();
+      if (!viewer.classList.contains('is-editing')) toggle.click();
+    });
+
+    // 상태 미리보기
     const s = state(edit);
+    syncBar();
     if (s === 'editing' || s === 'save-confirm') applyEditing(true);
     if (s === 'save-confirm') layer.open('#saveConfirm');
     if (s === 'approve-confirm') layer.open('#approveConfirm');
   }
 
   /* ---------- SCR-A-003/004 견적서 등록 ---------- */
-  const reg = $('#estimateRegister');
+  const reg = $('#regFlow');
   if (reg) {
-    const draft = $('#draftViewer [data-viewer]');
-    const preview = $('#previewViewer [data-viewer]');
-    const card = $('#attachCard');
-    const sprite = ($('use')?.getAttribute('href') || '').split('#')[0];
-    let mode = 'photo';
-    let current = 1;
-    setEditing(draft, true);
-
-    const OFFICE_ITEMS = [['모니터', '6'], ['컴퓨터', '3'], ['공기청정기', '1'], ['소형 냉장고', '1'], ['전자레인지', '1'], ['프린터/복합기', '1'],
-      ['TV', '1'], ['의자', '6'], ['테이블', '2'], ['원형 테이블', '1'], ['파티션', '3'], ['대형 캐비넷', '2'], ['책상', '2'], ['데스크 수납함', '3'], ['보조 서랍장', '3']];
-    function recognized(kind, unrecognized) {
-      const name = kind === 'pdf' ? '' : (unrecognized ? '담당자 미인식' : '김민준');
-      const date = kind === 'pdf' ? '' : (unrecognized ? '견적일 미인식' : '26.09.04');
-      return {
-        fields: {
-          companyName: '명품익스프레스', customer: name, phone: kind === 'pdf' ? '010-0000-0000' : '010-4821-7735',
-          estimateDate: date, moveDate: date || '26.09.04', transportDate: date || '26.09.04',
-          origin: '출발지 미인식', destination: '도착지 미인식', volume: '3.5톤',
-          note: kind === 'pdf' ? 'PDF에서 인식된 견적 정보입니다.' : '이미지에서 인식된 견적 정보입니다.',
-          group0: '전자기기', group1: '가구', group2: '', group3: '',
-          option0: '0', option1: '0', option2: '0', option3: '0', option4: '0', option5: '0', option6: '0', option7: '0',
-          movingCost: '0', extraCost: '0', total: '1,320,000', deposit: '132,000', balance: '1,188,000',
-          departureLadder: '0', destinationLadder: '0', ladderSubtotal: '0',
-        },
-        items: OFFICE_ITEMS,
-        rows: 8,
-      };
-    }
-
-    function renderSteps() {
-      const steps = mode === 'pdf' ? [['첨부', 1], ['미리보기', 3], ['견적 등록', 4]] : [['첨부', 1], ['수정', 2], ['미리보기', 3], ['견적 등록', 4]];
-      const idx = steps.findIndex(([, s]) => s === current);
-      $('#registerSteps').innerHTML = `<div class="flex items-center">${steps.map(([label], i) => {
-        const active = i === idx;
-        const done = i < idx;
-        const dot = done
-          ? `<svg class="icon" width="13" height="13"><use href="${sprite}#i-check"/></svg>`
-          : i + 1;
-        return `<div class="flex min-w-0 flex-col items-center gap-1.5">
-            <span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-extrabold ${active ? 'bg-[#346538] text-white' : done ? 'bg-[#dce9dd] text-[#346538]' : 'bg-[#eef0ee] text-[#929994]'}">${dot}</span>
-            <span class="whitespace-nowrap text-[8px] font-bold ${active ? 'text-[#346538]' : 'text-[#8a918c]'}">${label}</span>
-          </div>${i < steps.length - 1 ? `<span class="mx-2 mb-5 h-px flex-1 ${done ? 'bg-[#8eaa91]' : 'bg-[#dfe4df]'}"></span>` : ''}`;
-      }).join('')}</div>`;
-    }
-
-    function goto(step) {
-      if (step === 3 && current === 2) setSheet(preview, getSheet(draft));
-      current = step;
-      $$('[data-step]', reg).forEach((el) => { el.hidden = Number(el.dataset.step) !== step; });
-      // 프로토타입: STEP 1 은 pt-6, STEP 2~4 는 pt-5
-      reg.classList.toggle('pt-6', step === 1);
-      reg.classList.toggle('pt-5', step !== 1);
-      renderSteps();
-      if (step === 3) $('[data-back-label]', reg).textContent = mode === 'pdf' ? '첨부로' : '수정으로';
-      if (step === 4) prepareRegister();
-      const scroller = reg.closest('.overflow-y-auto');
-      if (scroller) scroller.scrollTop = 0;
-    }
-
-    // STEP 1 첨부
-    const setPreviewImages = (url) => $$('[data-preview-img]', card).forEach((img) => {
-      img.hidden = !url;
-      if (url) img.src = url; else img.removeAttribute('src');
-    });
-    function showAttachment(fileName, withPreview) {
-      $('#selectedFile').hidden = !fileName;
-      $('[data-file-name]', card).textContent = fileName || '';
-      $('#photoPreview').hidden = !withPreview;
-      $('#attachThumb').hidden = !fileName;
-    }
-    function resetAttachment() {
-      setPreviewImages('');
-      showAttachment('', false);
-      $('#photoInput').value = '';
-      $('#pdfInput').value = '';
-    }
-    function analyze(kind, unrecognized) {
-      $('#analyzing').hidden = false;
-      setTimeout(() => {
-        $('#analyzing').hidden = true;
-        mode = kind;
-        const data = recognized(kind, unrecognized);
-        setSheet(draft, data);
-        setSheet(preview, data);
-        goto(kind === 'pdf' ? 3 : 2);
-      }, 1400);
-    }
-
-    $('#photoInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      layer.close('#attachChooser');
-      setPreviewImages(URL.createObjectURL(file));
-      showAttachment(file.name, true);
-    });
-    $('#pdfInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      layer.close('#attachChooser');
-      setPreviewImages('');
-      showAttachment(file.name, false);
-      $('#registerName').value = '';
-      $('#registerDate').value = '';
-      analyze('pdf');
-    });
-    $('#retakeButton').addEventListener('click', resetAttachment);
-    $('#analyzeButton').addEventListener('click', () => analyze('photo'));
-
-    // STEP 2 ~ 4
-    $$('[data-goto-step]', reg).forEach((b) => b.addEventListener('click', () => goto(Number(b.dataset.gotoStep))));
-    $('#previewBack').addEventListener('click', () => {
-      if (mode === 'pdf') { resetAttachment(); mode = 'photo'; goto(1); } else goto(2);
-    });
-
-    const submit = $('#registerSubmit');
-    const nameInput = $('#registerName');
-    const dateInput = $('#registerDate');
-    function finalInfo() {
-      if (mode === 'pdf') return { name: nameInput.value.trim(), date: dateInput.value.trim() };
-      const f = getSheet(preview).fields;
-      return { name: f.customer.trim(), date: f.estimateDate.trim() };
-    }
-    function validate() {
-      const { name, date } = finalInfo();
-      const missing = !name || !date || name.includes('미인식') || date.includes('미인식');
-      submit.disabled = missing;
-      $('#unrecognizedNotice').hidden = mode === 'pdf' || !missing;
-    }
-    function prepareRegister() {
-      $('[data-step4-label]', reg).textContent = mode === 'pdf' ? 'STEP 3' : 'STEP 4';
-      $('[data-photo-only]', reg).hidden = mode === 'pdf';
-      $('[data-pdf-only]', reg).hidden = mode !== 'pdf';
-      validate();
-    }
-    nameInput.addEventListener('input', validate);
-    bindShortDate(dateInput, validate);
-
-    submit.addEventListener('click', () => {
-      if (submit.disabled) return;
-      const { name, date } = finalInfo();
-      const status = $('#registerStatus').value;
-      try {
-        sessionStorage.setItem('newEstimate', JSON.stringify({ name, date, status }));
-        sessionStorage.setItem('adminToast', JSON.stringify({
-          title: '견적서 등록 완료 알림',
-          message: `${name} 님의 신규 견적서가 등록되었습니다. 내용을 확인해 주세요.`,
-          href: reg.dataset.listUrl || '/admin/estimates',
-        }));
-      } catch (e) { /* 무시 */ }
-      location.href = reg.dataset.listUrl || '/admin/estimates';
-    });
-
-    // 상태 미리보기
     const s = state(reg);
-    const sample = () => { showAttachment('photo.jpg', true); };
-    switch (s) {
-      case 'chooser': layer.open('#attachChooser'); break;
-      case 'photo-preview': sample(); break;
-      case 'analyzing': sample(); $('#photoPreview').hidden = true; $('#analyzing').hidden = false; break;
-      case 'step2': case 'step3': case 'step4': case 'unrecognized': {
-        const data = recognized('photo', s === 'unrecognized');
-        setSheet(draft, data);
-        setSheet(preview, data);
-        mode = 'photo';
-        if (s === 'step2') goto(2);
-        else if (s === 'step3') { current = 2; goto(3); } else { current = 3; goto(4); }
-        break;
+    const params = new URLSearchParams(location.search);
+    const go = (q) => { location.href = `${location.pathname}?${q}`; };
+    const next = $('#reviewNext', reg);
+
+    // 1. 첨부: 파일을 고르면 확인 화면으로
+    $$('[data-attach]', reg).forEach((input) => input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (file) go(/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name) ? 'state=pdf-preview' : 'state=photo-preview');
+    }));
+    // 읽는 중: 첨부에서 넘어온 경우만 자동 이동 (?state=analyzing 으로 직접 열면 멈춤)
+    if (s === 'analyzing' && params.get('auto')) setTimeout(() => go('state=review'), 1800);
+
+    // 2. 토글 (작업 형태는 하나만, 운반 방법·옵션은 켜고 끄기) · 분류 세그먼트
+    reg.addEventListener('click', (e) => {
+      const t = e.target.closest('.reg-toggle');
+      if (t) {
+        const radio = t.closest('[data-radio]');
+        if (radio) $$('.reg-toggle', radio).forEach((b) => b.setAttribute('aria-pressed', String(b === t)));
+        else t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true'));
       }
-      case 'pdf-preview': case 'pdf-register': {
-        mode = 'pdf';
-        const data = recognized('pdf');
-        setSheet(preview, data);
-        goto(s === 'pdf-preview' ? 3 : 4);
-        break;
-      }
-      default: renderSteps();
+      const seg = e.target.closest('[data-segment] [role="radio"]');
+      if (seg) $$('[role="radio"]', seg.parentElement).forEach((x) => x.setAttribute('aria-checked', String(x === seg)));
+    });
+
+    // 금액: 총 비용 = 이사비용 + 사다리 + 옵션, 계약금 10%
+    function recalcReg() {
+      const f = (n) => toNumber(($(`[data-field="${n}"]`, reg) || {}).value);
+      const option = $$('[data-option]', reg).reduce((sum, i) => sum + toNumber(i.value), 0);
+      const total = f('movingCost') + f('fromLadderCost') + f('toLadderCost') + option;
+      const set = (k, v) => { const el = $(`[data-sum="${k}"]`, reg); if (el) el.textContent = money(v); };
+      set('option', option);
+      set('total', total);
+      set('deposit', Math.round(total * 0.1));
+      set('balance', total - Math.round(total * 0.1));
     }
+
+    // 확인이 필요한 항목: 개수 · 바로가기 · [다음] 활성화
+    function checkNext() {
+      if (!next) return;
+      next.disabled = $$(s === 'pdf-review' ? '[data-pdf-required]' : '[data-required]', reg).some((i) => !i.value.trim());
+    }
+    function updateMissing() {
+      const box = $('#missingSummary', reg);
+      if (box) {
+        const left = $$('input[data-missing]', reg);
+        $('[data-missing-count]', box).textContent = left.length;
+        $$('[data-jump]', box).forEach((b) => { b.hidden = !$(`[data-field="${b.dataset.jump}"][data-missing]`, reg); });
+        box.hidden = left.length === 0;
+      }
+      checkNext();
+    }
+    $$('[data-jump]', reg).forEach((b) => b.addEventListener('click', () => {
+      const input = $(`[data-field="${b.dataset.jump}"]`, reg);
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => input.focus({ preventScroll: true }), 300);
+    }));
+    next?.addEventListener('click', () => { if (!next.disabled) location.href = next.dataset.href; });
+
+    reg.addEventListener('input', (e) => {
+      const i = e.target;
+      if (i.matches('[data-money]')) {
+        i.value = i.value.replace(/\D/g, '') ? money(toNumber(i.value)) : '';
+        recalcReg();
+      }
+      if (i.matches('[data-date], [data-field$="Date"]')) {   // YY.MM.DD 자동 점
+        const d = i.value.replace(/\D/g, '').slice(0, 6);
+        const del = (e.inputType || '').startsWith('delete');
+        i.value = d.length >= 5 ? `${d.slice(0, 2)}.${d.slice(2, 4)}.${d.slice(4)}` : d.length >= 3 ? `${d.slice(0, 2)}.${d.slice(2)}` : (d.length === 2 && !del ? `${d}.` : d);
+      }
+      if (i.matches('[data-missing]') && i.value.trim()) i.removeAttribute('data-missing');
+      updateMissing();
+    });
+
+    // 크게 보기: 사진 단계는 원본 사진, PDF·등록 단계는 견적서 문서 (?state=full-view · ?state=register&full=open)
+    const full = $('#fullView');
+    const showDoc = s === 'register' || s === 'pdf-preview' || s === 'pdf-review';
+    $('[data-full="photo"]', full).hidden = showDoc;
+    $('[data-full="doc"]', full).hidden = !showDoc;
+    $('[data-full-title]', full).textContent = !showDoc ? 'photo.jpg'
+      : (reg.dataset.source === 'pdf' || s.startsWith('pdf') ? '견적서_정도현_230914.pdf' : '견적서 미리보기');
+    if (s === 'full-view' || params.get('full') === 'open') layer.open('#fullView');
+
+    // 3. 회원 연결 (?state=register&picker=open)
+    $('#memberPicker').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-member]');
+      if (!b) return;
+      const label = $('#memberLinked');
+      if (label) {
+        label.textContent = b.dataset.name ? `${b.dataset.name} · ${b.dataset.phone}` : '연결 안 함';
+        label.className = b.dataset.name ? 'font-semibold text-[#292929]' : 'text-[#b0b4b1]';
+      }
+      layer.close('#memberPicker');
+    });
+    if (params.get('picker') === 'open') layer.open('#memberPicker');
+
+    // [견적 관리에 등록]: 목록 맨 위에 추가 + 완료 알림 (모의)
+    $('#registerSubmit', reg)?.addEventListener('click', () => {
+      const submit = $('#registerSubmit', reg);
+      const status = ($('[data-segment] [aria-checked="true"]', reg) || {}).textContent || '견적 검토';
+      try {
+        sessionStorage.setItem('newEstimate', JSON.stringify({ name: submit.dataset.name, date: submit.dataset.date, status: status.trim() }));
+        sessionStorage.setItem('adminToast', JSON.stringify({
+          title: '견적서 등록 완료',
+          message: `${submit.dataset.name} 고객님의 견적서가 등록되었습니다.`,
+          href: '/admin/estimates',
+        }));
+      } catch (err) { /* 무시 */ }
+    });
+
+    updateMissing();
   }
 })();

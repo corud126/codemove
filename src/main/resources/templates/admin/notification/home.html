@@ -1,54 +1,249 @@
 <!DOCTYPE html>
-<!--/* SCR-A-013 알림 관리
-  state: (기본) 정상 운영 · paused(전체 자동 메시징 꺼짐 상태 표시) */-->
+<!--/* SCR-A-013~015 알림 관리 (한 화면: 발송 내역 · 알림 설정 탭) — /admin/notifications — 디자인 기준: docs/ui/관리자디자인기준.md
+  탭: ?tab=history (기본, 발송 내역) | ?tab=settings (알림 설정)
+  state: empty (내역 검색 결과 없음 — '99.01.01') | detail (내역 상세 시트 — 첫 행) | filter-held (보류 칸 선택)
+         picker (설정 + 보류 시작 시트) | picker-end (보류 종료 시트) | off (설정 — 고객 자동 발송 꺼짐)
+         loading (무한 스크롤 — 아래 불러오는 중 줄, 스크롤 맨 아래) | end (최근 30일 모두 불러옴 — 끝 안내 줄, 스크롤 맨 아래)
+  대량 처리: 기본 범위 최근 30일 · 20건씩 무한 스크롤 (끝: '최근 30일 발송 내역을 모두 불러왔습니다' + 날짜 검색 안내)
+   - 실제 구현: 서버 페이징 20건/페이지(커서: CREATED_AT, NOTIFICATION_ID), 채널·결과 필터와 검색은 쿼리 조건으로 처리 (불러온 행만 거르는 방식 아님)
+   - 날짜 검색은 30일 범위를 넘어 조회 (화면 개발 단계: 40일 넘은 더미 2건 26.09.15 · 26.09.10 은 날짜로 검색할 때만 보임)
+   - 인덱스: (RECEIVER_TYPE, CREATED_AT), (MEMBER_ID) / 보관 기간은 보류(11/03)
+  발송 내역 = 고객에게 보낸 알림만 (TBL_NOTIFICATION.RECEIVER_TYPE 01). 관리자 수신 알림은 헤더 알림 패널에서만 본다.
+   - 현황 3칸: 오늘 발송(SENT_AT 오늘) · 보류(SENT_AT NULL) · 문자 대체(NTF_CHANNEL 03) — 보류·문자 대체 칸을 누르면 결과 필터 (다시 누르면 해제)
+   - 채널 글자 드롭다운(NTF_CHANNEL) · 검색(돋보기: 고객 이름 · 날짜, 견적 관리와 같은 유연한 날짜 입력)
+   - 날짜 묶음(오늘 · 어제 · YY.MM.DD) · 행 2줄: 고객 · 시각 / 세부 종류(NTF_DETAIL 고객 쪽 이름) · 채널 + 정상 발송이 아니면 칩(보류 · 문자 대체)
+   - 상세 시트: 메시지 미리보기(NTF_TITLE · NTF_CONTENT) · 받는 사람(이름 · 휴대폰 가림) · 채널 · 발송 시각(또는 보류 중 · 발송 예정) · 알림 종류
+  알림 설정 (묶음 설정 목록: 섹션 제목 · 흰 카드 · 행 = 이름 + 토글, 설명은 섹션 아래 한 줄):
+   - 내 알림: 알림 받기 (새 컬럼 TBL_ADMIN.PUSH_ENABLED, 기본 Y)
+   - 고객 발송: 자동 발송(IS_ACTIVE) · 야간 발송 보류(QUIET_ENABLED) · 보류 시작 · 보류 종료(QUIET_START · QUIET_END, 행마다 시간 시트) · 알림톡 실패 시 문자 대체(SMS_FALLBACK)
+   - UPDATED_AT · ADMIN_ID 는 DB 감사용, 화면에 표시하지 않음
+  동작: js/admin/notification.js (더미 데이터는 템플릿·JS 에 있음) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
-      th:replace="~{fragments/admin-layout :: layout(title='알림 관리', active='', fixed=false, content=~{::content}, scripts=~{})}">
+      th:replace="~{fragments/admin-layout :: layout(title='알림 관리', active='', fixed=true, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
-  <div class="icons-2 px-4 pb-28 pt-5" th:with="paused=${param.state != null and param.state[0] == 'paused'}">
-    <div class="mb-5">
-      <p class="text-[10px] font-bold tracking-[0.12em] text-[#879189]">MESSAGE SERVICE</p>
-      <h2 class="mt-1 text-xl font-extrabold tracking-[-0.04em] text-[#346538]">알림 관리</h2>
+  <div id="notiManage" class="relative flex h-full min-h-0 flex-col"
+       th:with="st=${param.state != null ? param.state[0] : ''},
+                tab=${(param.tab != null and param.tab[0] == 'settings') or st == 'picker' or st == 'picker-end' or st == 'off' ? 'settings' : 'history'},
+                off=${st == 'off'},
+                tabCls='relative h-12 text-[15px] font-semibold text-[#888] after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 [&.is-active]:font-bold [&.is-active]:text-[#346538] [&.is-active]:after:bg-[#346538]',
+                toggleCls='group relative h-[30px] w-[50px] shrink-0 rounded-full bg-[#e5e7eb] transition-colors aria-pressed:bg-[#346538] disabled:opacity-50'"
+       th:attr="data-state=${st},data-tab=${tab}">
+    <!--/* 1행: 페이지 제목 */-->
+    <h2 class="shrink-0 px-5 pt-5 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">알림 관리</h2>
+
+    <!--/* 탭: 글자 + 선택 시 초록 밑줄 (견적 확인과 같은 모양) */-->
+    <div class="mt-3 grid shrink-0 grid-cols-2 border-b border-[#e5e7eb] px-4" role="tablist">
+      <button type="button" data-tab-btn="history" role="tab" th:class="${tabCls}" th:classappend="${tab == 'history'} ? 'is-active'">발송 내역</button>
+      <button type="button" data-tab-btn="settings" role="tab" th:class="${tabCls}" th:classappend="${tab == 'settings'} ? 'is-active'">알림 설정</button>
     </div>
 
-    <!--/* ① 자동 메시징 발송 현황 */-->
-    <section class="rounded-[22px] border border-white bg-white p-5 shadow-[0_8px_24px_rgba(36,58,39,.08)]">
-      <div class="flex items-center gap-2">
-        <span class="grid h-8 w-8 place-items-center rounded-xl bg-[#edf3ed] text-[#346538]">
-          <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons.svg} + '#i-bell'"/></svg>
-        </span>
-        <h3 class="text-sm font-extrabold text-[#3a403b]">자동 메시징 발송 현황</h3>
-      </div>
-      <div class="py-7 text-center">
-        <strong class="text-[42px] font-extrabold tracking-[-0.06em] text-[#346538]">45<span class="ml-1 text-lg tracking-normal">건</span></strong>
-        <p class="mt-2 text-xs font-semibold text-[#768078]">오늘 발송된 자동 알림 메시지 수</p>
-      </div>
-      <div th:unless="${paused}" class="flex items-center justify-center gap-2 rounded-xl bg-[#f2f6f2] py-2.5 text-[10px] font-bold text-[#59705c]">
-        <span class="h-2 w-2 rounded-full bg-[#4f8b55]"></span>
-        자동 메시징 시스템 정상 운영 중
-      </div>
-      <div th:if="${paused}" class="flex items-center justify-center gap-2 rounded-xl bg-[#fff0ee] py-2.5 text-[10px] font-bold text-[#a84a42]">
-        <span class="h-2 w-2 rounded-full bg-[#d95c50]"></span>
-        자동 메시징 일시 정지 중
-      </div>
-    </section>
+    <!--/* ============ 발송 내역 ============ */-->
+    <div data-panel="history" th:hidden="${tab != 'history'}" class="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4"
+         th:attr="data-initial-query=${st == 'empty'} ? '99.01.01' : null">
+      <!--/* 현황 3칸 — 보류 · 문자 대체 칸 = 결과 필터 */-->
+      <section class="grid grid-cols-3 overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+        <div class="px-4 py-3">
+          <p class="text-[12px] text-[#888]">오늘 발송</p>
+          <p class="mt-0.5 text-[18px] font-bold tabular-nums text-[#346538]">45</p>
+        </div>
+        <button type="button" data-stat="held" aria-pressed="false" class="group border-l border-[#eef0ee] px-4 py-3 text-left transition aria-pressed:bg-[#fff3e6]">
+          <p class="text-[12px] text-[#888] group-aria-pressed:font-semibold group-aria-pressed:text-[#d9701a]">보류</p>
+          <p class="mt-0.5 text-[18px] font-bold tabular-nums text-[#d9701a]">2</p>
+        </button>
+        <button type="button" data-stat="sms" aria-pressed="false" class="group border-l border-[#eef0ee] px-4 py-3 text-left transition aria-pressed:bg-[#f0f1ef]">
+          <p class="text-[12px] text-[#888] group-aria-pressed:font-semibold group-aria-pressed:text-[#292929]">문자 대체</p>
+          <p class="mt-0.5 text-[18px] font-bold tabular-nums text-[#555]">3</p>
+        </button>
+      </section>
 
-    <!--/* ② 알림 내역 · ③ 자동 메시징 관리 */-->
-    <div class="mt-5 space-y-3">
-      <a th:each="m : ${ {'document|알림 내역|관리자·사용자 상단 팝업 알림 기록 확인|/admin/notifications/history', 'settings|자동 메시징 관리|자동 알림 운영 상태와 발송 환경 관리|/admin/notifications/settings'} }"
-         th:with="t=${#strings.arraySplit(m, '|')}" th:href="@{${t[3]}}"
-         class="flex w-full items-center gap-4 rounded-[18px] border border-white bg-white p-4 text-left shadow-[0_5px_18px_rgba(36,58,39,.06)] transition active:scale-[.99]">
-        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#edf3ed] text-[#346538]">
-          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons.svg} + '#i-' + ${t[0]}"/></svg>
-        </span>
-        <span class="min-w-0 flex-1">
-          <strong class="block text-sm text-[#2e3630]" th:text="${t[1]}">알림 내역</strong>
-          <span class="mt-1 block text-xs leading-5 text-[#858d87]" th:text="${t[2]}">설명</span>
-        </span>
-        <svg class="icon text-[#9aa19b]" width="18" height="18"><use th:href="@{/images/admin/icons.svg} + '#i-arrowRight'"/></svg>
-      </a>
+      <!--/* 검색 — 상자 없이 글자 + 밑줄 (항상 펼쳐 둠, 이 화면의 주 기능) */-->
+      <div class="relative mt-5">
+        <svg class="icon pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+        <input id="notiQuery" type="search" autocomplete="off" placeholder="이름 또는 날짜 검색"
+               class="h-11 w-full border-b border-[#d9dcd8] bg-transparent pl-8 pr-10 text-[15px] text-[#1a1a1a] outline-none placeholder:text-[#b0b4b1] focus:border-[#346538] [&::-webkit-search-cancel-button]:hidden">
+        <button type="button" id="notiClear" aria-label="검색어 지우기" class="absolute -right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-[#888] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+
+      <!--/* 목록 머리: 왼쪽 건수 · 오른쪽 채널 필터 (리뷰 관리와 같은 줄, 목록에 붙임) */-->
+      <div class="mt-6 flex items-center">
+        <p class="flex items-center gap-2 px-1 text-[14px] font-semibold text-[#888]"><span>최근 30일 · <span id="notiCount" class="tabular-nums">20</span>건</span>
+          <!--/* 결과 필터가 걸려 있을 때만: 누르면 전체로 */-->
+          <button type="button" id="resultClear" hidden class="flex h-7 items-center gap-0.5 rounded-full bg-[#eef0ee] pl-2.5 pr-1.5 text-[13px] font-semibold text-[#555]"><span data-result-label>보류</span><svg class="icon" width="14" height="14"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg></button>
+        </p>
+        <span class="flex-1"></span>
+        <div class="relative -mr-2.5" data-dropdown>
+          <select id="channelFilter" hidden aria-label="채널">
+            <option value="">모든 채널</option><option>앱</option><option>알림톡</option><option>문자</option>
+          </select>
+          <button type="button" data-dd-trigger aria-haspopup="listbox" aria-expanded="false" class="flex h-9 items-center gap-0.5 px-2.5 text-[14px] font-medium text-[#666]">
+            <span data-dd-label>모든 채널</span><svg class="icon text-[#888]" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevron'"/></svg>
+          </button>
+          <ul data-dd-menu hidden role="listbox" class="absolute right-0 top-full z-30 mt-1 min-w-[136px] rounded-[16px] bg-white p-1.5 shadow-[0_10px_30px_rgba(26,26,26,.14)] ring-1 ring-[#eef0ee]"></ul>
+        </div>
+      </div>
+
+      <!--/* 날짜 묶음 — 행: 0 고객 | 1 휴대폰 끝 4자리 | 2 NTF_DETAIL(고객 쪽 이름) | 3 NTF_TITLE | 4 NTF_CONTENT | 5 NTF_CHANNEL | 6 발송 HH:MM(- = 보류) | 7 결과(sent·held·sms) | 8 날짜 | 9 생성 HH:MM */-->
+      <th:block th:with="rows=${ {
+            '강민주|1234|상담 답변 도착|상담 답변 도착|상담원이 답변을 보냈습니다. 채팅에서 확인해 주세요.|알림톡|-|held|26.11.02|22:41',
+            '김명품|5821|견적 변경|견적이 변경되었어요|승인된 견적 내용이 수정되었습니다. 다시 확인해 주세요.|알림톡|-|held|26.11.02|22:15',
+            '이서준|3307|이사 당일|오늘은 이사 당일입니다|담당 기사 정보를 확인해 주세요.|알림톡|08:00|sent|26.11.02|08:00',
+            '최지우|9048|견적 접수|견적 요청 접수|견적 요청이 정상적으로 접수되었습니다.|알림톡|08:00|sent|26.11.02|01:12',
+            '김명품|5821|예약 확정|예약이 확정되었어요|견적 확정으로 이사 예약이 완료되었습니다.|알림톡|16:05|sent|26.11.01|16:05',
+            '박철수|7712|계약금 결제|계약금 결제 완료|계약금 결제가 확인되었습니다.|문자|15:02|sms|26.11.01|15:02',
+            '정현우|2286|견적 도착|견적이 도착했어요|요청하신 견적이 도착했습니다. 확인해 주세요.|알림톡|11:20|sent|26.10.31|11:20',
+            '홍길동|6650|견적 도착|견적이 도착했어요|요청하신 견적이 도착했습니다. 확인해 주세요.|알림톡|10:47|sent|26.10.31|10:47',
+            '최지우|9048|이사 D-3|이사 3일 전|이사 예정일이 3일 남았습니다. 준비 사항을 확인해 주세요.|알림톡|09:00|sent|26.10.30|09:00',
+            '송지호|4419|일정 변경|이사 일정 변경|이사 일정이 11월 12일 오전 9시로 변경되었습니다.|문자|14:12|sms|26.10.29|14:12',
+            '윤아름|8803|이사 완료|이사 완료|이사 완료 처리가 되었습니다. 서비스 이용은 어떠셨나요?|알림톡|18:30|sent|26.10.28|18:30',
+            '한유진|1575|예약 취소|예약이 취소되었어요|11월 8일 이사 예약이 취소되었습니다.|알림톡|13:44|sent|26.10.27|13:44',
+            '윤아름|8803|공지·이야기|새 이야기가 올라왔어요|이사 후기 이벤트 소식을 확인해 보세요.|앱|10:00|sent|26.10.25|10:00',
+            '송지호|4419|이사 팁|이사 팁|이삿짐 포장 전 꼭 챙겨야 할 5가지를 알려 드려요.|앱|10:00|sent|26.10.24|10:00',
+            '이서준|3307|견적 도착|견적이 도착했어요|요청하신 견적이 도착했습니다. 확인해 주세요.|알림톡|14:20|sent|26.09.15|14:20',
+            '홍길동|6650|견적 접수|견적 요청 접수|견적 요청이 정상적으로 접수되었습니다.|알림톡|09:05|sent|26.09.10|09:05'} }">
+        <div th:each="g : ${ {'26.11.02|오늘', '26.11.01|어제', 'older|이전'} }"
+             th:with="gd=${#strings.arraySplit(g, '|')}" data-group class="mt-2 [&+[data-group]]:mt-5">
+          <h3 class="mb-2 px-1 text-[13px] font-medium text-[#888]" th:text="${gd[1]}">오늘</h3>
+          <div class="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+            <th:block th:each="r : ${rows}" th:with="t=${#strings.arraySplit(r, '|')}">
+              <div th:if="${t[8] == gd[0] or (gd[0] == 'older' and t[8] != '26.11.02' and t[8] != '26.11.01')}"
+                   th:attr="data-name=${t[0]},data-phone=${t[1]},data-date=${t[8]},data-channel=${t[5]},data-result=${t[7]},
+                            data-detail=${t[2]},data-title=${t[3]},data-content=${t[4]},data-sent=${t[6] == '-'} ? '' : |${t[8]} ${t[6]}|,
+                            data-archive=${t[8] == '26.09.15' or t[8] == '26.09.10'} ? 'Y' : null"
+                   role="button" tabindex="0" data-row
+                   class="cursor-pointer border-b border-[#eef0ee] px-4 py-3 transition last:border-none hover:bg-[#f7f8f6]">
+                <div class="flex items-center justify-between gap-2">
+                  <strong class="truncate text-[15px] font-semibold text-[#292929]" th:text="${t[0]}">강민주</strong>
+                  <span class="shrink-0 text-[13px] tabular-nums text-[#888]" th:text="${gd[0] == 'older'} ? ${t[8]} : ${t[9]}">22:41</span>
+                </div>
+                <div class="mt-0.5 flex items-center justify-between gap-2">
+                  <span class="truncate text-[13px] text-[#888]" th:text="|${t[2]} · ${t[5]}|">상담 답변 도착 · 알림톡</span>
+                  <span class="chip shrink-0" th:classappend="${t[7] == 'held'} ? 'chip-review' : (${t[7] == 'sms'} ? 'chip-progress' : 'chip-done')" th:text="${t[7] == 'held'} ? '보류' : (${t[7] == 'sms'} ? '문자 대체' : '발송')">발송</span>
+                </div>
+              </div>
+            </th:block>
+          </div>
+        </div>
+      </th:block>
+      <!--/* 무한 스크롤: 불러오는 중 줄 · 끝 안내 줄 · 감시 지점 */-->
+      <div id="notiLoading" hidden class="mt-3 flex items-center justify-center gap-2 py-3 text-[13px] text-[#888]">
+        <span class="h-4 w-4 animate-spin rounded-full border-2 border-[#d9dcd8] border-t-[#346538]" aria-hidden="true"></span>불러오는 중
+      </div>
+      <div id="notiEnd" hidden class="mt-4 py-3 text-center">
+        <p class="text-[13px] text-[#888]">최근 30일 발송 내역을 모두 불러왔습니다</p>
+        <button type="button" id="notiEndSearch" class="mt-1 text-[13px] font-semibold text-[#346538] underline underline-offset-2">이전 기록은 날짜로 검색</button>
+      </div>
+      <div id="notiSentinel" class="h-px"></div>
+      <p id="notiEmpty" hidden class="mt-2 rounded-[20px] bg-white py-12 text-center text-[14px] text-[#888] shadow-[0_2px_12px_rgba(26,26,26,.05)]">검색 결과가 없습니다.</p>
+    </div>
+
+    <!--/* ============ 알림 설정 (묶음 설정 목록) ============ */-->
+    <div data-panel="settings" th:hidden="${tab != 'settings'}" id="notiSettings" class="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-5">
+      <!--/* 내 알림 */-->
+      <h3 class="px-1 text-[13px] font-semibold text-[#888]">내 알림</h3>
+      <section class="mt-2 rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+        <div class="flex h-14 items-center justify-between gap-3 px-5">
+          <span class="text-[16px] font-medium text-[#292929]">알림 받기</span>
+          <button type="button" data-switch="push" aria-label="알림 받기" aria-pressed="true" th:class="${toggleCls}">
+            <span class="absolute left-[3px] top-[3px] h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(26,26,26,.2)] transition-transform group-aria-pressed:translate-x-5"></span>
+          </button>
+        </div>
+      </section>
+      <p class="mt-2 px-1 text-[13px] text-[#888]">꺼도 알림 패널에는 그대로 쌓입니다.</p>
+
+      <!--/* 고객 발송 */-->
+      <h3 class="mt-7 px-1 text-[13px] font-semibold text-[#888]">고객 발송</h3>
+      <section class="mt-2 overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+        <div class="flex h-14 items-center justify-between gap-3 border-b border-[#eef0ee] px-5">
+          <span class="text-[16px] font-medium text-[#292929]">자동 발송</span>
+          <button type="button" data-switch="enabled" aria-label="자동 발송" th:attr="aria-pressed=${!off}" th:class="${toggleCls}">
+            <span class="absolute left-[3px] top-[3px] h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(26,26,26,.2)] transition-transform group-aria-pressed:translate-x-5"></span>
+          </button>
+        </div>
+        <div data-needs="enabled" class="flex h-14 items-center justify-between gap-3 border-b border-[#eef0ee] px-5 transition-opacity">
+          <span class="text-[16px] font-medium text-[#292929]">야간 발송 보류</span>
+          <button type="button" data-switch="quiet" aria-label="야간 발송 보류" aria-pressed="true" th:class="${toggleCls}">
+            <span class="absolute left-[3px] top-[3px] h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(26,26,26,.2)] transition-transform group-aria-pressed:translate-x-5"></span>
+          </button>
+        </div>
+        <!--/* 보류 시작 · 보류 종료 (QUIET_START · QUIET_END) — 행마다 그 시각만 고르는 시트 */-->
+        <button th:each="q : ${ {'start|보류 시작|22:00|오후 10:00', 'end|보류 종료|08:00|오전 08:00'} }" th:with="t=${#strings.arraySplit(q, '|')}"
+                type="button" data-needs="quiet" th:attr="data-quiet-time=${t[0]},data-value=${t[2]}"
+                class="flex h-14 w-full items-center justify-between gap-3 border-b border-[#eef0ee] px-5 text-left transition-opacity disabled:cursor-default">
+          <span class="text-[16px] font-medium text-[#292929]" th:text="${t[1]}">보류 시작</span>
+          <span class="flex items-center gap-0.5 text-[15px] font-medium tabular-nums text-[#666]">
+            <span data-quiet-text th:text="${t[3]}">오후 10:00</span>
+            <svg class="icon text-[#b0b4b1]" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+          </span>
+        </button>
+        <div data-needs="enabled" class="flex h-14 items-center justify-between gap-3 px-5 transition-opacity">
+          <span class="text-[16px] font-medium text-[#292929]">알림톡 실패 시 문자 대체</span>
+          <button type="button" data-switch="sms" aria-label="알림톡 실패 시 문자 대체" aria-pressed="true" th:class="${toggleCls}">
+            <span class="absolute left-[3px] top-[3px] h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(26,26,26,.2)] transition-transform group-aria-pressed:translate-x-5"></span>
+          </button>
+        </div>
+      </section>
+      <p id="sendFooter" class="mt-2 break-keep px-1 text-[13px] text-[#888]">알림톡·문자에만 적용되며 앱 알림은 바로 표시됩니다.</p>
+    </div>
+
+  </div>
+
+  <!--/* 보류 시각 시트 — 헤더·하단 탭까지 덮음 (채팅 설정 시간 시트와 같은 모양) · 누른 행(보류 시작/종료)의 시각만 · 휠(오전/오후 · 시 · 분) */-->
+  <div id="timePicker" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div role="dialog" aria-modal="true" aria-labelledby="timePickerTitle"
+         class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 shadow-[0_-8px_30px_rgba(26,26,26,.12)] [animation:slideUp_.2s_ease-out]">
+      <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+      <div class="mt-3 flex items-center justify-between">
+        <h3 id="timePickerTitle" class="text-[18px] font-bold text-[#1a1a1a]">보류 시작</h3>
+        <button type="button" data-close aria-label="닫기" class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#555] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <div class="relative mt-2 grid grid-cols-3 gap-2" style="height:132px">
+        <div class="pointer-events-none absolute inset-x-0 top-[44px] h-11 rounded-[12px] bg-[#f2f5f2]"></div>
+        <div th:each="col : ${ {'period|오전 오후', 'hour|시', 'minute|분'} }" th:with="c=${#strings.arraySplit(col, '|')}"
+             th:attr="data-wheel=${c[0]}, aria-label=${c[1]}" role="listbox" tabindex="0"
+             class="relative h-full snap-y snap-mandatory overflow-y-auto py-[44px] [scrollbar-width:none] [mask-image:linear-gradient(transparent,#000_30%,#000_70%,transparent)] [&::-webkit-scrollbar]:hidden">
+          <th:block th:switch="${c[0]}">
+            <th:block th:case="'period'"><div th:each="v : ${ {'오전','오후'} }" role="option" th:attr="data-value=${v}" th:text="${v}" class="grid h-11 snap-center place-items-center text-[18px] text-[#b0b4b1] aria-selected:font-bold aria-selected:text-[#1a1a1a]">오전</div></th:block>
+            <th:block th:case="'hour'"><div th:each="h : ${#numbers.sequence(1, 12)}" role="option" th:attr="data-value=${#numbers.formatInteger(h, 2)}" th:text="${#numbers.formatInteger(h, 2)} + '시'" class="grid h-11 snap-center place-items-center text-[18px] tabular-nums text-[#b0b4b1] aria-selected:font-bold aria-selected:text-[#1a1a1a]">01시</div></th:block>
+            <th:block th:case="*"><div th:each="m : ${ {'00','10','20','30','40','50'} }" role="option" th:attr="data-value=${m}" th:text="${m} + '분'" class="grid h-11 snap-center place-items-center text-[18px] tabular-nums text-[#b0b4b1] aria-selected:font-bold aria-selected:text-[#1a1a1a]">00분</div></th:block>
+          </th:block>
+        </div>
+      </div>
+      <button type="button" id="pickerDone" class="btn-primary mt-4">완료</button>
     </div>
   </div>
+
+  <!--/* 알림 상세 시트 */-->
+  <div id="notiDetail" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div class="max-h-full w-full overflow-y-auto rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-3 shadow-[0_-12px_40px_rgba(26,26,26,.18)] [animation:slideUp_.2s_ease-out]">
+      <span class="mx-auto block h-1 w-10 rounded-full bg-[#e5e7eb]"></span>
+      <div class="mt-2 flex items-center justify-between">
+        <h3 class="text-[18px] font-bold text-[#1a1a1a]">알림 상세</h3>
+        <button type="button" data-close aria-label="닫기" class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <!--/* 메시지 미리보기 */-->
+      <div class="mt-3 rounded-[16px] bg-[#f2f3f1] px-4 py-3.5">
+        <p data-d="title" class="break-keep text-[15px] font-bold text-[#1a1a1a]">제목</p>
+        <p data-d="content" class="mt-1 break-keep text-[14px] leading-[1.6] text-[#292929]">내용</p>
+      </div>
+      <dl class="mt-4 divide-y divide-[#eef0ee] text-[14px]">
+        <div th:each="k : ${ {'to|받는 사람', 'channel|채널', 'sent|발송 시각', 'detail|알림 종류'} }"
+             th:with="t=${#strings.arraySplit(k, '|')}" class="flex items-center justify-between gap-3 py-3">
+          <dt class="shrink-0 text-[#888]" th:text="${t[1]}">받는 사람</dt>
+          <dd class="text-right font-semibold tabular-nums text-[#292929]" th:attr="data-d=${t[0]}">-</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts">
+  <script th:src="@{/js/admin/notification.js}"></script>
 </th:block>
 </body>
 </html>

@@ -1,0 +1,64 @@
+/* [시안] 관리자 v2 — 사용자 앱(css/user/app.css :root)과 같은 색·글자 기준
+   글자: 페이지 제목 22 · 섹션 제목 17 · 본문 15~16 · 보조 13~14 · 최소 12
+   색 규칙: 초록 계열 + 주황(조치가 필요한 것만) + 무채색. 파랑·보라 등 다른 색은 쓰지 않는다. */
+.admin-v2 {
+  --green: #346538;
+  --green-soft: #85a388;
+  --green-pale: #eef4f0;
+  --sage-text: #537557;
+  --sage-pale: #f0f4ea;
+  --cream: #e8e8cd;
+  --ink: #1a1a1a;
+  --body: #292929;
+  --sub: #555555;
+  --muted: #888888;
+  --line: #e5e7eb;
+  --surface: #f7f8f6;
+  --orange: #f5831a;
+  --orange-pale: #fff3e6;
+  --danger: #d8663d;
+  --danger-pale: #fff1e9;
+  color: var(--body);
+}
+/* v2 아이콘(icons-v2.svg)만 대상 — 아직 기존 icons.svg 를 쓰는 화면에는 영향 없음. 심볼에 fill 이 없으므로 기본값을 여기서 둔다 */
+:where(.admin-v2 svg.icon:has(use[href*="icons-v2"])) { stroke-width: 1.9; fill: none; }
+/* 하단 탭: 사용자 앱 활성 아이콘(images/user/b676d.svg 등)과 같은 값
+   비선택 = 연한 회색 선 1.5 + 회색 글자 / 선택 = 초록 선 1.8 + 아이콘 모양 안을 초록 18% 로 채움 + 초록 SemiBold 글자 */
+.admin-nav .icon { stroke-width: 1.5; color: #a3a8a4; }
+.admin-nav .is-selected .icon { color: var(--green); fill: rgb(52 101 56 / .18); stroke-width: 1.8; }
+
+/* 상태 색 (배지·아이콘 타일 공통): 완료·확정 = green, 승인·진행 = sage, 조치 필요 = orange, 취소 = danger */
+.tone-green { color: var(--green); background: var(--green-pale); }
+.tone-sage { color: var(--sage-text); background: var(--sage-pale); }
+.tone-orange { color: var(--orange); background: var(--orange-pale); }
+.tone-danger { color: var(--danger); background: var(--danger-pale); }
+
+/* 막대 그래프 색 */
+.bar-green { background: var(--green); }
+.bar-sage { background: var(--green-soft); }
+.bar-orange { background: var(--orange); }
+.bar-muted { background: #c9cdca; }
+.tone-solid { color: #fff; background: var(--green); }   /* 최종 단계(견적 확정 등) — 승인(sage)과 구분 */
+
+/* 목록 상태 칩 — 연한 배경 + 색 글씨, 채움 없음 (등록 버튼보다 위계 낮게)
+   조치 필요(검토·결제 대기 등) = 주황 · 진행 중 = 회색 · 완료 = 초록 · 취소 = 붉은 주황 */
+.chip { display: inline-flex; align-items: center; width: fit-content; height: 24px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+.chip-review { color: #d9701a; background: #fff3e6; }
+.chip-progress { color: #555555; background: #f0f1ef; }
+.chip-done { color: #346538; background: #eef4f0; }
+.chip-cancel { color: #d8663d; background: #fff1e9; }   /* 취소 */
+.chip-expired { color: #9a9f9b; box-shadow: inset 0 0 0 1px #e5e7eb; }   /* 만료 */
+
+/* 브랜드 글꼴 (사용자 앱 스플래시와 같은 파일) */
+@font-face { font-family: "Gmarket Sans TTF:Bold"; src: url("/fonts/Gmarket_Sans_TTF-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+.brand-font { font-family: "Gmarket Sans TTF:Bold", Pretendard, sans-serif; }
+
+/* 입력칸 (로그인 · 비밀번호 변경) */
+.field-input { height: 56px; width: 100%; border-radius: 14px; background: #fff; padding: 0 16px; font-size: 16px; color: var(--ink); outline: none; box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .15s; }
+.field-input::placeholder { color: #b0b4b1; }
+.field-input:focus { box-shadow: inset 0 0 0 2px var(--green); }
+.field-input.is-error { box-shadow: inset 0 0 0 2px var(--danger); }
+
+/* 큰 주요 버튼 — 조건이 안 맞으면 비활성 회색 */
+.btn-primary { display: flex; height: 56px; width: 100%; align-items: center; justify-content: center; border-radius: 14px; background: var(--green); color: #fff; font-size: 16px; font-weight: 700; }
+.btn-primary:disabled { background: #e5e7eb; color: #a3a8a4; cursor: default; }
