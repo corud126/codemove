@@ -23,8 +23,8 @@
       <img alt="" class="welcome-particle particle-10" th:src="@{/images/user/97ffe.svg}">
       <img alt="" class="welcome-particle particle-11" th:src="@{/images/user/63c36.svg}">
     </div>
-    <div class="welcome-copy"><span data-user-name>김무브</span>님, 환영합니다</div>
-    <a class="action welcome-button" th:href="@{/login/complete}">시작하기</a>
+    <div class="welcome-copy"><span th:text="${name ?: '김무브'}">김무브</span>님, 환영합니다</div>
+    <a class="action welcome-button" th:href="@{/}">시작하기</a>
   </div>
 </div>
 <th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>

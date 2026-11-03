@@ -24,3 +24,7 @@ label.field-label { display: block; }
 .easy-mode .onboarding-actions .action { font-size: 17px; }
 .easy-mode .sheet-title { font-size: 17px; }
 .easy-mode .phone-button { font-size: 17px; }
+
+/* 서버 확인 결과 안내 (인증번호 불일치 · 가입된 번호 등) */
+.auth-error { margin-top: 12px; color: #ef5f3c; font-size: 12px; line-height: 1.5; }
+.auth-error[hidden] { display: none; }

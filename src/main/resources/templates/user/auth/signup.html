@@ -3,6 +3,7 @@
 <!--/* SCR-U 회원가입 본인인증 정보 (G-A07, G-A10)
   state: (기본) 미입력 | filled (이름·번호 입력 + 개인정보 수집 동의 완료)
   /signup?terms=agreed : 개인정보 수집 안내(G-A08)에서 '내용을 확인했어요' 후 복귀
+  '다음' → POST /signup (auth.js) → 인증번호 발송 후 /signup/verify
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='회원가입', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/auth.css}">
@@ -28,6 +29,7 @@
         <input class="field" id="signupPhone" type="tel" inputmode="tel" name="phone" autocomplete="tel" maxlength="13"
                placeholder="휴대폰 번호를 입력해주세요." data-phone-input th:value="${filled} ? '010-1234-5678' : ''">
       </div>
+      <p class="auth-error" data-auth-error hidden></p>
 
       <div class="signup-bottom">
         <div class="terms-row">

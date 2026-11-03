@@ -2,6 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U 휴대전화 로그인 (G-A05~A06)
   state: (기본) 번호 입력 전 | sent (인증번호 발송 후 입력 완료)
+  인증하기 → POST /login/phone/send, 로그인 → POST /login/phone (auth.js)
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='휴대전화 로그인', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/auth.css}">
@@ -37,8 +38,9 @@
         </div>
         <div class="phone-code-hint"><span data-phone-echo>010-1234-5678</span> 으로 인증번호가 발송되었어요.</div>
       </div>
+      <p class="auth-error" data-auth-error hidden></p>
 
-      <a class="action form-submit next-button" th:href="@{/login/complete}" data-login-submit
+      <a class="action form-submit next-button" th:href="@{/login/phone}" data-login-submit
          th:classappend="${sent} ? '' : 'is-disabled'" th:attr="aria-disabled=${!sent}">로그인</a>
       <div class="form-links">
         <a class="action" th:href="@{/signup}">회원가입</a>

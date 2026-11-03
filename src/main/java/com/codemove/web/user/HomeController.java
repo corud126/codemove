@@ -7,13 +7,15 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.codemove.member.LoginMember;
+
 import jakarta.servlet.http.HttpSession;
 
 /**
  * 사용자 홈 (SCR-U-001~002).
  * 앱 진입점: 로그인하지 않았으면 온보딩으로 보낸다.
- * 화면 개발 단계: 로그인은 세션 표시(LOGIN_KEY)로 흉내 내고, ?state= 로 화면 상태를 바꿔 확인한다(guest 외에는 로그인 필요).
- * DB 연동 시 로그인 회원의 견적·예약 상태로 대체.
+ * 로그인 회원은 세션의 LOGIN_KEY(LoginMember). 견적·예약 상태는 아직 ?state= 로 바꿔 확인한다(guest 외에는 로그인 필요).
+ * 견적·예약 연동 시 로그인 회원의 견적·예약 상태로 대체.
  */
 @Controller
 public class HomeController {
@@ -22,8 +24,8 @@ public class HomeController {
 
 	@GetMapping("/")
 	public String home(@RequestParam(required = false) String state, HttpSession session, Model model) {
-		boolean loggedIn = session.getAttribute(LOGIN_KEY) != null;
-		if (!loggedIn && !"guest".equals(state)) {
+		LoginMember member = (LoginMember) session.getAttribute(LOGIN_KEY);
+		if (member == null && !"guest".equals(state)) {
 			// 비회원은 둘러보기 홈(?state=guest)만 볼 수 있다
 			return "redirect:/onboarding";
 		}
@@ -31,7 +33,7 @@ public class HomeController {
 			state = "none";
 		}
 		model.addAttribute("state", state);
-		model.addAttribute("userName", "김무브");
+		model.addAttribute("userName", member != null ? member.name() : null);
 		model.addAttribute("reviews", List.of(
 				new ReviewCard("김코드", "이용 2회차 · 어제", "원룸(반포장)", "★★★★★",
 						"친절하게 응대해주시고, 주의사항이나 필요한 부분 꼼꼼히 체크해주셔서 이사 잘 할 수 있었습니다."),

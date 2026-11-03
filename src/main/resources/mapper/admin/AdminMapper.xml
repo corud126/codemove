@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.admin.AdminMapper">
+
+	<sql id="columns">
+		ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE, ADMIN_ROLE, PW_CHANGED_AT, IS_ACTIVE, PUSH_ENABLED, CREATED_AT
+	</sql>
+
+	<select id="selectByLoginId" resultType="Admin">
+		SELECT <include refid="columns"/>
+		  FROM TBL_ADMIN
+		 WHERE LOGIN_ID = #{loginId}
+	</select>
+
+	<select id="selectById" resultType="Admin">
+		SELECT <include refid="columns"/>
+		  FROM TBL_ADMIN
+		 WHERE ADMIN_ID = #{adminId}
+	</select>
+
+	<update id="updatePassword">
+		UPDATE TBL_ADMIN
+		   SET PASSWORD = #{password},
+		       PW_CHANGED_AT = SYSDATE
+		 WHERE ADMIN_ID = #{adminId}
+	</update>
+
+</mapper>

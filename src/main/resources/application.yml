@@ -28,6 +28,17 @@ server:
       # URL 에 ;jsessionid= 가 붙지 않도록 쿠키로만 세션 유지
       tracking-modes: cookie
 
+# 간편 로그인 앱 키는 application-local.yml 에 작성 (비어 있으면 해당 로그인 버튼은 로그인 방법 선택으로 돌아감)
+codemove:
+  oauth:
+    providers:
+      kakao:
+        client-id:
+        client-secret:
+      naver:
+        client-id:
+        client-secret:
+
 ---
 # 로컬 개발: 템플릿·정적 파일을 src에서 직접 읽어 수정 즉시 반영 (재시작 불필요)
 spring:

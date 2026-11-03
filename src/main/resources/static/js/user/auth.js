@@ -2,10 +2,12 @@
  * 온보딩 · 로그인 · 회원가입 화면 동작 (G-A01~A13)
  *  [data-onboarding]   슬라이드 전환 (data-autoplay="true" 일 때 3.5초 자동 전환)
  *  [data-phone-input]  휴대폰 번호 010-0000-0000 형식 자동 입력
- *  [data-phone-login]  인증하기 → 인증번호 입력칸 노출, 타이머, 로그인 버튼 활성화
- *  [data-signup]       이름·번호·개인정보 동의 시 '다음' 활성화 (입력값은 sessionStorage 에 임시 보관)
- *  [data-verify]       6자리 인증번호 입력칸 이동·붙여넣기, 타이머, 재발송
+ *  [data-phone-login]  인증하기(발송) → 인증번호 입력칸 노출, 타이머, 로그인
+ *  [data-signup]       이름·번호·개인정보 동의 시 '다음' 활성화 → 인증번호 발송 (입력값은 sessionStorage 에 임시 보관)
+ *  [data-verify]       6자리 인증번호 입력칸 이동·붙여넣기, 타이머, 재발송, 인증 완료(가입)
+ *  [data-auth-error]   서버가 돌려준 안내 문구 표시
  *  .is-disabled 버튼/링크는 클릭 무시
+ *  서버 요청은 post() 로 보내고 {redirect} 면 이동, {message} 면 안내 문구를 띄운다
  */
 (function () {
   const STORE_KEY = 'codemove.signup';
@@ -29,6 +31,30 @@
     if (!el) return;
     el.classList.toggle('is-disabled', !enabled);
     el.setAttribute('aria-disabled', String(!enabled));
+  }
+
+  /* 폼 값으로 POST. 응답 JSON 에 ok(성공 여부)를 붙여 돌려준다 */
+  async function post(url, data) {
+    try {
+      const res = await fetch(url, { method: 'POST', body: new URLSearchParams(data || {}) });
+      return Object.assign({ ok: res.ok }, await res.json());
+    } catch (_) {
+      return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+    }
+  }
+
+  function showError(scope, message) {
+    const el = scope.querySelector('[data-auth-error]');
+    if (!el) return;
+    el.textContent = message || '';
+    el.hidden = !message;
+  }
+
+  /* 성공: 이동 / 실패: 안내 문구. redirect 가 없으면 응답을 그대로 돌려준다 */
+  function follow(scope, result) {
+    if (result.redirect) { location.href = result.redirect; return null; }
+    showError(scope, result.ok ? '' : result.message);
+    return result.ok ? result : null;
   }
 
   /* 카운트다운 타이머. el.dataset.seconds 부터 시작 */
@@ -56,11 +82,6 @@
 
   document.querySelectorAll('[data-phone-input]').forEach((input) => {
     input.addEventListener('input', () => { input.value = formatPhone(input.value); });
-  });
-
-  document.querySelectorAll('[data-user-name]').forEach((el) => {
-    const { name } = load();
-    if (name) el.textContent = name;
   });
 
   /* 온보딩 */
@@ -109,16 +130,22 @@
       code.classList.remove('is-focused');
       sync();
     });
-    send.addEventListener('click', () => {
+    send.addEventListener('click', async () => {
       if (send.classList.contains('is-disabled')) return;
+      const result = follow(phoneLogin, await post('/login/phone/send', { phone: phone.value }));
+      if (!result) return;
       sent = true;
       send.textContent = '재인증';
       group.hidden = false;
       code.value = '';
       phoneLogin.querySelector('[data-phone-echo]').textContent = phone.value;
-      startTimer(timerEl, 180);
+      startTimer(timerEl, result.seconds);
       code.focus();
       sync();
+    });
+    submit.addEventListener('click', async (e) => {
+      e.preventDefault();
+      follow(phoneLogin, await post('/login/phone', { phone: phone.value, code: code.value }));
     });
     if (sent) startTimer(timerEl);
     sync();
@@ -143,6 +170,10 @@
     };
     name.addEventListener('input', sync);
     phone.addEventListener('input', sync);
+    submit.addEventListener('click', async (e) => {
+      e.preventDefault();
+      follow(signup, await post('/signup', { name: name.value.trim(), phone: phone.value, agreed: agreed }));
+    });
     sync();
   }
 
@@ -184,11 +215,21 @@
       });
     });
 
-    verify.querySelector('[data-otp-resend]').addEventListener('click', () => {
+    verify.querySelector('[data-otp-resend]').addEventListener('click', async () => {
+      const result = follow(verify, await post('/signup/verify/resend'));
+      if (!result) return;
       boxes.forEach((b) => { b.value = ''; });
-      startTimer(timerEl, 180);
+      startTimer(timerEl, result.seconds);
       boxes[0].focus();
       sync();
+    });
+    submit.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const result = await post('/signup/verify', { code: boxes.map((b) => b.value).join('') });
+      if (result.ok && result.redirect) {
+        try { sessionStorage.removeItem(STORE_KEY); } catch (_) { /* 저장 불가 환경 무시 */ }
+      }
+      follow(verify, result);
     });
 
     startTimer(timerEl);

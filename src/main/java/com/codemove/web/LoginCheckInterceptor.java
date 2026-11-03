@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpSession;
 
 /**
  * 비회원 접근 차단: 로그인하지 않았으면 로그인 방법 선택(/login)으로 보낸다.
- * 화면 개발 단계: 로그인 여부는 세션 표시(HomeController.LOGIN_KEY)로 판단. DB 연동 시 실제 인증으로 대체.
+ * 로그인 여부는 세션의 로그인 회원(HomeController.LOGIN_KEY)으로 판단한다.
  */
 public class LoginCheckInterceptor implements HandlerInterceptor {
 

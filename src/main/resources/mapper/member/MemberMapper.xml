@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.member.MemberMapper">
+
+	<sql id="columns">
+		M.MEMBER_ID, M.MEMBER_NAME, M.PHONE, M.IS_VERIFIED, M.IS_ACTIVE, M.JOINED_AT, M.TERMS_AGREED_AT, M.WITHDRAWN_AT
+	</sql>
+
+	<select id="selectByPhone" resultType="Member">
+		SELECT <include refid="columns"/>
+		  FROM TBL_MEMBER M
+		 WHERE M.PHONE = #{phone}
+	</select>
+
+	<select id="selectById" resultType="Member">
+		SELECT <include refid="columns"/>
+		  FROM TBL_MEMBER M
+		 WHERE M.MEMBER_ID = #{memberId}
+	</select>
+
+	<insert id="insertMember" parameterType="Member">
+		<selectKey keyProperty="memberId" resultType="long" order="BEFORE">
+			SELECT SEQ_MEMBER.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_MEMBER (MEMBER_ID, MEMBER_NAME, PHONE, IS_VERIFIED, TERMS_AGREED_AT)
+		VALUES (#{memberId}, #{memberName}, #{phone}, #{isVerified}, #{termsAgreedAt})
+	</insert>
+
+	<!-- 번호는 UNIQUE 라 'W' || MEMBER_ID 로 비워 둔다 → 같은 번호로 새로 가입 가능 -->
+	<update id="withdrawMember">
+		UPDATE TBL_MEMBER
+		   SET MEMBER_NAME = '탈퇴회원',
+		       PHONE = 'W' || MEMBER_ID,
+		       IS_ACTIVE = 'N',
+		       WITHDRAWN_AT = SYSDATE
+		 WHERE MEMBER_ID = #{memberId}
+		   AND IS_ACTIVE = 'Y'
+	</update>
+
+	<select id="selectBySocial" resultType="Member">
+		SELECT <include refid="columns"/>
+		  FROM TBL_SOCIAL S
+		  JOIN TBL_MEMBER M ON M.MEMBER_ID = S.MEMBER_ID
+		 WHERE S.LOGIN_TYPE = #{loginType}
+		   AND S.SOCIAL_NO = #{socialNo}
+	</select>
+
+	<select id="selectSocials" resultType="Social">
+		SELECT SOCIAL_ID, MEMBER_ID, LOGIN_TYPE, SOCIAL_NO, CONNECTED_AT
+		  FROM TBL_SOCIAL
+		 WHERE MEMBER_ID = #{memberId}
+		 ORDER BY LOGIN_TYPE
+	</select>
+
+	<insert id="insertSocial" parameterType="Social">
+		<selectKey keyProperty="socialId" resultType="long" order="BEFORE">
+			SELECT SEQ_SOCIAL.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_SOCIAL (SOCIAL_ID, MEMBER_ID, LOGIN_TYPE, SOCIAL_NO)
+		VALUES (#{socialId}, #{memberId}, #{loginType}, #{socialNo})
+	</insert>
+
+	<delete id="deleteSocials">
+		DELETE FROM TBL_SOCIAL WHERE MEMBER_ID = #{memberId}
+	</delete>
+
+</mapper>

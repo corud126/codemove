@@ -1,6 +1,6 @@
 /*
  * SCR-A-023 회원 관리 (templates/admin/member/list.html) — 더미 데이터 — 고객(TBL_MEMBER)만 조회 (ERD Q11)
- *  필터: 활성·비활성(IS_ACTIVE, 목록 맨 앞 칩) · 로그인 방식은 상세에만 · 삭제 기능 없음
+ *  활성 회원만 표시(탈퇴 회원은 이름·번호가 파기돼 목록에서 제외) · 로그인 방식은 상세에만 · 삭제 기능 없음
  *  검색(이름·초성 / 숫자 → 휴대폰 번호·가입일) · 페이지(8명) · 행 클릭 → 상세
  */
 (function () {
@@ -23,8 +23,6 @@
   const input = $('#memberSearchInput');
   const toggle = $('#memberSearchToggle');
   const detail = $('#memberDetail');
-  const selectedOf = (boxEl, attr) => $(`[${attr}][aria-selected="true"]`, boxEl).getAttribute(attr);
-  let active = selectedOf($('#activeFilter'), 'data-active-filter');
   let query = input.value;
   let page = 1;
 
@@ -74,7 +72,6 @@
   // 검색: 010 으로 시작하는 7자리 이상 → 휴대폰 번호 / 날짜 형태 → 가입일 / 그 외 → 이름·초성
   const isPhone = (q) => /^[\d\s-]+$/.test(q) && digits(q).startsWith('010') && digits(q).length >= 7;
   function matches(r) {
-    if (active !== '전체' && r.dataset.active !== active) return false;
     const q = query.trim();
     if (!q) return true;
     if (isPhone(q)) return digits(r.dataset.phone).includes(digits(q));
@@ -106,21 +103,15 @@
 
   function openDetail(row) {
     const d = row.dataset;
-    const withdrawn = d.withdrawn !== '-';
     const values = {
       initial: d.name[0], name: d.name, phone: d.phone,
       verified: d.verified === 'Y' ? '완료' : '미인증',
-      active: d.active === 'Y' ? '활성' : (withdrawn ? '비활성 (탈퇴)' : '비활성'),
-      joined: full(d.joined), terms: full(d.terms), withdrawn: full(d.withdrawn),
+      joined: full(d.joined), terms: full(d.terms),
     };
     $$('[data-f]', detail).forEach((el) => { if (el.dataset.f in values) el.textContent = values[el.dataset.f]; });
     const vChip = $('[data-f="verifiedChip"]', detail);
     vChip.className = `chip ${d.verified === 'Y' ? 'chip-done' : 'chip-review'}`;
     vChip.textContent = d.verified === 'Y' ? '본인인증 완료' : '미인증';
-    const aChip = $('[data-f="activeChip"]', detail);
-    aChip.hidden = d.active === 'Y';
-    aChip.textContent = withdrawn ? '탈퇴' : '비활성';
-    $('[data-f-row="withdrawn"]', detail).hidden = !withdrawn;
 
     const list = $('[data-f="logins"]', detail);
     list.innerHTML = '';
@@ -135,18 +126,6 @@
     });
     layer.open(detail);
   }
-
-  function bindSegment(boxEl, attr, set) {
-    boxEl.addEventListener('click', (e) => {
-      const btn = e.target.closest(`[${attr}]`);
-      if (!btn) return;
-      $$(`[${attr}]`, boxEl).forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
-      set(btn.getAttribute(attr));
-      page = 1;
-      render();
-    });
-  }
-  bindSegment($('#activeFilter'), 'data-active-filter', (v) => { active = v; });
 
   box.addEventListener('click', (e) => {
     const row = e.target.closest('[data-row]');
@@ -175,5 +154,4 @@
   render();
   if (s === 'search' || s === 'empty') setSearch(true);
   if (s === 'detail') openDetail(rows()[0]);
-  if (s === 'withdrawn') openDetail(rows().find((r) => r.dataset.row === '25'));
 })();
