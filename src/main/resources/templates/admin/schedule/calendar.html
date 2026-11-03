@@ -1,220 +1,54 @@
 <!DOCTYPE html>
-<!--/* SCR-A-020 일정 캘린더 + SCR-A-021 일정 등록(팝업)
-  state: (기본) 9월 27일 선택 · day(A 날짜 일정 목록, 9/26) · detail(B 예약 상세 정보) · month(C 년·월 선택)
-         register(A-021 기본) · member(A-021 A 회원 검색) · custom(A-021 B 분류 직접 입력)
-  달력·일정은 schedule.js 에서 더미 데이터로 그린다. 업체 휴무일·예약 불가는 일정 관리(A-022) 저장값(sessionStorage)을 반영 */-->
+<!--/* SCR-A-020 예약 일정 — 예약을 확인하는 뷰어 (보기 전용, 등록 없음). 디자인 기준: docs/ui/관리자디자인기준.md
+  개인 일정 · 휴무일 · 공휴일 관리는 일정 관리(/admin/schedule/manage)로 분리
+  1행 제목 / 월 달력(예약 건수만큼 크림색 점 · 휴무일 회색 '휴무' · 예약 불가 = 회색 '마감', ‹ › 달 이동, [오늘], [달력 접기] = 고른 날의 주만)
+  / 고른 날 예약 — 모든 날 같은 박스 목록(시간 · 이름 / 출발 → 도착), 오늘은 지난 이사 흐리게 · 다음 이사 이름 옆 남은 시간. 결제 상태는 예약 상세에서
+  예약을 누르면 간단한 예약 정보 시트(날짜 · 시간 · 이름 · 유형 · 출발·도착 · 전화) → [예약 상세 보기] = 예약 관리
+  ERD: TBL_RESERVATION 예약 완료(01)·이사 완료(02)만 (취소 미표시), PAY_STATUS 는 예약 정보 시트에만, 휴무일은 TBL_DAY_STATUS 표시만
+  state: (기본) 오늘 고름 · day(9/29) · closed(휴무일 9/20) · next-month(10월) · collapsed(달력 접기) · detail(예약 정보 시트)
+  더미 데이터·동작: js/admin/schedule.js (오늘 = 26.09.27 가정) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
-      th:replace="~{fragments/admin-layout :: layout(title='일정 캘린더', active='schedule', fixed=false, content=~{::content}, scripts=~{::scripts})}">
+      th:replace="~{fragments/admin-layout :: layout(title='예약 일정', active='schedule', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
-  <div id="scheduleCalendar" class="px-4 pb-28 pt-6" th:data-state="${st}"
-       th:with="ic=@{/images/admin/icons.svg}, st=${param.state != null ? param.state[0] : ''}">
-    <h2 class="px-1 text-[24px] font-extrabold tracking-[-0.04em] text-[#346538]">일정 캘린더</h2>
+  <div id="scheduleCalendar" class="px-4 pb-28 pt-5"
+       th:with="ic=@{/images/admin/icons-v2.svg}, st=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${st}">
+    <!--/* 1행: 페이지 제목만 */-->
+    <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">예약 일정</h2>
 
-    <!--/* ① 이전·다음 달 · ② 년·월 선택 · ③ 날짜 칸(고객명·휴무 배지) · ④ 범례 */-->
-    <section data-cal-box class="mt-5 rounded-[20px] bg-white p-4 shadow-[0_5px_18px_rgba(36,58,39,.06)] transition-all">
-      <div class="flex items-center justify-center gap-4">
-        <button type="button" aria-label="이전 달" data-month-step="-1" class="grid h-8 w-8 rotate-180 place-items-center text-[#586159]">
-          <svg class="icon" width="17" height="17"><use th:href="${ic} + '#i-arrowRight'"/></svg>
-        </button>
-        <button type="button" data-open-month class="flex items-center gap-1 text-[15px] font-extrabold text-[#29312b]">
-          <span data-month-label>2026년 9월</span>
-          <svg class="icon" width="14" height="14"><use th:href="${ic} + '#i-chevron'"/></svg>
-        </button>
-        <button type="button" aria-label="다음 달" data-month-step="1" class="grid h-8 w-8 place-items-center text-[#586159]">
-          <svg class="icon" width="17" height="17"><use th:href="${ic} + '#i-arrowRight'"/></svg>
-        </button>
-      </div>
-      <div class="mt-4 grid grid-cols-7 text-center text-[9px] font-bold">
-        <span class="text-[#c85f57]">일</span><span class="text-[#858d87]">월</span><span class="text-[#858d87]">화</span><span class="text-[#858d87]">수</span><span class="text-[#858d87]">목</span><span class="text-[#858d87]">금</span><span class="text-[#557fa3]">토</span>
-      </div>
-      <div data-cal-grid class="mt-2 grid grid-cols-7"></div>
-      <div class="mt-3 flex flex-wrap gap-3 border-t border-[#edf0ed] pt-3 text-[8px] text-[#727a74]">
-        <span><b class="mr-1 inline-block h-2 w-2 bg-[#343a35]"></b>업체 휴무일</span>
-        <span><b class="mr-1 inline-block h-2 w-2 bg-[#F57C00]"></b>예약 불가</span>
-        <span><b class="mr-1 inline-block h-2 w-2 bg-[#4f80ac]"></b>승인 대기</span>
-        <span><b class="mr-1 inline-block h-2 w-2 bg-[#4f8b55]"></b>예약 확정</span>
-        <span><b class="mr-1 inline-block h-2 w-2 bg-[#59635b]"></b>이사 완료</span>
-        <span><b class="mr-1 inline-block h-2 w-2 bg-[#7a6db0]"></b>견적 상담</span>
-        <span><b class="mr-1 inline-block h-2 w-2 rounded-full bg-[#4f80ac]"></b>손 없는 날</span>
-        <span><b class="mr-1 inline-block h-2 w-2 rounded-full bg-[#c85f57]"></b>공휴일</span>
-      </div>
-    </section>
 
-    <!--/* ⑤ 선택한 날의 일정 목록 (일정 펼치기) */-->
-    <section data-day-box class="mt-4 rounded-[20px] bg-white p-5 shadow-[0_5px_18px_rgba(36,58,39,.06)] transition-all">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-[10px] font-bold text-[#89918b]" data-day-month>2026년 9월</p>
-          <div class="mt-1 flex items-baseline gap-2">
-            <h3 class="text-[17px] font-extrabold" data-day-title>9월 27일</h3>
-            <span data-day-badges class="flex gap-1"></span>
-          </div>
-        </div>
-        <button type="button" data-expand class="text-[9px] font-bold text-[#7b837d]">일정 펼치기</button>
-      </div>
-      <div data-day-list class="mt-5 space-y-3"></div>
-      <button type="button" data-open-register class="mx-auto mt-5 block rounded-full border border-[#cfd6d0] px-5 py-2.5 text-[10px] font-bold text-[#346538]">+ 일정 등록</button>
-    </section>
+    <div data-view-body></div>
 
-    <!--/* C · 년·월 선택 */-->
-    <div id="monthPicker" data-layer hidden class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 grid place-items-center bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
-      <div class="w-full rounded-[20px] bg-white p-5">
-        <button type="button" data-grid-toggle class="mx-auto flex items-center gap-1 text-[16px] font-extrabold">
-          <span data-temp-label>2026년 9월</span>
-          <svg class="icon rotate-180" width="15" height="15"><use th:href="${ic} + '#i-chevron'"/></svg>
-        </button>
-        <div data-picker-select class="mt-5 grid grid-cols-3 gap-2">
-          <label class="text-center">
-            <span class="mb-1.5 block text-[9px] font-bold text-[#858d87]">년</span>
-            <select data-temp-year class="h-12 w-full rounded-xl bg-[#f5f6f5] px-2 text-center text-[12px] font-bold">
-              <option th:each="y : ${#numbers.sequence(2024, 2028)}" th:text="${y}" th:value="${y}">2026</option>
-            </select>
-          </label>
-          <label class="text-center">
-            <span class="mb-1.5 block text-[9px] font-bold text-[#858d87]">월</span>
-            <select data-temp-month class="h-12 w-full rounded-xl bg-[#f5f6f5] px-2 text-center text-[12px] font-bold">
-              <option th:each="m : ${#numbers.sequence(1, 12)}" th:text="${m}" th:value="${m}">9</option>
-            </select>
-          </label>
-          <label class="text-center">
-            <span class="mb-1.5 block text-[9px] font-bold text-[#858d87]">일</span>
-            <select data-temp-day class="h-12 w-full rounded-xl bg-[#f5f6f5] px-2 text-center text-[12px] font-bold"></select>
-          </label>
+    <!--/* 간단한 예약 정보 — 아래에서 올라오는 시트 (하단 탭까지 덮음) */-->
+    <div id="reservationSheet" data-layer hidden class="absolute inset-x-0 bottom-0 top-0 z-50 flex items-end bg-[#1a1a1a]/40">
+      <div role="dialog" aria-modal="true" aria-label="예약 정보" class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
+        <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+        <!--/* 블록은 [예약 상세 보기] 하나만 — 머리(오늘 · 날짜 + X) / 시간 · 이름 / 유형 / 출발·도착(상자 없이) / 전화(동그란 아이콘) + [예약 상세 보기] · 결제 상태·예약 번호는 예약 상세에서 */-->
+        <div class="mt-3 flex items-center justify-between">
+          <p class="text-[14px] font-semibold text-[#888]"><span data-r-today hidden class="text-[#346538]">오늘 · </span><span data-r-date>9월 27일 (일)</span></p>
+          <button type="button" aria-label="닫기" data-close class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#555] hover:bg-[#f0f1ef]">
+            <svg class="icon" width="22" height="22"><use th:href="${ic} + '#i-x'"/></svg>
+          </button>
         </div>
-        <div data-picker-grid hidden class="mt-5 grid grid-cols-3 gap-2"></div>
-        <div class="mt-5 grid grid-cols-2 gap-2">
-          <button type="button" data-close class="h-11 rounded-xl border border-[#d9ded9] text-[11px] font-bold">취소</button>
-          <button type="button" data-month-apply class="h-11 rounded-xl bg-[#346538] text-[11px] font-bold text-white">완료</button>
+        <div class="flex items-baseline gap-2.5">
+          <b class="text-[30px] font-extrabold leading-10 tabular-nums tracking-[-0.02em] text-[#1a1a1a]" data-r-time>13:00</b>
+          <b class="min-w-0 truncate text-[20px] font-bold text-[#292929]" data-r-name>홍서윤</b>
+          <span data-r-service>원룸이사</span>
+        </div>
+        <!--/* 경로: 상자 없이 · 한 줄에 점 + 출발/도착 + 주소, 점 사이 점선 */-->
+        <div class="relative mt-4 border-t border-[#eef0ee] pt-4">
+          <span class="absolute bottom-[11px] left-[5px] top-[27px] border-l-[1.5px] border-dashed border-[#b9c9bb]"></span>
+          <p class="relative flex items-start gap-3"><i class="mt-[5px] h-[11px] w-[11px] shrink-0 rounded-full border-[2.5px] border-[#346538] bg-white"></i>
+            <span class="w-7 shrink-0 text-[14px] font-semibold text-[#9a9f9b]">출발</span><span class="min-w-0 text-[15px] text-[#292929]" data-r-origin>-</span></p>
+          <p class="relative mt-3 flex items-start gap-3"><i class="mt-[5px] h-[11px] w-[11px] shrink-0 rounded-full bg-[#346538]"></i>
+            <span class="w-7 shrink-0 text-[14px] font-semibold text-[#9a9f9b]">도착</span><span class="min-w-0 text-[15px] text-[#292929]" data-r-destination>-</span></p>
+        </div>
+        <div class="mt-6 flex items-center gap-3">
+          <a data-r-tel href="#" aria-label="고객에게 전화" class="grid h-14 w-14 shrink-0 place-items-center rounded-full text-[#346538] ring-1 ring-inset ring-[#cfdccf] hover:bg-[#eef4f0]">
+            <svg class="icon" width="22" height="22"><use th:href="${ic} + '#i-phone'"/></svg></a>
+          <a data-r-link th:href="@{/admin/reservations}" class="btn-primary flex-1">예약 상세 보기</a>
         </div>
       </div>
-    </div>
-
-    <!--/* B · 예약 상세 정보 */-->
-    <div id="reservationDetail" data-layer hidden class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 grid place-items-center bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
-      <div class="w-full rounded-[20px] bg-white p-5">
-        <div class="flex items-center justify-between">
-          <h3 class="text-[17px] font-extrabold">예약 상세 정보</h3>
-          <button type="button" aria-label="닫기" data-close><svg class="icon" width="18" height="18"><use th:href="${ic} + '#i-x'"/></svg></button>
-        </div>
-        <div class="mt-4 flex items-center justify-between">
-          <span class="rounded-full bg-[#edf4ed] px-2 py-1 text-[9px] font-bold text-[#346538]">예약 완료</span>
-          <span class="text-[9px] text-[#858d87]">신청일 <span data-r="appliedDate">26.09.26</span></span>
-        </div>
-        <div class="mt-4 space-y-3">
-          <section class="rounded-xl bg-[#f7f8f7] p-4">
-            <h4 class="text-[11px] font-extrabold text-[#346538]">연동 정보</h4>
-            <div class="mt-3 grid grid-cols-[88px_1fr] gap-y-2 text-[10px]">
-              <span class="font-bold text-[#737b75]">회원 정보</span><span data-r="name">김명품</span>
-              <span class="font-bold text-[#737b75]">견적 번호</span><span data-r="estimateNo">EST-0002</span>
-              <span class="font-bold text-[#737b75]">예약 번호</span><span data-r="reservationNo">RSV-0002</span>
-            </div>
-          </section>
-          <section class="rounded-xl bg-[#f7f8f7] p-4">
-            <h4 class="text-[11px] font-extrabold text-[#346538]">예약 상세 내역</h4>
-            <div class="mt-3 grid grid-cols-[88px_1fr] gap-y-2 text-[10px]">
-              <span class="font-bold text-[#737b75]">이사 유형</span><span data-r="service">가정이사</span>
-              <span class="font-bold text-[#737b75]">이사일</span><span data-r="movingDate">26.09.26</span>
-              <span class="font-bold text-[#737b75]">이사 시간</span><span data-r="movingTime">08:00</span>
-              <span class="font-bold text-[#737b75]">출발지</span><span data-r="origin">서울 중구 세종대로 110</span>
-              <span class="font-bold text-[#737b75]">도착지</span><span data-r="destination">경기 수원시 팔달구 효원로 241</span>
-            </div>
-          </section>
-        </div>
-        <a data-r-link th:href="@{/admin/reservations}" class="mt-5 grid h-11 w-full place-items-center rounded-xl bg-[#346538] text-[11px] font-bold text-white">상세 보기</a>
-      </div>
-    </div>
-
-    <!--/* 등록한 일정 상세 */-->
-    <div id="manualDetail" data-layer hidden class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 grid place-items-center bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
-      <div class="w-full rounded-[20px] bg-white p-5 shadow-2xl">
-        <div class="flex items-center justify-between">
-          <h3 class="text-[17px] font-extrabold">일정 상세</h3>
-          <button type="button" aria-label="일정 상세 닫기" data-close><svg class="icon" width="18" height="18"><use th:href="${ic} + '#i-x'"/></svg></button>
-        </div>
-        <div data-manual-body class="mt-5"></div>
-      </div>
-    </div>
-
-    <!--/* 등록한 일정 삭제 확인 */-->
-    <div id="manualDelete" data-layer hidden class="absolute inset-x-0 bottom-[82px] top-[68px] z-[70] grid place-items-center bg-[#1f2d21]/45 p-6 backdrop-blur-[2px]">
-      <div class="w-full rounded-[20px] bg-white p-6 text-center shadow-2xl">
-        <h3 class="text-[17px] font-extrabold text-[#29312b]">정말 삭제하시겠습니까?</h3>
-        <p class="mt-2 text-[10px] text-[#8b928d]">삭제된 데이터는 복구할 수 없습니다.</p>
-        <div class="mt-6 grid grid-cols-2 gap-2">
-          <button type="button" data-close class="h-11 rounded-xl border border-[#d9ded9] text-[11px] font-bold text-[#69716b]">취소</button>
-          <button type="button" data-manual-delete class="h-11 rounded-xl bg-[#c75f56] text-[11px] font-bold text-white">삭제</button>
-        </div>
-      </div>
-    </div>
-
-    <!--/* SCR-A-021 일정 등록 */-->
-    <div id="scheduleRegister" data-layer hidden class="absolute inset-x-0 bottom-[82px] top-[68px] z-50 grid place-items-center overflow-y-auto bg-[#1f2d21]/45 p-5 backdrop-blur-[2px]">
-      <form data-register-form novalidate class="my-auto w-full rounded-[20px] bg-white p-5 shadow-2xl">
-        <div class="flex items-center justify-between">
-          <h3 class="text-[17px] font-extrabold">일정 등록</h3>
-          <button type="button" aria-label="일정 등록 닫기" data-close><svg class="icon" width="18" height="18"><use th:href="${ic} + '#i-x'"/></svg></button>
-        </div>
-        <div class="mt-4 max-h-[480px] space-y-3 overflow-y-auto pr-1">
-          <!--/* ① 제목 */-->
-          <label class="block">
-            <span class="mb-1 block text-[9px] font-bold">제목 <b class="text-[#c75f56]">*</b></span>
-            <input name="title" autocomplete="off" placeholder="일정 제목을 입력하세요"
-                   class="h-10 w-full rounded-lg border border-[#dfe4df] px-3 text-[11px] outline-none focus:border-[#346538]">
-          </label>
-          <!--/* ② 분류: 견적 상담 / 기타 / 직접 입력 */-->
-          <div class="block">
-            <span class="mb-1 block text-[9px] font-bold">분류 <b class="text-[#c75f56]">*</b></span>
-            <button type="button" data-category-toggle aria-expanded="false"
-                    class="flex h-10 w-full items-center justify-between rounded-lg border border-[#dfe4df] bg-white px-3 text-left text-[11px]">
-              <span data-category-label class="font-semibold text-[#424a44]">견적 상담</span>
-              <svg class="icon" width="14" height="14" data-category-chevron><use th:href="${ic} + '#i-chevron'"/></svg>
-            </button>
-            <div data-category-menu hidden class="mt-1.5 overflow-hidden rounded-lg border border-[#dfe4df] bg-white shadow-[0_8px_20px_rgba(36,58,39,.12)]">
-              <button type="button" th:each="c : ${ {'견적 상담', '기타', '직접 입력'} }" th:attr="data-category=${c}" th:text="${c}"
-                      class="flex h-10 w-full items-center border-b border-[#edf0ed] px-3 text-left text-[11px] font-semibold text-[#59625b] last:border-none hover:bg-[#f5f7f5]">견적 상담</button>
-            </div>
-            <input type="hidden" name="category" value="견적 상담">
-            <input data-category-custom hidden autocomplete="off" placeholder="분류명을 직접 입력하세요"
-                   class="mt-2 h-10 w-full rounded-lg border border-[#dfe4df] px-3 text-[11px] outline-none focus:border-[#346538]">
-          </div>
-          <!--/* ③ 요일·날짜 · ④ 시간 */-->
-          <div class="grid grid-cols-2 gap-2">
-            <label class="block">
-              <span class="mb-1 block text-[9px] font-bold">요일·날짜 <b class="text-[#c75f56]">*</b></span>
-              <input name="date" type="date" value="2026-09-27" class="h-10 w-full rounded-lg border border-[#dfe4df] px-2 text-[10px]">
-            </label>
-            <label class="block">
-              <span class="mb-1 block text-[9px] font-bold">시간 <b class="text-[#c75f56]">*</b></span>
-              <input name="time" type="time" class="h-10 w-full rounded-lg border border-[#dfe4df] px-2 text-[10px]">
-            </label>
-          </div>
-          <!--/* ⑤ 장소 */-->
-          <label class="block">
-            <span class="mb-1 block text-[9px] font-bold">장소</span>
-            <input name="place" autocomplete="off" placeholder="일정 장소를 입력하세요" class="h-10 w-full rounded-lg border border-[#dfe4df] px-3 text-[11px]">
-          </label>
-          <!--/* ⑥ 회원 연결 */-->
-          <div class="rounded-xl bg-[#f7f8f7] p-3">
-            <p class="text-[10px] font-extrabold text-[#346538]">회원 연결</p>
-            <input data-member-query autocomplete="off" placeholder="회원 이름이나 휴대전화를 입력하세요"
-                   class="mt-2 h-9 w-full rounded-lg border border-[#dfe4df] bg-white px-3 text-[10px] outline-none focus:border-[#346538]">
-            <div data-member-results hidden class="mt-2 max-h-28 overflow-y-auto rounded-lg border border-[#e1e5e1] bg-white"></div>
-          </div>
-          <!--/* ⑦ 예약 내역 연결 */-->
-          <div class="rounded-xl bg-[#f7f8f7] p-3">
-            <p class="text-[10px] font-extrabold text-[#346538]">예약 내역 연결</p>
-            <input data-reservation-query autocomplete="off" placeholder="이름, 휴대전화 또는 주소를 입력하세요"
-                   class="mt-2 h-9 w-full rounded-lg border border-[#dfe4df] bg-white px-3 text-[10px] outline-none focus:border-[#346538]">
-            <div data-reservation-results hidden class="mt-2 max-h-36 overflow-y-auto rounded-lg border border-[#e1e5e1] bg-white"></div>
-          </div>
-        </div>
-        <div class="mt-5 grid grid-cols-2 gap-2">
-          <button type="button" data-close class="h-11 rounded-xl border border-[#d9ded9] text-[11px] font-bold">취소</button>
-          <button type="submit" data-register-submit disabled
-                  class="h-11 rounded-xl bg-[#346538] text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">등록</button>
-        </div>
-      </form>
     </div>
   </div>
 </th:block>
