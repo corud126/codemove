@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U-08x 견적내역 (G-H05~H06 / E-H05~H06)
   state: (없음) 견적내역 H05 | filter 필터 바텀시트 H06
-  필터(전체·검토 중·만료)는 more.js 에서 동작
+  필터(전체·검토 중·견적 도착·견적 확정·만료)는 more.js 에서 동작
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='견적내역', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/more.css}">
@@ -31,7 +31,7 @@
       </a>
 
       <div class="estimate-list-head" data-filter-group>
-        <div><strong>견적 목록</strong><span>2</span></div>
+        <div><strong>견적 목록</strong><span>4</span></div>
         <div class="estimate-filter-wrap">
           <div class="action estimate-filter-button" role="button" tabindex="0" aria-label="견적 목록 필터 선택"
                data-filter-toggle="#estimateFilter" th:classappend="${state == 'filter'} ? 'open'">
@@ -46,7 +46,23 @@
           <div class="estimate-history-main">
             <div class="estimate-history-meta"><span>검토 중</span><small>2026. 06. 10</small></div>
             <strong>서초구 → 마포구</strong>
-            <small>투룸 · 반포장</small>
+            <small>빌라 / 주택 · 반포장</small>
+          </div>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </a>
+        <a class="action estimate-history-row arrived" data-status="arrived" th:href="@{/estimates/1}" aria-label="2026. 04. 29 서초구 → 강동구 견적 상세">
+          <div class="estimate-history-main">
+            <div class="estimate-history-meta"><span>견적 도착</span><small>2026. 04. 29</small></div>
+            <strong>서초구 → 강동구</strong>
+            <small>아파트 · 포장이사</small>
+          </div>
+          <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
+        </a>
+        <a class="action estimate-history-row confirmed" data-status="confirmed" th:href="@{/estimates/1(state='confirmed')}" aria-label="2026. 03. 10 강남구 → 서초구 견적 상세">
+          <div class="estimate-history-main">
+            <div class="estimate-history-meta"><span>견적 확정</span><small>2026. 03. 10</small></div>
+            <strong>강남구 → 서초구</strong>
+            <small>원룸 / 오피스텔 · 일반포장</small>
           </div>
           <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
         </a>
@@ -54,7 +70,7 @@
           <div class="estimate-history-main">
             <div class="estimate-history-meta"><span>만료</span><small>2026. 01. 24</small></div>
             <strong>강남구 → 송파구</strong>
-            <small>원룸 · 일반포장</small>
+            <small>원룸 / 오피스텔 · 일반포장</small>
           </div>
           <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
         </a>
@@ -71,6 +87,8 @@
       <div class="reservation-filter-options">
         <div class="action selected" role="menuitem" tabindex="0" data-filter="all">전체<span>✓</span></div>
         <div class="action" role="menuitem" tabindex="0" data-filter="reviewing">검토 중<span hidden>✓</span></div>
+        <div class="action" role="menuitem" tabindex="0" data-filter="arrived">견적 도착<span hidden>✓</span></div>
+        <div class="action" role="menuitem" tabindex="0" data-filter="confirmed">견적 확정<span hidden>✓</span></div>
         <div class="action" role="menuitem" tabindex="0" data-filter="expired">만료<span hidden>✓</span></div>
       </div>
     </div>

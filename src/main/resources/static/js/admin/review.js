@@ -1,7 +1,7 @@
 /*
  * SCR-A-012 리뷰 관리 (templates/admin/review/list.html) — 더미 데이터
  *  별점·답변 드롭다운(건수 갱신) · 내용 3줄 넘치면 [더보기] · 사진 크게 보기
- *  [답변 달기] → 입력 → [답변 등록](답변일 기록·답변 대기 칩 제거·알림 발송) / [취소] · 답변 아래 [수정 | 삭제] → 입력창 [취소][저장] / 삭제 확인 후 답변 대기
+ *  [답변 달기] → 입력 → [답변 등록](답변일 기록·답변 대기 칩 제거, 고객 알림 없음 — 사용자 앱 후기 목록에 표시) / [취소] · 답변 아래 [수정 | 삭제] → 입력창 [취소][저장] / 삭제 확인 후 답변 대기
  */
 (function () {
   const root = document.getElementById('reviewList');
@@ -121,13 +121,6 @@
       $('[data-reply-form]', card).hidden = true;
       $('[data-pending-chip]', card).hidden = true;
       card.dataset.answered = 'Y';
-      if (window.AdminToast) {
-        window.AdminToast.show({
-          title: '리뷰 답변 등록 알림',
-          message: `${card.dataset.name} 고객님의 리뷰에 관리자 답변이 등록되었습니다.`,
-          href: '/admin/reviews',
-        });
-      }
       return;
     }
     // 답변 수정: [수정] → 입력창 / [취소] 원래 글로 / [저장] 반영

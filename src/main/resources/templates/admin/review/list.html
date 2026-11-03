@@ -3,7 +3,7 @@
   컬럼 기준: docs/erd/admin-screen-mapping.md (TBL_REVIEW, TBL_REVIEW_PHOTO) · 카드 내용은 사용자 앱 후기(홈 '실제 고객 후기', 더보기 > 후기)와 같은 정보
   상태: (기본) | ?state=reply (A 답변 작성: 이서준 리뷰) | ?state=edit-reply (B 답변 수정: 김명품 리뷰)
         ?state=filter (별점 4점) | ?state=empty (별점 2점 — 리뷰 없음) | ?state=pending (답변 대기만) | ?state=filter-menu (별점 메뉴 열림) | ?state=answer-delete (답변 삭제 확인)
-  ERD 반영: 별점 1~5(RATING), 사진 최대 5장(TBL_REVIEW_PHOTO), 답변 최대 1000자(REPLY_CONTENT), 답변일(REPLIED_AT, 없으면 답변 대기), '사무실이사' → '기업이사'
+  ERD 반영: 별점 1~5(RATING), 사진 최대 5장(TBL_REVIEW_PHOTO), 답변 최대 500자(REPLY_CONTENT), 답변일(REPLIED_AT, 없으면 답변 대기), '사무실이사' → '기업이사'
   행 데이터: id|이름|작성일|이사 유형|포장 방식|출발 구|도착 구|별점|내용|답변일(-)|사진 수
   별점·답변 글자 드롭다운 · 내용 더보기 · 사진 보기 · 답변 달기/등록/취소 · 답변 수정(수정 | 삭제 → [취소][저장])은 review.js */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
@@ -93,10 +93,8 @@
           <span class="chip chip-review shrink-0" data-pending-chip th:hidden="${answered}">답변 대기</span>
           <span class="ml-auto shrink-0 text-[13px] tabular-nums text-[#888]" th:text="${t[2]}">26.06.02</span>
         </div>
-        <!--/* 2줄: 사용자 앱과 같은 이름 — 이사 유형(원룸 · 아파트 · 사무실) · 포장 방식(일반포장 · 반포장 · 포장이사 · 보관이사) · 출발 구 → 도착 구 */-->
-        <p class="mt-1 text-[13px] text-[#888]"
-           th:with="house=${t[3] == '원룸이사' ? '원룸' : (t[3] == '기업이사' ? '사무실' : '아파트')}, pack=${t[4] == '일반' ? '일반포장' : (t[4] == '포장' ? '포장이사' : (t[4] == '보관' ? '보관이사' : t[4]))}"
-           th:text="|${house} · ${pack} · ${t[5]} → ${t[6]}|">아파트 · 포장이사 · 강남구 → 서초구</p>
+        <!--/* 2줄: 예약 관리·예약 일정과 같은 관리자 이름(CODE_NAME) — 이사 유형(원룸이사 · 가정이사 · 기업이사) · 포장 방식(일반 · 반포장 · 보관 · 포장) · 출발 구 → 도착 구 */-->
+        <p class="mt-1 text-[13px] text-[#888]" th:text="|${t[3]} · ${t[4]} · ${t[5]} → ${t[6]}|">가정이사 · 포장 · 강남구 → 서초구</p>
 
         <!--/* 내용 (3줄까지, 넘치면 더보기) */-->
         <p data-content class="mt-3 line-clamp-3 break-keep text-[15px] leading-6 text-[#292929]" th:text="${t[8]}">리뷰 내용</p>
@@ -120,10 +118,10 @@
             <button type="button" data-answer-delete class="-mr-2 h-8 px-2">삭제</button>
           </div>
           <div class="hidden [.is-editing_&]:block">
-            <textarea data-answer-input aria-label="답변 수정" maxlength="1000" th:text="${reply}"
+            <textarea data-answer-input aria-label="답변 수정" maxlength="500" th:text="${reply}"
                       class="min-h-24 w-full resize-none rounded-[14px] bg-white p-3.5 text-[14px] leading-[22px] text-[#292929] outline-none ring-1 ring-[#e5e7eb] focus:ring-2 focus:ring-[#346538]"></textarea>
             <div class="mt-2 flex items-center justify-end gap-2">
-              <span class="mr-auto text-[13px] tabular-nums text-[#888]"><span data-answer-count>0</span>/1000</span>
+              <span class="mr-auto text-[13px] tabular-nums text-[#888]"><span data-answer-count>0</span>/500</span>
               <button type="button" data-answer-cancel class="h-9 rounded-full bg-[#f0f1ef] px-4 text-[14px] font-semibold text-[#555]">취소</button>
               <button type="button" data-answer-save class="h-9 rounded-full bg-[#346538] px-4 text-[14px] font-bold text-white">저장</button>
             </div>
@@ -132,7 +130,7 @@
 
         <!--/* 답변 작성 */-->
         <div data-reply-form th:hidden="${answered or !writing}" class="mt-4">
-          <textarea data-reply-input aria-label="답변 내용" placeholder="답변 내용 입력" maxlength="1000"
+          <textarea data-reply-input aria-label="답변 내용" placeholder="답변 내용 입력" maxlength="500"
                     class="min-h-24 w-full resize-none rounded-[14px] bg-white p-3.5 text-[14px] leading-[22px] text-[#292929] outline-none ring-1 ring-[#e5e7eb] placeholder:text-[#b0b4b1] focus:ring-2 focus:ring-[#346538]"></textarea>
           <div class="mt-2 flex justify-end gap-2">
             <button type="button" data-reply-cancel class="h-9 rounded-full bg-[#f0f1ef] px-4 text-[14px] font-semibold text-[#555]">취소</button>

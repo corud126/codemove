@@ -157,11 +157,17 @@
       f('ladderSubtotal').value = money(subtotal);
       f('extraCost').value = money(subtotal);
     }
-    if (['movingCost', 'extraCost', 'departureLadder', 'destinationLadder'].includes(changed)) {
-      const total = toNumber(f('movingCost').value) + toNumber(f('extraCost').value);
+    const isOption = /^option\d+$/.test(changed);
+    if (isOption) {
+      const option = $$('[data-field^="option"]', viewer).filter((i) => /^option\d+$/.test(i.dataset.field)).reduce((sum, i) => sum + toNumber(i.value), 0);
+      f('optionCost').value = money(option);
+    }
+    // 총 비용 = 이사비용 + 사다리비용 + 옵션비용
+    if (isOption || ['movingCost', 'extraCost', 'optionCost', 'departureLadder', 'destinationLadder'].includes(changed)) {
+      const total = toNumber(f('movingCost').value) + toNumber(f('extraCost').value) + toNumber(f('optionCost').value);
       f('total').value = money(total);
     }
-    if (['movingCost', 'extraCost', 'departureLadder', 'destinationLadder', 'total'].includes(changed)) {
+    if (isOption || ['movingCost', 'extraCost', 'optionCost', 'departureLadder', 'destinationLadder', 'total'].includes(changed)) {
       const total = toNumber(f('total').value);
       const deposit = Math.round(total * 0.1);
       f('deposit').value = money(deposit);

@@ -3,7 +3,7 @@
  *  내 정보 수정: 휴대폰 번호 입력 → 인증번호 발송(3분 타이머) → 6자리 입력 → 변경
  *  견적내역·예약내역: [data-filter-toggle] / [data-filter] 로 목록 필터
  *  후기 작성: 별점, 사진 첨부(최대 5장), 등록 → 후기 목록(?state=done)
- *  알림: 탭(전체·내 이사·공지), 행 클릭 시 읽음, 모두 읽음
+ *  알림: 탭(전체·내 이사), 행 클릭 시 읽음, 모두 읽음
  */
 (function () {
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -63,7 +63,7 @@
     if (e.target.closest('[data-close]')) setToggleOpen(false);
   });
 
-  /* ---------- 알림: 탭(전체·내 이사·공지), 읽음 처리, 모두 읽음 ---------- */
+  /* ---------- 알림: 탭(전체·내 이사), 읽음 처리, 모두 읽음 ---------- */
   const notiFeed = $('#notificationFeed');
   if (notiFeed) {
     const markRead = (row) => {
@@ -96,7 +96,7 @@
       }
     });
     const initial = new URLSearchParams(location.search).get('tab');
-    if (initial === 'move' || initial === 'notice') showTab(initial);
+    if (initial === 'move') showTab(initial);
   }
 
   /* ---------- 내 정보 수정: 휴대폰 번호 변경 ---------- */

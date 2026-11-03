@@ -21,14 +21,21 @@
 
 /* ── 1. 영상 올리기 ── */
 .q-upload.video-upload-card { position: relative; min-height: 163px; margin-top: 28px; padding: 40.5px 20px 0; justify-content: flex-start; border: 1.5px dashed #9cb59e; border-radius: 20px; background: #f8faf5; gap: 0; }
-.q-upload.uploaded { min-height: 201px; border: 1.5px solid #cbdacb; background: var(--white); box-shadow: none; }
 .q-upload-icon { flex: 0 0 auto; width: 45px; height: 28px; margin-left: 1.5px; }
-.q-upload-empty, .q-upload-done { display: flex; flex-direction: column; align-items: center; }
+.q-upload-empty { display: flex; flex-direction: column; align-items: center; }
 .q-upload-empty strong { margin-top: 15px; color: var(--green); font-family: "Pretendard:Bold"; font-size: 16px; display: flex; align-items: center; gap: 6.5px; letter-spacing: -.1px; }
-.q-upload-empty small, .q-upload-done small { margin-top: 4px; color: #9a9a9a; font-size: 13px; }
-.q-upload-done strong { margin-top: 14.5px; color: var(--ink); font-family: "Pretendard:Bold"; font-size: 16px; letter-spacing: -.1px; word-break: break-all; }
-.q-upload-done small { margin-top: 4.5px; }
-.q-upload-change { margin-top: 13px; color: var(--green); font-family: "Pretendard:SemiBold"; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
+.q-upload-empty small { margin-top: 4px; color: #9a9a9a; font-size: 13px; }
+/* 선택 후: 첨부 카드 (썸네일 + 파일 정보 한 줄) — 카메라 아이콘은 숨김 */
+.q-upload.uploaded { min-height: 0; padding: 16px; flex-direction: row; justify-content: flex-start; text-align: left; border: 1.5px solid #cbdacb; background: var(--white); box-shadow: none; }
+.q-upload.uploaded .q-upload-icon { display: none; }
+.q-upload-done { display: flex; flex-direction: row; align-items: center; gap: 14px; width: 100%; min-width: 0; }
+.q-upload-thumb { position: relative; flex: 0 0 auto; width: 96px; height: 72px; overflow: hidden; border-radius: 12px; background: linear-gradient(135deg, #dfe9e0, #c9d9cb); display: grid; place-items: center; }
+.q-upload-thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.q-upload-thumb svg { position: relative; }
+.q-upload-info { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; }
+.q-upload-done strong { margin: 0; max-width: 100%; overflow: hidden; color: var(--ink); font-family: "Pretendard:Bold"; font-size: 15px; letter-spacing: -.1px; white-space: nowrap; text-overflow: ellipsis; }
+.q-upload-done small { margin-top: 3px; color: #9a9a9a; font-size: 13px; }
+.q-upload-change { margin-top: 8px; color: var(--green); font-family: "Pretendard:SemiBold"; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
 .q-upload-done[hidden], .q-upload-empty[hidden] { display: none; }
 
 .q-example-head { margin-top: 28px; display: flex; align-items: center; justify-content: space-between; }
@@ -116,6 +123,18 @@
 .q-cal .days span { width: 36px; height: 36px; margin: 0 auto; aspect-ratio: auto; color: #222; font-size: 14.5px; }
 .q-cal .days .muted { color: #cfcfcf; }
 .q-cal .days .picked { color: var(--white); font-family: "Pretendard:Bold"; }
+/* 날짜 칸 = 숫자 동그라미(36px) + 아래 고정 표시 줄(13px) — 휴무 · 마감(회색) · 손없음(초록) 글자가 모두 같은 자리
+   휴무 · 마감은 선택 불가(흐린 숫자), 손 없는 날은 선택 가능, 일요일 · 공휴일은 빨간 숫자 */
+.q-cal .days { row-gap: 2px; }
+.q-cal .days span { width: auto; height: auto; aspect-ratio: auto; display: flex; flex-direction: column; align-items: center; gap: 1px; border-radius: 0; background: none !important; }
+.q-cal .days .q-day-num { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; font-weight: inherit; transition: background-color .12s ease; }
+.q-cal .days .picked .q-day-num { background: var(--green); color: var(--white); font-family: "Pretendard:Bold"; }
+.q-cal .days .selectable:hover .q-day-num { background: var(--green-pale); }
+.q-cal .days .is-red:not(.picked):not(.muted) { color: #d8663d; }
+.q-cal .days .muted.is-red { color: #efc3b2; }
+.q-cal .days .q-day-mark { height: 13px; display: flex; align-items: center; justify-content: center; background: none !important; }
+.q-day-tag { color: #8f8f8f; font-size: 11px; font-family: "Pretendard:SemiBold"; line-height: 1; letter-spacing: -.4px; white-space: nowrap; }
+.q-day-tag.is-nomove { color: var(--green); }
 .q-cal .time-row { margin-top: 16.5px; margin-bottom: -1.5px; min-height: 52px; padding: 0 16px; align-items: center; border: 1px solid #e3e3e3; border-radius: 14px; }
 .q-cal .time-row[hidden] { display: none; }
 .q-cal .time-row b { color: var(--ink); font-family: "Pretendard:Bold"; font-size: 15.5px; }
@@ -199,7 +218,7 @@
 .q-time-slots button.active { border-color: var(--green) !important; background: var(--green) !important; color: var(--white) !important; font-family: "Pretendard:Bold" !important; }
 .q-time-slots button:disabled { border-color: #f3f3f1 !important; background: #f3f3f1 !important; color: #c8c8c8 !important; cursor: not-allowed; line-height: 1.05; }
 .q-time-slots button small { font-size: 10px; }
-.q-time-any { margin: 19.5px auto 9px !important; font-size: 14px !important; }
+.q-time-note { margin: 14px 0 9px; color: #8a8a8a; font-size: 13px; text-align: center; }
 
 .q-unknown { align-items: center; text-align: center; padding-bottom: max(27px, calc(var(--safe-bottom) + 21px)); }
 .q-unknown-icon { margin-top: 31px; }
@@ -367,7 +386,7 @@
 .easy-mode .q-time-period + .q-time-slots { margin-top: 9.5px; }
 .easy-mode .q-time-slots + .q-time-period { margin-top: 14px; }
 .easy-mode .q-time-slots button { min-height: 58px; font-size: 17px !important; }
-.easy-mode .q-time-any { margin-bottom: 25px !important; font-size: 16px !important; }
+.easy-mode .q-time-note { margin-bottom: 25px; font-size: 15px; }
 .easy-mode .q-unknown > strong { margin-top: 23.5px; font-size: 22px; }
 .easy-mode .q-unknown > span { margin-top: 7.5px; font-size: 15.5px; }
 .easy-mode .q-unknown .q-sheet-btn { margin-top: 29px; }
