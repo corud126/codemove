@@ -1,105 +1,462 @@
 <!DOCTYPE html>
-<!--/* SCR-A-010 답변 설정 관리
-  state: (기본) 첫 주제 펼침 · register(A 답변 등록 · 필수 미입력 비활성) · edit(답변 수정) · delete(삭제 확인) · empty(검색 결과 없음) */-->
+<!--/* SCR-A-010 챗봇 답변 관리 — 디자인 기준: docs/ui/관리자디자인기준.md (실제 화면: admin/chat/answers.html) · 뒤로 = 채팅 설정
+  목록: 1행 뒤로 · 제목 / 2행 주제 N개 · 검색 아이콘 · [추가] · 검색은 밑줄 입력칸 · 흰 카드 하나에 주제 한 줄씩 (버튼 이름 / 첫 답변 한 줄 회색 · ›)
+        사용 안 함 = 흐린 이름 + '사용 안 함'
+  편집(한 화면 · 저장 한 번 · 바깥 카드 없음, 50대 비전문가 기준 사용성): 머리(뒤로 · 답변 수정/주제 추가 · ⋯ = 사용 안 함으로 바꾸기/사용하기(바로 적용) · 삭제) · 미리 보기(입력하는 대로)
+        입력칸 = 흰 상자(1px 테두리) · 이름표 15px 진하게 · 예시 placeholder · 선택은 펼친 라디오 목록(이름 + 설명 한 줄)
+        기본: 고객이 누르는 버튼(TITLE) · 챗봇이 처음 하는 말(INTRO) · 답변 방식(안내/예약 조회/견적 조회)
+        AI에게 알려 줄 정보(안내만, TBL_LOREBOOK): 정보마다 흰 카드 — 이럴 때(키워드, 쉼표 구분 → '#a#b' 저장) · 이렇게 답해요(내용), X 삭제, '+ 정보 추가'
+        답변 아래 버튼: 버튼마다 흰 카드 — 버튼 글자 · 누르면(화면 이동/다른 질문으로 연결(=이어서 질문)/상담원 연결) · 이동할 화면(상자 선택칸) 또는 보낼 질문, X 삭제
+        아래 고정 [저장] (바뀐 것이 있고 버튼 이름이 있을 때만) → '저장되었습니다' · 주제 추가는 같은 화면 + [추가]
+  state: (기본) 목록 · search(검색 '견적') · empty(검색 결과 없음) · edit · edit-query(조회형) · register(주제 추가) · more(⋯ 시트) · delete(삭제 확인)
+         검토용: 편집 state 에 #mid · #bottom 을 붙이면 스크롤 · &id=4 = 꺼진 주제(사다리차 이용)
+  ERD: TBL_CHATBOT_TOPIC TITLE(50, 화면 이름 '고객이 누르는 버튼') · INTRO(200, 선택, '챗봇이 처음 하는 말') · TOPIC_TYPE('답변 방식') · IS_ACTIVE
+       / TBL_LOREBOOK KEYWORDS(200) · CONTENT(1000) / TBL_CHATBOT_ACTION LABEL(20) · ACTION_TYPE · ACTION_VALUE(200)
+       SORT_ORDER = 목록 번호 순서(추가한 순서) · UPDATED_AT·ADMIN_ID 표시 안 함 */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
-      th:replace="~{fragments/admin-layout :: layout(title='답변 설정 관리', active='', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+      th:replace="~{fragments/admin-layout :: layout(title='챗봇 답변 관리', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
 <body>
-<th:block th:fragment="content">
-  <div class="icons-2 relative flex h-full min-h-0 flex-col overflow-hidden bg-[#f5f6f8]" data-chat-answers>
-    <header class="relative flex h-14 shrink-0 items-center justify-center border-b border-[#e5e9e5] bg-white">
-      <h2 class="text-base font-extrabold text-[#29322b]">답변 설정 관리</h2>
-      <a th:href="@{/admin/chats}" aria-label="답변 설정 닫기" class="absolute right-3 grid h-10 w-10 place-items-center rounded-full text-[#525c54] hover:bg-[#f2f4f2]">
-        <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
-      </a>
-    </header>
-
-    <!--/* ① 검색 · ② + 등록 */-->
-    <div class="flex shrink-0 items-center gap-2 p-4 pb-2">
-      <label class="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-white px-4 py-3 shadow-[0_3px_12px_rgba(36,58,39,.05)]">
-        <svg class="icon text-[#8b928d]" width="17" height="17"><use th:href="@{/images/admin/icons.svg} + '#i-search'"/></svg>
-        <input type="search" data-topic-query placeholder="검색어를 입력하세요" aria-label="답변 주제 검색"
-               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9ca29e]">
-      </label>
-      <button type="button" data-topic-new class="h-11 shrink-0 rounded-full bg-[#346538] px-4 text-xs font-bold text-white">+ 등록</button>
-    </div>
-
-    <!--/* ③ 주제 카드 클릭 → 펼침 · ④ 수정 · ⑤ 삭제 */-->
-    <div class="min-h-0 flex-1 overflow-y-auto p-4 pt-2">
-      <div class="space-y-2" data-topics>
-        <section th:each="tp, s : ${ {'이사 견적|이사 비용과 방문 견적 과정을 안내합니다.|#견적#비용#가격|출발지와 도착지, 이사 날짜, 짐의 양을 알려주시면 예상 견적을 안내해 드립니다.', '예약 방법|상담부터 예약 확정까지의 절차를 안내합니다.|#예약#신청#계약|견적 확인 후 예약금을 결제하면 이사 일정이 최종 확정됩니다.', '포장 이사|포장 서비스 범위와 준비 사항을 확인합니다.|#포장#박스#정리|포장 이사는 전문 인력이 포장부터 운반, 기본 정리까지 진행합니다.', '사다리차 이용|사다리차 필요 여부와 추가 비용을 안내합니다.|#사다리차#엘리베이터#고층|현장 층수와 작업 환경에 따라 사다리차 필요 여부 및 비용이 달라집니다.'} }"
-                 th:with="t=${#strings.arraySplit(tp, '|')}" th:attr="data-topic=${s.count}"
-                 class="overflow-hidden rounded-2xl border border-white bg-white shadow-[0_3px_12px_rgba(36,58,39,.05)]">
-          <div role="button" tabindex="0" data-topic-toggle th:attr="aria-expanded=${s.first}" class="flex w-full cursor-pointer items-center gap-2 p-4 text-left">
-            <span class="min-w-0 flex-1">
-              <strong class="block text-sm text-[#303832]" data-topic-title th:text="${t[0]}">이사 견적</strong>
-              <span class="mt-1 block truncate text-xs text-[#8a918c]" data-topic-intro th:text="${t[1]}">소개</span>
-            </span>
-            <button type="button" data-topic-edit th:attr="aria-label=${t[0]} + ' 수정'" class="grid h-8 w-8 place-items-center rounded-lg bg-[#f2f5f2] text-[#346538]">
-              <svg class="icon" width="15" height="15"><use th:href="@{/images/admin/icons.svg} + '#i-edit'"/></svg>
-            </button>
-            <button type="button" data-topic-delete th:attr="aria-label=${t[0]} + ' 삭제'" class="grid h-8 w-8 place-items-center rounded-lg bg-[#fff0ee] text-[#b64b42]">
-              <svg class="icon" width="15" height="15"><use th:href="@{/images/admin/icons.svg} + '#i-trash'"/></svg>
-            </button>
-          </div>
-          <div data-topic-body th:hidden="${!s.first}" class="border-t border-[#edf0ed] bg-[#fafbfa] px-4 py-3">
-            <div class="mb-3 last:mb-0" data-lorebook th:attr="data-keywords=${t[2]}">
-              <div class="flex flex-wrap gap-1">
-                <span th:each="k : ${#strings.arraySplit(t[2], '#')}" class="rounded-full bg-[#e9f1e9] px-2 py-1 text-[10px] font-bold text-[#346538]" th:text="'#' + ${k}">#견적</span>
-              </div>
-              <p class="mt-2 text-xs leading-5 text-[#626a64]" data-lorebook-content th:text="${t[3]}">내용</p>
-            </div>
-          </div>
-        </section>
+<th:block th:fragment="content"><th:block th:with="state=${param.state != null ? param.state[0] : ''}, ic=@{/images/admin/icons-v2.svg},
+    boxCls='block w-full rounded-[12px] bg-[#f5f6f4] px-3.5 text-[16px] text-[#1a1a1a] outline-none transition-colors placeholder:text-[#a9aea9] focus:bg-white focus:ring-2 focus:ring-inset focus:ring-[#346538]',
+    labelCls='mb-2 flex items-center justify-between text-[15px] font-semibold text-[#292929]'">
+  <div class="relative flex h-full min-h-0 flex-col overflow-hidden" id="chatAnswers" th:attr="data-state=${state}">
+    <!--/* ============ 목록 ============ */-->
+    <!--/* 1행: 뒤로 · 제목만 / 2행: 건수 · 검색 · 추가 (견적 관리와 같은 위계) */-->
+    <div class="relative z-20 shrink-0 bg-[#f7f8f6] px-4 pb-3 pt-5 transition-shadow" data-scroll-head>
+      <div class="flex h-9 items-center gap-1">
+        <a th:href="@{/admin/chats/settings}" aria-label="채팅 설정으로 돌아가기"
+           class="-ml-2 grid h-9 w-9 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+          <svg class="icon" width="24" height="24"><use th:href="${ic} + '#i-chevronLeft'"/></svg>
+        </a>
+        <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">챗봇 답변 관리</h2>
       </div>
-      <p data-empty hidden class="py-16 text-center text-sm text-[#858d87]">검색 결과가 없습니다.</p>
-    </div>
-
-    <!--/* A. 답변 등록 / 수정 */-->
-    <div id="topicEditor" data-layer hidden class="absolute inset-0 z-40 flex flex-col bg-[#f5f6f8]">
-      <header class="relative flex h-14 shrink-0 items-center justify-center border-b border-[#e5e9e5] bg-white">
-        <h3 class="text-base font-extrabold text-[#303832]" data-editor-title>답변 등록</h3>
-        <button type="button" aria-label="답변 편집 닫기" data-close class="absolute right-3 grid h-10 w-10 place-items-center rounded-full">
-          <svg class="icon" width="20" height="20"><use th:href="@{/images/admin/icons.svg} + '#i-x'"/></svg>
+      <div class="mt-5 flex items-center gap-1">
+        <span class="px-1 text-[14px] font-semibold text-[#888]">주제 <span class="tabular-nums" data-topic-count>6</span>개</span>
+        <button type="button" data-search-toggle aria-label="주제 검색" aria-expanded="false"
+                class="ml-auto grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee] aria-expanded:bg-[#eef0ee]">
+          <svg class="icon" width="22" height="22"><use th:href="${ic} + '#i-search'"/></svg>
         </button>
-      </header>
-      <div class="min-h-0 flex-1 overflow-y-auto p-4">
-        <section class="space-y-3 rounded-[18px] bg-white p-4">
-          <input type="text" data-draft-title placeholder="주제 제목을 입력하세요" aria-label="주제 제목"
-                 class="h-12 w-full rounded-xl border border-[#dfe4df] bg-[#f7f8f7] px-3 text-sm font-semibold outline-none focus:border-[#89a18b]">
-          <textarea data-draft-intro placeholder="주제 제목과 함께 보일 짧은 소개를 입력해주세요" aria-label="주제 소개"
-                    class="h-24 w-full resize-none rounded-xl border border-[#dfe4df] bg-[#f7f8f7] p-3 text-sm leading-5 outline-none focus:border-[#89a18b]"></textarea>
-        </section>
-        <div class="mb-3 mt-5 flex items-center justify-between">
-          <div>
-            <h4 class="text-sm font-extrabold text-[#303832]">로어북</h4>
-            <p class="mt-1 text-[10px] text-[#8a918c]">키워드에 따라 AI에게 전달할 내용을 설정합니다</p>
-          </div>
-          <button type="button" data-lorebook-add class="rounded-xl bg-[#edf3ed] px-3 py-2 text-xs font-bold text-[#346538]">+ 등록</button>
-        </div>
-        <div class="space-y-3" data-lorebooks></div>
+        <button type="button" data-topic-new class="flex h-9 items-center rounded-full bg-[#346538] px-4 text-[14px] font-bold text-white">추가</button>
       </div>
-      <div class="shrink-0 border-t border-[#e5e9e5] bg-white p-3">
-        <button type="button" data-topic-save disabled
-                class="h-12 w-full rounded-xl bg-[#346538] text-sm font-extrabold text-white disabled:bg-[#bcc5bd]">등록</button>
-      </div>
+    <div data-search-bar hidden class="relative mt-2">
+      <svg class="icon pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="${ic} + '#i-search'"/></svg>
+      <input type="search" data-topic-query autocomplete="off" placeholder="버튼 이름 검색" aria-label="버튼 이름 검색"
+             class="h-11 w-full border-b border-[#d9dcd8] bg-transparent pl-8 pr-10 text-[15px] text-[#1a1a1a] outline-none placeholder:text-[#b0b4b1] focus:border-[#346538] [&::-webkit-search-cancel-button]:hidden">
+      <button type="button" data-query-clear aria-label="검색어 지우기" class="absolute -right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-[#888] hover:bg-[#f0f1ef]">
+        <svg class="icon" width="18" height="18"><use th:href="${ic} + '#i-x'"/></svg>
+      </button>
+    </div>
+    </div>
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1" data-scroll-body>
+      <section class="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+        <div data-rows></div>
+        <p data-empty hidden class="py-12 text-center text-[14px] text-[#888]">검색 결과가 없습니다.</p>
+      </section>
     </div>
 
-    <!--/* ⑤ 삭제 확인 */-->
-    <div id="topicDeleteModal" data-layer hidden class="absolute inset-0 z-50 grid place-items-center bg-[#1f2d21]/45 p-6 backdrop-blur-[2px]">
-      <div role="alertdialog" aria-modal="true" class="w-full rounded-[22px] bg-white p-5 text-center shadow-[0_20px_50px_rgba(25,42,28,.24)]">
-        <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#fff0ee] text-[#b64b42]">
-          <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons.svg} + '#i-trash'"/></svg>
-        </span>
-        <h3 class="mt-4 text-base font-extrabold text-[#303832]">정말 삭제하시겠습니까?</h3>
-        <p class="mt-2 text-xs text-[#8a918c]">삭제된 데이터는 복구할 수 없습니다.</p>
-        <div class="mt-5 grid grid-cols-2 gap-2">
-          <button type="button" data-close class="h-11 rounded-xl bg-[#f0f2f0] text-sm font-bold text-[#646c66]">취소</button>
-          <button type="button" data-topic-delete-confirm class="h-11 rounded-xl bg-[#c65249] text-sm font-bold text-white">삭제</button>
+    <!--/* ============ 편집 ============ */-->
+    <div id="topicEditor" data-layer hidden class="absolute inset-0 z-30 flex flex-col bg-[#f7f8f6]">
+      <div class="relative z-20 box-content flex h-9 shrink-0 items-center gap-1 bg-[#f7f8f6] px-4 pb-3 pt-5 transition-shadow" data-scroll-head>
+        <button type="button" data-editor-back aria-label="목록으로" class="-ml-2 grid h-9 w-9 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+          <svg class="icon" width="24" height="24"><use th:href="${ic} + '#i-chevronLeft'"/></svg>
+        </button>
+        <h3 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]" data-editor-title>답변 수정</h3>
+        <!--/* 주제 상태 — ⋯ 메뉴 사용 여부를 따라 바로 바뀜 (주제 추가 중에는 숨김) */-->
+        <span class="shrink-0 text-[14px] font-semibold text-[#f5831a]" data-status-chip>· 사용 중</span>
+        <span class="flex-1"></span>
+        <button type="button" data-more aria-label="더보기" class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+        </button>
+      </div>
+      <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-32 pt-1" data-editor-body data-scroll-body>
+        <!--/* 미리 보기 — 옅은 바탕, 고객 채팅 모양 */-->
+        <p class="text-[13px] text-[#888]">미리 보기</p>
+        <div class="-mx-1 mt-2 rounded-[16px] bg-[#e7ebe6] p-3">
+          <div class="flex justify-end"><span class="max-w-[80%] rounded-[16px_4px_16px_16px] bg-[#346538] px-3.5 py-2 text-[14px] text-white" data-pv-title>이사 견적</span></div>
+          <div class="mt-2 flex items-center gap-2">
+            <span class="h-6 w-6 overflow-hidden rounded-[7px] bg-[#e7f1e8]"><img alt="" class="h-full w-full object-cover" th:src="@{/images/user/mover-assistant-3d.svg}"></span>
+            <span class="text-[12px] font-semibold text-[#777]">명품 이사 도우미</span>
+          </div>
+          <p class="mt-1 max-w-[88%] whitespace-pre-line rounded-[4px_16px_16px_16px] bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-[#444]" data-pv-intro></p>
+          <div class="mt-2 flex flex-wrap gap-1.5" data-pv-buttons></div>
         </div>
+
+        <!--/* 카드 1 · 기본 */-->
+        <section class="mt-6 rounded-[20px] bg-white/90 p-5 ring-1 ring-inset ring-[#e5e8e4]">
+          <h4 class="text-[17px] font-bold text-[#1a1a1a]">기본</h4>
+          <!--/* 글자 수는 입력칸 안 오른쪽 아래, 그 칸에 커서가 있을 때만 */-->
+          <label class="mt-5 block">
+            <span th:class="${labelCls}">고객이 누르는 버튼</span>
+            <span class="group/f relative block">
+              <input type="text" data-f="title" maxlength="50" autocomplete="off" placeholder="예: 이사 견적" th:class="${boxCls} + ' h-12 pr-16'">
+              <span class="pointer-events-none absolute bottom-1.5 right-3 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-count-for="title">0/50</span>
+            </span>
+          </label>
+          <label class="mt-5 block">
+            <span th:class="${labelCls}">챗봇이 처음 하는 말</span>
+            <span class="group/f relative block">
+              <textarea data-f="intro" data-grow maxlength="200" rows="1" placeholder="예: 이사 비용과 견적 과정을 안내해 드릴게요." th:class="${boxCls} + ' min-h-12 resize-none overflow-hidden pb-6 pt-3 leading-6'"></textarea>
+              <span class="pointer-events-none absolute bottom-1.5 right-3 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-count-for="intro">0/200</span>
+            </span>
+          </label>
+          <div class="mt-5">
+            <span th:class="${labelCls}">답변 방식</span>
+            <div data-type-list></div>
+          </div>
+        </section>
+
+        <!--/* AI에게 알려 줄 정보 (TBL_LOREBOOK) — 안내만 · 바깥 카드 없이 정보 하나 = 흰 카드 하나 */-->
+        <section data-ref-section class="mt-10">
+          <h4 class="px-1 text-[17px] font-bold text-[#1a1a1a]">AI에게 알려 줄 정보 <span class="ml-0.5 font-semibold tabular-nums text-[#346538]" data-count-of="refs">0</span></h4>
+          <div class="mt-3 space-y-2.5" data-list="refs"></div>
+          <button type="button" data-add="refs" class="mt-1 flex px-1 h-11 items-center gap-1 text-[16px] font-semibold text-[#346538]">
+            <svg class="icon" width="19" height="19"><use th:href="${ic} + '#i-plus'"/></svg>정보 추가
+          </button>
+        </section>
+
+        <!--/* 답변 아래 버튼 (TBL_CHATBOT_ACTION) — 버튼 하나 = 흰 카드 하나 */-->
+        <section class="mt-10">
+          <h4 class="px-1 text-[17px] font-bold text-[#1a1a1a]">답변 아래 버튼 <span class="ml-0.5 font-semibold tabular-nums text-[#346538]" data-count-of="actions">0</span></h4>
+          <div class="mt-3 space-y-2.5" data-list="actions"></div>
+          <button type="button" data-add="actions" class="mt-1 flex px-1 h-11 items-center gap-1 text-[16px] font-semibold text-[#346538]">
+            <svg class="icon" width="19" height="19"><use th:href="${ic} + '#i-plus'"/></svg>버튼 추가
+          </button>
+        </section>
+      </div>
+
+      <!--/* 저장 — 아래 고정 (하단 탭에서 20px) */-->
+      <div data-saved hidden class="absolute bottom-[96px] left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-[#346538] px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_24px_rgba(26,26,26,.2)] [animation:slideUp_.2s_ease-out]">
+        <svg class="icon" width="17" height="17"><use th:href="${ic} + '#i-check'"/></svg><span data-saved-text>저장되었습니다</span>
+      </div>
+      <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#f7f8f6] from-70% to-transparent px-4 pb-5 pt-6">
+        <button type="button" data-save class="btn-primary" disabled>저장</button>
       </div>
     </div>
   </div>
+
+  <!--/* ⋯ 메뉴 */-->
+  <div id="moreSheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div role="dialog" aria-modal="true" aria-label="주제 메뉴" class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
+      <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+      <!--/* 사용 여부 — 누르면 [저장] 없이 바로 적용 · 안내 알약 */-->
+      <button type="button" data-toggle-active
+              class="mt-3 flex h-14 w-full items-center gap-3 rounded-[14px] px-2 text-left text-[16px] font-semibold text-[#292929] hover:bg-[#f2f3f1]">
+        <svg class="icon text-[#555]" width="22" height="22"><use data-toggle-icon th:href="${ic} + '#i-eyeOff'"/></svg><span data-toggle-label>사용 안 함으로 바꾸기</span>
+      </button>
+      <button type="button" data-open="#deleteConfirm" data-close="#moreSheet"
+              class="flex h-14 w-full items-center gap-3 rounded-[14px] px-2 text-left text-[16px] font-semibold text-[#d8663d] hover:bg-[#fff1e9]">
+        <svg class="icon" width="22" height="22"><use th:href="${ic} + '#i-trash'"/></svg>삭제
+      </button>
+      <button type="button" data-close class="mt-3 h-14 w-full rounded-[14px] bg-[#f0f1ef] text-[16px] font-semibold text-[#555]">취소</button>
+    </div>
+  </div>
+
+  <!--/* 삭제 확인 */-->
+  <div id="deleteConfirm" data-layer hidden class="absolute inset-0 z-50 grid place-items-center bg-[#1a1a1a]/40 p-6">
+    <div role="alertdialog" aria-modal="true" class="w-full rounded-[20px] bg-white p-6 text-center shadow-[0_18px_50px_rgba(26,26,26,.18)] [animation:slideUp_.2s_ease-out]">
+      <p class="text-[18px] font-bold text-[#1a1a1a]">정말 삭제하시겠습니까?</p>
+      <p class="mt-2 text-[14px] text-[#888]">삭제된 데이터는 복구할 수 없습니다.</p>
+      <div class="mt-6 grid grid-cols-2 gap-2">
+        <button type="button" data-close class="h-12 rounded-[14px] bg-[#f0f1ef] text-[15px] font-semibold text-[#555]">취소</button>
+        <button type="button" data-delete-ok class="h-12 rounded-[14px] bg-[#d8663d] text-[15px] font-semibold text-white">삭제</button>
+      </div>
+    </div>
+  </div>
+</th:block></th:block>
+<th:block th:fragment="scripts">
+  <script th:inline="javascript">
+    (function () {
+      const root = document.getElementById('chatAnswers');
+      const state = root.dataset.state;
+      const SPRITE = /*[[@{/images/admin/icons-v2.svg}]]*/ '/images/admin/icons-v2.svg';
+      const $ = (s, r = document) => r.querySelector(s);
+      const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+      const icon = (n, z, cls = '') => `<svg class="icon ${cls}" width="${z}" height="${z}"><use href="${SPRITE}#i-${n}"/></svg>`;
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      // 펼친 선택 목록 (값 = 공통코드 이름, 화면 글자는 label)
+      const CHOICES = {
+        type: [{ v: '안내', label: '안내', desc: 'AI가 아래 정보로 답변해요' },
+               { v: '예약 조회', label: '예약 조회', desc: '고객의 예약 정보를 보여 줘요' },
+               { v: '견적 조회', label: '견적 조회', desc: '고객의 견적 정보를 보여 줘요' }],
+        atype: [{ v: '화면 이동', label: '화면 이동', desc: '앱의 다른 화면으로 이동해요' },
+                { v: '이어서 질문', label: '다른 질문으로 연결', desc: '정해 둔 질문을 대신 보내요' },
+                { v: '상담원 연결', label: '상담원 연결', desc: '상담원에게 연결해요' }],
+      };
+      const SCREENS = ['견적 신청', '내 이사', '예약 상세', '견적 상세', '견적서', '알림'];
+
+      // 더미 (주제 + 참고 내용 refs + 답변 버튼 actions — 배열 순서 = SORT_ORDER)
+      let topics = [
+        { id: 1, title: '이사 견적', intro: '이사 비용과 방문 견적 과정을 안내합니다.', type: '안내', active: true,
+          refs: [{ keywords: '#견적#비용#가격', content: '출발지와 도착지, 이사 날짜, 짐의 양을 알려주시면 예상 견적을 안내해 드립니다.' },
+                 { keywords: '#방문견적#현장', content: '방문 견적은 담당자가 현장을 확인한 뒤 확정 금액을 안내해 드립니다.' }],
+          actions: [{ label: '견적 신청하기', type: '화면 이동', value: '견적 신청' }, { label: '상담원 연결', type: '상담원 연결', value: '' }] },
+        { id: 2, title: '예약 방법', intro: '상담부터 예약 확정까지의 절차를 안내합니다.', type: '안내', active: true,
+          refs: [{ keywords: '#예약#신청#계약', content: '견적 확인 후 예약금을 결제하면 이사 일정이 최종 확정됩니다.' }],
+          actions: [{ label: '예약금은 얼마예요?', type: '이어서 질문', value: '예약금은 얼마인가요?' }] },
+        { id: 3, title: '포장 이사', intro: '포장 서비스 범위와 준비 사항을 확인합니다.', type: '안내', active: true,
+          refs: [{ keywords: '#포장#박스#정리', content: '포장 이사는 전문 인력이 포장부터 운반, 기본 정리까지 진행합니다.' }], actions: [] },
+        { id: 4, title: '사다리차 이용', intro: '사다리차 필요 여부와 추가 비용을 안내합니다.', type: '안내', active: false,
+          refs: [{ keywords: '#사다리차#엘리베이터#고층', content: '현장 층수와 작업 환경에 따라 사다리차 필요 여부 및 비용이 달라집니다.' }],
+          actions: [{ label: '상담원 연결', type: '상담원 연결', value: '' }] },
+        { id: 5, title: '내 예약 확인', intro: '예약 일정과 진행 상태를 알려 드립니다.', type: '예약 조회', active: true, refs: [],
+          actions: [{ label: '예약 정보 보기', type: '화면 이동', value: '예약 상세' }, { label: '상담원 연결', type: '상담원 연결', value: '' }] },
+        { id: 6, title: '내 견적 확인', intro: '', type: '견적 조회', active: true, refs: [],
+          actions: [{ label: '견적서 보기', type: '화면 이동', value: '견적서' }] },
+      ];
+
+      /* ---------- 목록 ---------- */
+      const rows = $('[data-rows]', root);
+      const query = $('[data-topic-query]', root);
+      const searchBtn = $('[data-search-toggle]', root);
+      const searchBar = $('[data-search-bar]', root);
+      function renderList() {
+        const q = query.value.trim().toLowerCase();
+        const list = topics.filter((t) => !q || t.title.toLowerCase().includes(q));
+        rows.innerHTML = list.map((t) => `
+          <button type="button" data-topic="${t.id}" class="flex min-h-14 w-full items-center gap-3 border-b border-[#eef0ee] py-3 pl-5 pr-4 text-left last:border-none hover:bg-[#f7f8f6]">
+            <span class="min-w-0 flex-1">
+              <strong class="block truncate text-[16px] font-medium ${t.active ? 'text-[#292929]' : 'text-[#b0b4b1]'}">${esc(t.title)}</strong>
+              ${t.intro ? `<span class="mt-0.5 block truncate text-[13px] ${t.active ? 'text-[#888]' : 'text-[#b0b4b1]'}">${esc(t.intro)}</span>` : ''}
+            </span>
+            ${t.active ? '' : '<span class="shrink-0 text-[13px] text-[#b0b4b1]">사용 안 함</span>'}
+            ${icon('chevronRight', 18, 'shrink-0 text-[#b0b4b1]')}
+          </button>`).join('');
+        $('[data-empty]', root).hidden = list.length > 0;
+        $('[data-topic-count]', root).textContent = topics.length;
+      }
+      // 머리줄: 아래 내용이 스크롤되면 얇은 구분선 (머리는 z-20 · 바탕색으로 내용을 가림)
+      $$('[data-scroll-body]', root).forEach((sb) => {
+        const head = sb.previousElementSibling;
+        const sync = () => head.classList.toggle('shadow-[0_1px_0_#e5e7eb]', sb.scrollTop > 0);
+        sb.addEventListener('scroll', sync);
+        sb._syncHead = sync;
+      });
+      function setSearch(open) { searchBar.hidden = !open; searchBtn.setAttribute('aria-expanded', String(open)); if (!open) query.value = ''; renderList(); }
+      searchBtn.addEventListener('click', () => { setSearch(searchBar.hidden); if (!searchBar.hidden) query.focus(); });
+      query.addEventListener('input', renderList);
+      $('[data-query-clear]', root).addEventListener('click', () => { query.value = ''; renderList(); query.focus(); });
+      rows.addEventListener('click', (e) => { const b = e.target.closest('[data-topic]'); if (b) openEditor(Number(b.dataset.topic)); });
+
+      /* ---------- 편집 ---------- */
+      const editor = $('#topicEditor');
+      const body = $('[data-editor-body]', editor);
+      const saveBtn = $('[data-save]', editor);
+      const refBox = $('[data-list="refs"]', editor);
+      const actBox = $('[data-list="actions"]', editor);
+      const fTitle = $('[data-f="title"]', editor), fIntro = $('[data-f="intro"]', editor);
+      let editingId = null, original = '', type = '안내', active = true;
+
+      const box = 'block w-full rounded-[12px] bg-[#f5f6f4] px-3.5 text-[16px] text-[#1a1a1a] outline-none transition-colors placeholder:text-[#a9aea9] focus:bg-white focus:ring-2 focus:ring-inset focus:ring-[#346538]';
+      const lbl = (text) => `<span class="mb-2 block text-[15px] font-semibold text-[#292929]">${text}</span>`;
+      // 입력칸 + 칸 안 오른쪽 아래 글자 수 (그 칸에 커서가 있을 때만)
+      const counted = (fieldHtml, max, val) => `<span class="group/f relative block" data-max="${max}">${fieldHtml}
+          <span class="pointer-events-none absolute bottom-1.5 right-3 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-count>${val.length}/${max}</span></span>`;
+      // 펼친 선택 목록 (라디오): 왼쪽 동그라미 · 이름 16px · 회색 설명 한 줄
+      const choiceList = (name, value) => `<div role="radiogroup" data-choice="${name}" data-value="${esc(value)}" class="divide-y divide-[#eef0ee]">
+          ${CHOICES[name].map((o) => {
+            const on = o.v === value;
+            return `<button type="button" role="radio" aria-checked="${on}" data-choice-option="${esc(o.v)}" class="flex w-full items-center gap-3 py-3 text-left">
+              <span class="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full ${on ? 'bg-[#346538] text-white' : 'ring-2 ring-inset ring-[#cfd3cf]'}">${on ? icon('check', 14) : ''}</span>
+              <span class="min-w-0"><span class="block text-[16px] font-medium ${on ? 'text-[#346538]' : 'text-[#292929]'}">${o.label}</span><span class="mt-0.5 block text-[14px] text-[#888]">${o.desc}</span></span>
+            </button>`;
+          }).join('')}</div>`;
+      // 이동할 화면: 상자 모양 선택칸 (누르면 메뉴)
+      const screenSelect = (value) => `<div class="mt-4" data-dd="screen" data-value="${esc(value)}">${lbl('이동할 화면')}
+          <div class="relative">
+            <button type="button" data-dd-trigger aria-haspopup="listbox" aria-expanded="false" class="flex h-12 w-full items-center justify-between rounded-[12px] bg-[#f5f6f4] px-3.5 text-left text-[16px] text-[#1a1a1a] aria-expanded:bg-white aria-expanded:ring-2 aria-expanded:ring-inset aria-expanded:ring-[#346538]">
+              <span data-dd-label>${esc(value)}</span>${icon('chevron', 18, 'text-[#888]')}</button>
+            <ul data-dd-menu hidden role="listbox" class="absolute inset-x-0 top-full z-20 mt-1 rounded-[16px] bg-white p-1.5 shadow-[0_10px_30px_rgba(26,26,26,.14)] ring-1 ring-[#eef0ee]">
+              ${SCREENS.map((o) => `<li><button type="button" role="option" data-dd-option="${esc(o)}" aria-selected="${o === value}" class="flex h-11 w-full items-center justify-between gap-3 rounded-[10px] px-3 text-left text-[16px] ${o === value ? 'font-semibold text-[#346538]' : 'text-[#292929] hover:bg-[#f2f3f1]'}">${o}${o === value ? icon('check', 16) : ''}</button></li>`).join('')}
+            </ul>
+          </div></div>`;
+      // 항목: 번호 없음 · 오른쪽 위 작은 X · 항목 사이 얇은 구분선
+      const itemHead = (label) => `<button type="button" data-remove aria-label="${label} 삭제" class="absolute right-2.5 top-3 grid h-9 w-9 place-items-center rounded-full text-[#b0b4b1] hover:bg-[#eef0ee] hover:text-[#555]">${icon('x', 18)}</button>`;
+      // 항목 = 흰 카드 하나씩 (바깥 묶음 카드 없음) · 오른쪽 위 작은 X
+      const itemCls = 'relative rounded-[20px] bg-white/90 p-5 ring-1 ring-inset ring-[#e5e8e4]';
+      // 키워드: 입력은 쉼표로 구분 ('견적, 비용, 가격') — 저장 값 KEYWORDS 는 '#견적#비용#가격'
+      const kwDisplay = (k) => k.split('#').map((x) => x.trim()).filter(Boolean).join(', ');
+      const kwStore = (v) => v.split(',').map((x) => x.replace(/#/g, '').trim()).filter(Boolean).map((x) => `#${x}`).join('');
+      const area = `${box} min-h-12 resize-none overflow-hidden pb-6 pt-3 leading-6`;
+      const kwVal = (r) => kwDisplay(r.keywords);
+
+      function refItem(r) {
+        return `<div data-ref class="${itemCls}">${itemHead('정보')}
+          <label class="block">${lbl('이럴 때')}
+            ${counted(`<input type="text" data-r-keywords maxlength="200" autocomplete="off" placeholder="예: 견적, 비용, 가격" value="${esc(kwVal(r))}" class="${box} h-12 pr-16">`, 200, kwVal(r))}</label>
+          <label class="mt-4 block">${lbl('이렇게 답해요')}
+            ${counted(`<textarea data-r-content data-grow maxlength="1000" rows="1" placeholder="예: 출발지·도착지·날짜를 알려 주시면 예상 견적을 안내해 드립니다." class="${area}">${esc(r.content)}</textarea>`, 1000, r.content)}</label>
+        </div>`;
+      }
+      function actionExtra(a) {
+        if (a.type === '화면 이동') return screenSelect(a.value || SCREENS[0]);
+        if (a.type === '이어서 질문') {
+          return `<label class="mt-3 block">
+            ${counted(`<textarea data-a-value data-grow maxlength="200" rows="1" aria-label="보낼 질문" placeholder="보낼 질문 (예: 예약금은 얼마인가요?)" class="${area}">${esc(a.value)}</textarea>`, 200, a.value)}</label>`;
+        }
+        return '';
+      }
+      function actionItem(a) {
+        return `<div data-act class="${itemCls}">${itemHead('버튼')}
+          <label class="block">${lbl('버튼 글자')}
+            ${counted(`<input type="text" data-a-label maxlength="20" autocomplete="off" placeholder="예: 견적 신청하기" value="${esc(a.label)}" class="${box} h-12 pr-16">`, 20, a.label)}</label>
+          <div class="mt-3">${choiceList('atype', a.type)}</div>
+          <div data-a-extra>${actionExtra(a)}</div>
+        </div>`;
+      }
+      const grow = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 1}px`; };
+
+      // 화면 → 데이터
+      function read() {
+        return {
+          title: fTitle.value.trim(), intro: fIntro.value.trim(), type, active,
+          refs: type !== '안내' ? [] : $$('[data-ref]', refBox).map((c) => ({
+            keywords: kwStore($('[data-r-keywords]', c).value),
+            content: $('[data-r-content]', c).value.trim() })).filter((r) => r.keywords || r.content),
+          actions: $$('[data-act]', actBox).map((c) => {
+            const t = $('[data-choice="atype"]', c).dataset.value;
+            const scr = $('[data-dd="screen"]', c), q = $('[data-a-value]', c);
+            return { label: $('[data-a-label]', c).value.trim(), type: t, value: scr ? scr.dataset.value : q ? q.value.trim() : '' };
+          }).filter((a) => a.label),
+        };
+      }
+      // 미리 보기 · 글자 수 · [저장] 활성
+      function refresh() {
+        // 섹션 제목 옆 개수 (추가·삭제할 때 바로 바뀜)
+        $('[data-count-of="refs"]', editor).textContent = $$('[data-ref]', refBox).length;
+        $('[data-count-of="actions"]', editor).textContent = $$('[data-act]', actBox).length;
+        const d = read();
+        $('[data-pv-title]', editor).textContent = d.title || '고객이 누르는 버튼';
+        const pv = $('[data-pv-intro]', editor);
+        pv.textContent = d.intro || (type === '안내' ? '아래 정보로 AI가 답변합니다.' : `${type === '예약 조회' ? '예약' : '견적'} 정보를 보여 드립니다.`);
+        pv.classList.toggle('text-[#a0a4a1]', !d.intro);
+        $('[data-pv-buttons]', editor).innerHTML = d.actions.map((a) =>
+          `<span class="inline-flex min-h-7 items-center rounded-full border border-[#b9d0bc] bg-white px-3 text-[13px] font-semibold text-[#346538]">${esc(a.label)}</span>`).join('');
+        $('[data-count-for="title"]', editor).textContent = `${fTitle.value.length}/50`;
+        $('[data-count-for="intro"]', editor).textContent = `${fIntro.value.length}/200`;
+        $('[data-ref-section]', editor).hidden = type !== '안내';
+        // 사용 여부 → 제목 옆 상태 글자 (사용 중 주황 · 사용 안 함 회색)
+        const chip = $('[data-status-chip]', editor);
+        chip.hidden = !editingId;
+        chip.textContent = active ? '· 사용 중' : '· 사용 안 함';
+        chip.className = `shrink-0 text-[14px] font-semibold ${active ? 'text-[#f5831a]' : 'text-[#9a9f9b]'}`;
+        saveBtn.disabled = !d.title || JSON.stringify(d) === original;
+      }
+      function openEditor(id) {
+        editingId = id || null;
+        const t = id ? topics.find((x) => x.id === id) : { title: '', intro: '', type: '안내', active: true, refs: [{ keywords: '', content: '' }], actions: [] };
+        $('[data-editor-title]', editor).textContent = id ? '답변 수정' : '주제 추가';
+        $('[data-more]', editor).hidden = !id;
+        saveBtn.textContent = id ? '저장' : '추가';
+        fTitle.value = t.title; fIntro.value = t.intro; type = t.type; active = t.active;
+        $('[data-type-list]', editor).innerHTML = choiceList('type', type);
+        refBox.innerHTML = (t.refs.length ? t.refs : [{ keywords: '', content: '' }]).map(refItem).join('');
+        actBox.innerHTML = t.actions.map(actionItem).join('');
+        editor.hidden = false;
+        $$('[data-grow]', editor).forEach(grow);
+        original = id ? JSON.stringify(read()) : '';
+        refresh();
+        body.scrollTop = 0;
+      }
+      $('[data-topic-new]', root).addEventListener('click', () => openEditor());
+      $('[data-editor-back]', editor).addEventListener('click', () => { editor.hidden = true; renderList(); });
+      // ⋯ 메뉴 — 사용 여부는 [저장] 없이 바로 적용 (다른 입력 중인 내용은 그대로 저장 대기)
+      function openMore() {
+        $('[data-toggle-label]').textContent = active ? '사용 안 함으로 바꾸기' : '사용하기';
+        $('[data-toggle-icon]').setAttribute('href', `${SPRITE}#i-${active ? 'eyeOff' : 'eye'}`);
+        $('#moreSheet').hidden = false;
+      }
+      $('[data-more]', editor).addEventListener('click', openMore);
+      $('[data-toggle-active]').addEventListener('click', () => {
+        active = !active;
+        topics = topics.map((t) => (t.id === editingId ? { ...t, active } : t));
+        if (original) original = JSON.stringify({ ...JSON.parse(original), active });
+        $('#moreSheet').hidden = true;
+        refresh();
+        showSaved(active ? '사용 중으로 바꿨어요' : '사용 안 함으로 바꿨어요');
+      });
+      $('[data-add="refs"]', editor).addEventListener('click', () => { refBox.insertAdjacentHTML('beforeend', refItem({ keywords: '', content: '' })); refresh(); });
+      $('[data-add="actions"]', editor).addEventListener('click', () => { actBox.insertAdjacentHTML('beforeend', actionItem({ label: '', type: '화면 이동', value: SCREENS[0] })); refresh(); });
+
+      // 드롭다운 · X 삭제
+      const closeMenus = () => $$('[data-dd-menu]', editor).forEach((m) => { m.hidden = true; m.previousElementSibling.setAttribute('aria-expanded', 'false'); });
+      body.addEventListener('click', (e) => {
+        const rm = e.target.closest('[data-remove]');
+        if (rm) { rm.closest('[data-ref], [data-act]').remove(); refresh(); return; }
+        // 펼친 선택 목록 (답변 방식 · 누르면)
+        const ch = e.target.closest('[data-choice-option]');
+        if (ch) {
+          const list = ch.closest('[data-choice]'), name = list.dataset.choice, v = ch.dataset.choiceOption;
+          const card = list.closest('[data-act]');
+          list.outerHTML = choiceList(name, v);
+          if (name === 'type') type = v;
+          if (name === 'atype') {   // 동작이 바뀌면 그 버튼의 이동할 화면 / 보낼 질문 칸을 바꾼다
+            $('[data-a-extra]', card).innerHTML = actionExtra({ type: v, value: v === '화면 이동' ? SCREENS[0] : '' });
+            $$('[data-grow]', card).forEach(grow);
+          }
+          refresh();
+          return;
+        }
+        // 이동할 화면 상자 → 메뉴
+        const trig = e.target.closest('[data-dd-trigger]');
+        if (trig) {
+          const menu = trig.nextElementSibling, open = menu.hidden;
+          closeMenus();
+          menu.hidden = !open; trig.setAttribute('aria-expanded', String(open));
+          return;
+        }
+        const opt = e.target.closest('[data-dd-option]');
+        if (opt) {
+          const dd = opt.closest('[data-dd]');
+          dd.outerHTML = screenSelect(opt.dataset.ddOption);
+          refresh();
+        }
+      });
+      document.addEventListener('click', (e) => { if (!e.target.closest('[data-dd]')) closeMenus(); });
+      // 입력할 때마다: 글자 수 · 자동 높이 · 미리 보기
+      body.addEventListener('input', (e) => {
+        const wrap = e.target.closest('[data-max]');
+        if (wrap) { const c = $('[data-count]', wrap); if (c) c.textContent = `${e.target.value.length}/${wrap.dataset.max}`; }
+        if (e.target.matches('[data-grow]')) grow(e.target);
+        refresh();
+      });
+
+      // 저장 / 추가
+      const savedPill = $('[data-saved]', editor);
+      let pillTimer;
+      function showSaved(text = '저장되었습니다') { $('[data-saved-text]', savedPill).textContent = text; savedPill.hidden = false; clearTimeout(pillTimer); pillTimer = setTimeout(() => { savedPill.hidden = true; }, 1800); }
+      saveBtn.addEventListener('click', () => {
+        if (saveBtn.disabled) return;
+        const d = read();
+        if (editingId) topics = topics.map((t) => (t.id === editingId ? { ...t, ...d } : t));
+        else { editingId = Date.now(); topics.push({ id: editingId, ...d }); $('[data-editor-title]', editor).textContent = '답변 수정'; $('[data-more]', editor).hidden = false; saveBtn.textContent = '저장'; }
+        original = JSON.stringify(read());
+        refresh();
+        showSaved();
+      });
+
+      // 삭제
+      $('[data-delete-ok]').addEventListener('click', () => {
+        topics = topics.filter((t) => t.id !== editingId);
+        $('#deleteConfirm').hidden = true;
+        editor.hidden = true;
+        renderList();
+      });
+
+      /* 상태 */
+      renderList();
+      if (state === 'search') { setSearch(true); query.value = '견적'; renderList(); }
+      if (state === 'empty') { setSearch(true); query.value = '없는주제'; renderList(); }
+      const qid = Number(new URLSearchParams(location.search).get('id')) || 1;   // ?state=edit&id=4 → 사다리차 이용(사용 안 함)
+      if (['edit', 'more', 'delete'].includes(state)) openEditor(qid);
+      if (state === 'edit-query') openEditor(5);
+      if (state === 'register') openEditor();
+      if (state === 'more') openMore();
+      if (state === 'delete') $('#deleteConfirm').hidden = false;
+      if (location.hash === '#bottom') setTimeout(() => { body.scrollTop = 9999; }, 800);   // 검토용 (스타일 적용 뒤)
+      if (location.hash === '#focus') setTimeout(() => { fTitle.focus(); }, 800);   // 검토용: 글자 수 표시 확인
+      if (location.hash === '#mid') body.scrollTop = 520;      // 검토용
+    })();
+  </script>
 </th:block>
-<th:block th:fragment="scripts"><script th:src="@{/js/admin/chat.js}"></script></th:block>
 </body>
 </html>

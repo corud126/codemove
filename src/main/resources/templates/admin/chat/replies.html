@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!--/* 자주 쓰는 답변 (신규) — 디자인 기준: docs/ui/관리자디자인기준.md · 진입: 채팅 설정 › 자주 쓰는 답변 · 뒤로 = 채팅 설정
+  상담원이 채팅 상세에서 불러와 보내는 저장 답변. ERD 신규 TBL_SAVED_REPLY: REPLY_ID · TITLE(30) · CONTENT(500) · ADMIN_ID · UPDATED_AT
+    (REPLY_ID·ADMIN_ID·UPDATED_AT 은 화면에 표시하지 않음 · 순서 기능 없음 = 등록순(REPLY_ID))
+  모양: 채팅 설정과 같은 묶음 목록 — 행 2줄(제목 16px · 내용 한 줄 회색), 행 누르면 수정 시트
+  state: (기본) · edit(첫 답변 수정 시트) · new(등록 시트) · delete(삭제 확인) · empty(등록된 답변 없음) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='자주 쓰는 답변', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content"><th:block th:with="state=${param.state != null ? param.state[0] : ''}, ic=@{/images/admin/icons-v2.svg}">
+  <div class="relative flex h-full min-h-0 flex-col overflow-hidden" id="chatReplies" th:attr="data-state=${state}">
+    <!--/* 1행: 뒤로(→ 채팅 설정) · 제목만 / 2행: 건수 · 추가 (견적 관리와 같은 위계) */-->
+    <div class="relative z-20 shrink-0 bg-[#f7f8f6] px-4 pb-3 pt-5 transition-shadow" data-scroll-head>
+      <div class="flex h-9 items-center gap-1">
+        <a th:href="@{/admin/chats/settings}" aria-label="채팅 설정으로 돌아가기"
+           class="-ml-2 grid h-9 w-9 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+          <svg class="icon" width="24" height="24"><use th:href="${ic} + '#i-chevronLeft'"/></svg>
+        </a>
+        <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">자주 쓰는 답변</h2>
+      </div>
+      <div class="mt-5 flex items-center gap-1">
+        <span class="px-1 text-[14px] font-semibold text-[#888]">답변 <span class="tabular-nums" data-count>5</span>개</span>
+        <span class="flex-1"></span>
+        <button type="button" data-new class="flex h-9 items-center rounded-full bg-[#346538] px-4 text-[14px] font-bold text-white">추가</button>
+      </div>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1" data-scroll-body>
+      <section class="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+        <ol class="divide-y divide-[#eef0ee]" data-rows></ol>
+        <p data-empty hidden class="py-12 text-center text-[14px] text-[#888]">등록된 답변이 없습니다.</p>
+      </section>
+    </div>
+  </div>
+
+  <!--/* 등록·수정 시트 — 제목 30자 · 내용 500자 */-->
+  <div id="replySheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div role="dialog" aria-modal="true" aria-labelledby="replyTitle"
+         class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 shadow-[0_-8px_30px_rgba(26,26,26,.12)] [animation:slideUp_.2s_ease-out]">
+      <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+      <div class="mt-3 flex items-center justify-between">
+        <h3 id="replyTitle" class="text-[18px] font-bold text-[#1a1a1a]" data-sheet-title>답변 등록</h3>
+        <button type="button" data-close aria-label="닫기" class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#555] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="22" height="22"><use th:href="${ic} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <!--/* 입력칸: 챗봇 답변 관리와 같은 채움 상자 · 글자 수는 칸 안 오른쪽 아래, 입력 중에만 */-->
+      <label class="mt-3 block">
+        <span class="mb-2 block text-[15px] font-semibold text-[#292929]">제목</span>
+        <span class="group/f relative block">
+          <input type="text" data-input-title maxlength="30" autocomplete="off"
+                 class="block h-12 w-full rounded-[12px] bg-[#f5f6f4] px-3.5 pr-16 text-[16px] text-[#1a1a1a] outline-none transition-colors focus:bg-white focus:ring-2 focus:ring-inset focus:ring-[#346538]">
+          <span class="pointer-events-none absolute bottom-1.5 right-3 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-count-title>0/30</span>
+        </span>
+      </label>
+      <label class="mt-5 block">
+        <span class="mb-2 block text-[15px] font-semibold text-[#292929]">내용</span>
+        <span class="group/f relative block">
+          <textarea data-input-content maxlength="500"
+                    class="block h-40 w-full resize-none rounded-[12px] bg-[#f5f6f4] px-3.5 pb-6 pt-3 text-[16px] leading-6 text-[#1a1a1a] outline-none transition-colors focus:bg-white focus:ring-2 focus:ring-inset focus:ring-[#346538]"></textarea>
+          <span class="pointer-events-none absolute bottom-1.5 right-3 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-count-content>0/500</span>
+        </span>
+      </label>
+      <div class="mt-5 flex gap-2">
+        <button type="button" data-sheet-delete hidden class="h-14 shrink-0 rounded-[14px] bg-[#fff1e9] px-5 text-[16px] font-bold text-[#d8663d]">삭제</button>
+        <button type="button" data-save class="btn-primary flex-1">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!--/* 삭제 확인 */-->
+  <div id="deleteModal" data-layer hidden class="absolute inset-0 z-50 grid place-items-center bg-[#1a1a1a]/40 p-6">
+    <div role="alertdialog" aria-modal="true" class="w-full rounded-[20px] bg-white p-6 text-center shadow-[0_18px_50px_rgba(26,26,26,.18)] [animation:slideUp_.2s_ease-out]">
+      <p class="text-[18px] font-bold text-[#1a1a1a]">정말 삭제하시겠습니까?</p>
+      <p class="mt-2 text-[14px] text-[#888]">삭제된 데이터는 복구할 수 없습니다.</p>
+      <div class="mt-6 grid grid-cols-2 gap-2">
+        <button type="button" data-close class="h-12 rounded-[14px] bg-[#f0f1ef] text-[15px] font-semibold text-[#555]">취소</button>
+        <button type="button" data-delete-confirm class="h-12 rounded-[14px] bg-[#d8663d] text-[15px] font-semibold text-white">삭제</button>
+      </div>
+    </div>
+  </div>
+</th:block></th:block>
+<th:block th:fragment="scripts">
+  <script>
+    // 머리줄: 아래 내용이 스크롤되면 얇은 구분선 (머리는 z-20 · 바탕색으로 내용을 가림)
+    document.querySelectorAll("[data-scroll-body]").forEach((sb) => { const head = sb.previousElementSibling; sb.addEventListener("scroll", () => head.classList.toggle("shadow-[0_1px_0_#e5e7eb]", sb.scrollTop > 0)); });
+  </script>
+  <script th:inline="javascript">
+    (function () {
+      const root = document.getElementById('chatReplies');
+      const state = root.dataset.state;
+      const SPRITE = /*[[@{/images/admin/icons-v2.svg}]]*/ '/images/admin/icons-v2.svg';
+      const $ = (s, r = document) => r.querySelector(s);
+      const icon = (n, z, cls = '') => `<svg class="icon ${cls}" width="${z}" height="${z}"><use href="${SPRITE}#i-${n}"/></svg>`;
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+      // 더미 (TBL_SAVED_REPLY — 등록순)
+      let replies = state === 'empty' ? [] : [
+        { id: 1, title: '방문 견적 안내', content: '방문 견적은 담당자가 현장을 확인한 뒤 확정 금액을 안내해 드립니다. 원하시는 방문 날짜와 시간을 알려주세요.' },
+        { id: 2, title: '계약금 입금 안내', content: '견적 확인 후 계약금을 입금해 주시면 이사 일정이 확정됩니다. 입금 계좌는 예약 상세에서 확인하실 수 있습니다.' },
+        { id: 3, title: '사다리차 비용 안내', content: '사다리차 비용은 층수와 작업 환경에 따라 달라집니다. 현장 확인 후 정확한 금액을 안내해 드리겠습니다.' },
+        { id: 4, title: '이사 당일 준비물', content: '귀중품과 중요 서류는 직접 챙겨 주시고, 냉장고는 전날 미리 비워 두시면 좋습니다.' },
+        { id: 5, title: '상담 종료 인사', content: '문의해 주셔서 감사합니다. 더 궁금한 점이 있으시면 언제든 채팅으로 남겨 주세요.' },
+      ];
+      let editing = null, deleting = null;
+      const rows = $('[data-rows]', root);
+
+      function render() {
+        rows.innerHTML = replies.map((r) => `<li><button type="button" data-edit="${r.id}" class="flex min-h-[68px] w-full items-center gap-3 py-2.5 pl-5 pr-4 text-left hover:bg-[#f7f8f6]">
+            <span class="min-w-0 flex-1"><strong class="block truncate text-[16px] font-medium text-[#292929]">${esc(r.title)}</strong>
+              <span class="mt-0.5 block truncate text-[14px] text-[#888]">${esc(r.content)}</span></span>${icon('chevronRight', 18, 'shrink-0 text-[#b0b4b1]')}</button></li>`).join('');
+        $('[data-count]', root).textContent = replies.length;
+        $('[data-empty]', root).hidden = replies.length > 0;
+        rows.hidden = replies.length === 0;
+      }
+      rows.addEventListener('click', (e) => {
+        const ed = e.target.closest('[data-edit]');
+        if (ed) openSheet(Number(ed.dataset.edit));
+      });
+
+      // 등록·수정 시트
+      const sheet = document.getElementById('replySheet');
+      const tIn = $('[data-input-title]', sheet), cIn = $('[data-input-content]', sheet), save = $('[data-save]', sheet);
+      const sync = () => {
+        $('[data-count-title]', sheet).textContent = `${tIn.value.length}/30`;
+        $('[data-count-content]', sheet).textContent = `${cIn.value.length}/500`;
+        save.disabled = !tIn.value.trim() || !cIn.value.trim();
+      };
+      function openSheet(id) {
+        editing = id || null;
+        const r = id ? replies.find((x) => x.id === id) : { title: '', content: '' };
+        $('[data-sheet-title]', sheet).textContent = id ? '답변 수정' : '답변 추가';
+        $('[data-sheet-delete]', sheet).hidden = !id;
+        tIn.value = r.title; cIn.value = r.content;
+        sync();
+        sheet.hidden = false;
+      }
+      $('[data-new]', root).addEventListener('click', () => openSheet());
+      [tIn, cIn].forEach((el) => el.addEventListener('input', sync));
+      save.addEventListener('click', () => {
+        const item = { id: editing || Date.now(), title: tIn.value.trim(), content: cIn.value.trim() };
+        replies = editing ? replies.map((r) => (r.id === editing ? item : r)) : [...replies, item];
+        sheet.hidden = true;
+        render();
+      });
+
+      // 삭제 (수정 시트의 [삭제] → 확인)
+      const del = document.getElementById('deleteModal');
+      $('[data-sheet-delete]', sheet).addEventListener('click', () => { deleting = editing; del.hidden = false; });
+      $('[data-delete-confirm]', del).addEventListener('click', () => {
+        replies = replies.filter((r) => r.id !== deleting);
+        del.hidden = true; sheet.hidden = true;
+        render();
+      });
+
+      render();
+      if (state === 'edit') openSheet(1);
+      if (state === 'new') openSheet();
+      if (state === 'delete') { openSheet(1); deleting = 1; del.hidden = false; }
+    })();
+  </script>
+</th:block>
+</body>
+</html>
