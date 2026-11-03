@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U 가입 완료 (G-A13)
+  state 없음. '시작하기' → 홈
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='가입 완료', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/auth.css}">
+</head>
+<body>
+<div class="app-shell auth-shell">
+  <div class="screen welcome">
+    <div class="welcome-stage">
+      <img alt="달리는 상자 캐릭터" class="welcome-box" th:src="@{/images/user/415ab.png}">
+      <img alt="" class="welcome-particle particle-1" th:src="@{/images/user/6514c.svg}">
+      <img alt="" class="welcome-particle particle-2" th:src="@{/images/user/6a3f5.svg}">
+      <img alt="" class="welcome-particle particle-3" th:src="@{/images/user/a82d3.svg}">
+      <img alt="" class="welcome-particle particle-4" th:src="@{/images/user/04e05.svg}">
+      <img alt="" class="welcome-particle particle-5" th:src="@{/images/user/b2424.svg}">
+      <img alt="" class="welcome-particle particle-6" th:src="@{/images/user/dca9e.svg}">
+      <img alt="" class="welcome-particle particle-7" th:src="@{/images/user/e0c5f.svg}">
+      <img alt="" class="welcome-particle particle-8" th:src="@{/images/user/48dcd.svg}">
+      <img alt="" class="welcome-particle particle-9" th:src="@{/images/user/1429b.svg}">
+      <img alt="" class="welcome-particle particle-10" th:src="@{/images/user/97ffe.svg}">
+      <img alt="" class="welcome-particle particle-11" th:src="@{/images/user/63c36.svg}">
+    </div>
+    <div class="welcome-copy"><span data-user-name>김무브</span>님, 환영합니다</div>
+    <a class="action welcome-button" th:href="@{/login/complete}">시작하기</a>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/auth.js}"></script>
+</body>
+</html>

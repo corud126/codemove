@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!--/* 관리자 공통 fragment (모바일 프레임: 상단 헤더 · 콘텐츠 · 하단 탭) — 디자인 기준: docs/ui/관리자디자인기준.md
+  사용 예)
+  <html xmlns:th="http://www.thymeleaf.org" lang="ko"
+        th:replace="~{fragments/admin-layout :: layout(title='견적 관리', active='estimate', fixed=false, content=~{::content}, scripts=~{::scripts})}">
+    <th:block th:fragment="content"> ...화면 본문... </th:block>
+    <th:block th:fragment="scripts"><script th:src="@{/js/admin/estimate.js}"></script></th:block>
+  active : schedule | estimate | home | chat | menu (하단 탭 강조), 해당 없으면 ''
+  fixed  : true 이면 콘텐츠 영역이 스크롤되지 않음(채팅처럼 화면 안에서 자체 스크롤하는 경우)
+  scripts: 없으면 ~{}
+  - 로고: 사용자 앱 브랜드 마크(집 + 미소) + 관리자 표시 · 메뉴 검색은 헤더가 아니라 전체 메뉴 맨 위
+  - 아이콘: images/admin/icons-v2.svg (Lucide, id 는 기존 icons.svg 와 동일)
+*/-->
+<html xmlns:th="http://www.thymeleaf.org" th:fragment="layout(title, active, fixed, content, scripts)" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+    // 반응형 프레임: 설계 크기 430px 폭으로 그리고 기기에 맞게 배율(--frame-zoom)·높이(--app-h)를 정한다 (첫 렌더 전에 실행)
+    //  휴대폰(폭 480px 미만): 기기 폭에 꽉 차게, 높이 = 기기 높이 ÷ 배율 / PC·태블릿: 430 × 874 프레임, 창이 작으면 축소
+    (function () {
+      const root = document.documentElement;
+      function fit() {
+        const phone = innerWidth < 480;
+        const zoom = phone ? innerWidth / 430 : Math.min(1, (innerHeight - 48) / 874, (innerWidth - 32) / 430);
+        root.style.setProperty("--frame-zoom", zoom.toFixed(4));
+        root.style.setProperty("--app-h", (phone ? innerHeight / zoom : 874).toFixed(2) + "px");
+      }
+      fit();
+      addEventListener("resize", fit);
+    })();
+  </script>
+  <title th:text="${title} + ' | 명품익스프레스 관리자'">명품익스프레스 관리자</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.min.css">
+  <!--/* 개발용 Tailwind 브라우저 빌드. 배포 전 Tailwind CLI로 정적 CSS 빌드 후 교체 */-->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11/dist/index.global.js"></script>
+  <link rel="stylesheet" th:href="@{/css/admin/admin.css}">
+  <link rel="stylesheet" th:href="@{/css/admin/admin-v2.css}">
+</head>
+<body class="admin-v2">
+<main class="grid h-[100dvh] place-items-center overflow-hidden bg-[#e8ebe8]">
+  <div id="adminFrame" style="--header-h:64px;--nav-h:86px" class="relative overflow-hidden bg-[#f7f8f6] min-[480px]:rounded-[32px] min-[480px]:shadow-[0_18px_60px_rgba(39,61,43,.18)]">
+    <div class="flex h-full flex-col">
+      <header class="z-20 flex h-[var(--hdr)] pt-[var(--safe-top)] shrink-0 items-center justify-between bg-white px-5">
+        <a class="flex items-center gap-2.5" th:href="@{/admin}" aria-label="관리자 홈">
+          <svg class="h-[27px] w-[27px]" viewBox="0 0 132 130" aria-hidden="true">
+            <path fill="#346538" d="M54 5a18 18 0 0 1 24 0l44 38a29 29 0 0 1 10 22v42a23 23 0 0 1-23 23H23A23 23 0 0 1 0 107V65a29 29 0 0 1 10-22L54 5Z"/>
+            <path fill="none" stroke="#e8e8cd" stroke-width="10" stroke-linecap="round" d="M35 80c17 16 45 16 62 0"/>
+          </svg>
+          <span class="text-[16px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">명품익스프레스</span>
+          <span class="rounded-md bg-[#eef4f0] px-1.5 py-0.5 text-[12px] font-bold text-[#346538]">관리자</span>
+        </a>
+        <div class="flex items-center">
+          <button type="button" aria-label="최근 알림" data-open="#notificationPanel"
+                  class="relative grid h-11 w-11 place-items-center rounded-full text-[#292929] transition hover:bg-[#f2f5f2]">
+            <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-bell'"/></svg>
+            <span class="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#f5831a]"></span>
+          </button>
+        </div>
+      </header>
+
+      <div class="min-h-0 flex-1" th:classappend="${fixed} ? 'overflow-hidden pb-[var(--nav)]' : 'overflow-y-auto pb-[var(--safe-bottom)]'">
+        <th:block th:replace="${content}"/>
+      </div>
+
+      <!--/* 하단 탭 — 사용자 앱 .bottom-nav 와 같은 모양: 흰 배경 + 위 모서리 27px + 그림자, 선택은 배경 없이 아이콘·글자만 초록 */-->
+      <nav class="admin-nav absolute inset-x-0 bottom-0 z-30 grid h-[var(--nav)] grid-cols-5 rounded-t-[27px] bg-white px-3 pb-[var(--safe-bottom)] pt-[18px] shadow-[0_-3px_20px_4px_rgba(0,0,0,.1)]">
+        <a th:each="tab : ${ {'schedule|예약일정|calendar|/admin/schedule', 'estimate|견적|document|/admin/estimates', 'home|홈|home|/admin', 'chat|채팅|chat|/admin/chats', 'menu|전체|menu|#'} }"
+           th:with="t=${#strings.arraySplit(tab, '|')}"
+           th:href="${t[0] == 'menu'} ? '#' : @{${t[3]}}"
+           th:attr="data-open=${t[0] == 'menu'} ? '#allMenu' : null, aria-label=${t[1]}"
+           class="flex h-[52px] flex-col items-center justify-start gap-[5px] text-[12px] leading-[1.2] tracking-[.2px]"
+           th:classappend="${active == t[0]} ? 'is-selected font-semibold text-[#346538]' : 'text-[#9a9f9b]'">
+          <svg class="icon" width="27" height="27"><use th:href="@{/images/admin/icons-v2.svg} + '#i-' + ${t[2]}"/></svg>
+          <span th:text="${t[1]}">홈</span>
+        </a>
+      </nav>
+    </div>
+
+    <th:block th:replace="~{fragments/admin-overlays :: overlays}"/>
+  </div>
+</main>
+<script th:src="@{/js/admin/admin.js}"></script>
+<th:block th:replace="${scripts}"/>
+</body>
+</html>

@@ -1,0 +1,62 @@
+/* 채팅 (G-G01~G07) — app.css 의 chat-* 를 캡처 기준으로 보정 */
+.chat-screen { background: #f4f5f2; }
+.chat-header-title strong { font-size: 17px; color: #222; }
+.chat-content { padding: 28px 16px 120px; }
+.chat-bot-row { margin: 0 0 10px; gap: 10px; }
+.chat-avatar { width: 32px; height: 32px; border-radius: 9px; box-shadow: none; }
+.chat-bot-name { font-size: 13px; color: #777; }
+.chat-menu-card { width: 322px; max-width: 88%; padding: 15px 8px 13px; border-radius: 16px; box-shadow: none; }
+.chat-greeting { padding: 0 12px 13px; color: #333; font-size: 15px; line-height: 1.55; }
+.chat-topic-list { gap: 6px; }
+.chat-topic { min-height: 40px; padding-block: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: #f5f6f3; color: #333; font-size: 14px; }
+.chat-topic-accent { background: #fbeedf; color: #b8601d; }
+.chat-hours { padding: 7px 12px 0; color: #a5a5a5; font-size: 11px; }
+.chat-restart-label { margin: 50px auto 18px; padding: 5px 9px; font-size: 10px; line-height: 12px; }
+.chat-thread { gap: 17px; }
+.chat-message-content { max-width: 310px; gap: 8px; }
+.message { padding: 13px 15px; color: #444; font-size: 15px; line-height: 1.6; border-radius: 16px; }
+.message.user { padding: 13px 15px; border-radius: 18px 4px 18px 18px; font-size: 15px; }
+.chat-message-wrap.user .chat-message-time { margin-top: 0; }
+.chat-quick-replies { margin-top: 2px; }
+.chat-quick-replies .action { display: inline-flex; align-items: center; min-height: 33px; padding: 6px 12px; font-size: 12px; text-decoration: none; }
+.chat-file-message { padding: 8px 11px; gap: 8px; border-radius: 10px; color: #4f6652; font-size: 11px; }
+.chat-mini-avatar { width: 26px; height: 26px; border-radius: 8px; box-shadow: none; }
+.chat-message-time { color: #aaa; font-size: 9px; line-height: 11px; }
+
+/* 입력창 */
+.chat-input { left: 12px; right: 12px; bottom: 12px; min-height: 52px; padding: 6px; border-radius: 26px; box-shadow: 0 2px 10px rgb(0 0 0 / .04); }
+.chat-input-row { min-height: 40px; gap: 10px; }
+.chat-attach, .chat-send { width: 40px; height: 40px; }
+.chat-attach { background: #f4f5f2; }
+.chat-attach img { width: 18px; height: 18px; }
+.chat-editor { color: #a3a3a3; font-size: 13.5px; padding-right: 4px; }
+.chat-editor:empty::before { color: #a3a3a3; }
+.chat-send.is-disabled { opacity: 1; background: #c9d3c5; }
+.chat-attachment-chip { min-height: 36px; padding: 0 12px 0 10px; border-radius: 18px; gap: 6px; font-size: 12.5px; color: var(--green); }
+.chat-attachment-chip > img { width: 13px; height: 13px; }
+.chat-attachment-chip .action { color: #9a9a9a; }
+.chat-attachment-chip .action svg { width: 10px; height: 10px; }
+
+/* 뒤로 가기: 캡처는 꺾쇠(<) 아이콘 */
+.chat-header .back img { content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M15 4.5 7.5 12l7.5 7.5' stroke='%23292929' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+
+/* 쉬운 모드 (E-G01~G07) */
+.easy-mode .chat-header-title strong { font-size: 19px; }
+.easy-mode .chat-avatar { width: 38px; height: 38px; border-radius: 10px; }
+.easy-mode .chat-bot-name { font-size: 15px; }
+.easy-mode .chat-menu-card { width: 374px; max-width: 94%; padding: 17px 8px 11px; }
+.easy-mode .chat-greeting { padding: 0 12px 11px; font-size: 17px; }
+.easy-mode .chat-topic { min-height: 52px; font-size: 17px; border-radius: 12px; }
+.easy-mode .chat-hours { padding-top: 9px; font-size: 13px; }
+
+.easy-mode .chat-message-content { max-width: 342px; }
+.easy-mode .message { font-size: 18px; padding: 13px 15px; }
+.easy-mode .chat-quick-replies .action { min-height: 36px; padding: 6px 16px; font-size: 14px; }
+.easy-mode .chat-mini-avatar { width: 28px; height: 28px; }
+.easy-mode .chat-message-time { font-size: 10px; }
+.easy-mode .chat-input { min-height: 62px; border-radius: 31px; }
+.easy-mode .chat-input-row { min-height: 48px; }
+.easy-mode .chat-attach, .easy-mode .chat-send { width: 48px; height: 48px; }
+.easy-mode .chat-attach img { width: 22px; height: 22px; }
+.easy-mode .chat-editor { font-size: 17px; }
+.chat-header { background: #fff; backdrop-filter: none; }

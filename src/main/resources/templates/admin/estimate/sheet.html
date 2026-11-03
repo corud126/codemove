@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<!--/* 견적서/계약서 문서 fragment (SCR-A-002 견적 수정 · SCR-A-003/004 견적서 등록 공용) — 사용자 앱 견적서(css/user/app.css .vendor-*)와 같은 배치·글자·선
+  styles : 문서 전용 스타일 (페이지마다 한 번 포함). 580px 기준 값을 문서 폭에 비례(--u = 문서 폭 / 580)
+  sheet  : 문서 본문. 값은 input[readonly] (칸을 채우고 테두리 없음) → 상위 [data-viewer] 에 .is-editing 이 붙으면 같은 자리에서 편집 (estimate.js)
+  ERD: 품목 그룹 4개 고정(전자기기·가구·생활용품·기타) · 작업내용 포장/반포장/일반/보관 · 운반방법 출발(전)/도착(후) · 사다리 층수 · 옵션 8종 × 선택 2 + 비용
+       작업일이 없으면(상위 noDate=true) 작업일 칸에 '미정'(주황) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<body>
+
+<style th:fragment="styles">
+  .qs { --u: calc(100cqw / 580); width: 100%; background: #fff; color: #111; letter-spacing: 0; }
+  .qs-in { font-size: calc(var(--u) * 11); line-height: 1.25; padding: calc(var(--u) * 28) calc(var(--u) * 30) calc(var(--u) * 24); }
+  .qs b, .qs strong { font-weight: 600; }
+  .qs input { display: block; width: 100%; min-width: 0; height: auto; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; line-height: inherit; text-align: inherit; outline: none; }
+  .qs input::placeholder { color: #f5831a; }
+  .qs .ln { border-color: #222; }
+  /* 머리 */
+  .qs-top { display: grid; grid-template-columns: 1.1fr 1fr 1.5fr; align-items: start; gap: calc(var(--u) * 18); margin-bottom: calc(var(--u) * 18); }
+  .qs-brand, .qs-title { display: flex; flex-direction: column; }
+  .qs-brand strong { font-weight: 700; font-size: calc(var(--u) * 21); letter-spacing: .02em; }
+  .qs-brand span { margin-top: calc(var(--u) * 3); font-size: calc(var(--u) * 9); }
+  .qs-title { align-items: center; text-align: center; }
+  .qs-title strong { font-weight: 700; font-size: calc(var(--u) * 20); letter-spacing: .06em; white-space: nowrap; }
+  .qs-title span { margin-top: calc(var(--u) * 5); font-family: serif; font-size: calc(var(--u) * 9); }
+  .qs-reg { border-top: 1px solid #222; border-left: 1px solid #222; }
+  .qs-reg div { display: grid; grid-template-columns: calc(var(--u) * 90) 1fr; }
+  .qs-reg b, .qs-reg span { min-height: calc(var(--u) * 22); padding: calc(var(--u) * 3) calc(var(--u) * 7); box-sizing: border-box; border-right: 1px solid #222; border-bottom: 1px solid #222; display: flex; align-items: center; }
+  .qs-reg b { justify-content: center; }
+  /* 업체·고객 */
+  .qs-cust { display: grid; grid-template-columns: calc(var(--u) * 66) minmax(0, 1fr) calc(var(--u) * 60) minmax(0, .9fr); border-top: 1px solid #222; border-left: 1px solid #222; }
+  .qs-cust > * { min-height: calc(var(--u) * 26); padding: calc(var(--u) * 4) calc(var(--u) * 8); box-sizing: border-box; border-right: 1px solid #222; border-bottom: 1px solid #222; display: flex; align-items: center; gap: calc(var(--u) * 3); }
+  .qs-cust > b { justify-content: center; background: #fafafa; }
+  /* 품목 */
+  .qs-items { margin-top: calc(var(--u) * 8); border-top: 1px solid #222; border-left: 1px solid #222; }
+  .qs-groups { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .qs-ihead, .qs-irow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr) calc(var(--u) * 42)); }
+  .qs-groups > *, .qs-ihead > *, .qs .qs-irow > input { min-height: calc(var(--u) * 26); padding: calc(var(--u) * 4) calc(var(--u) * 6); box-sizing: border-box; border-right: 1px solid #222; border-bottom: 1px solid #222; display: flex; align-items: center; }
+  .qs-groups b, .qs-ihead b { justify-content: center; background: #f7f7f7; }
+  .qs .qs-irow > input:nth-child(even) { text-align: center; }
+  .qs-items { position: relative; }
+  .qs-rowctl { display: none; position: absolute; z-index: 1; left: 50%; bottom: 0; transform: translate(-50%, 50%); padding: 0 calc(var(--u) * 6); background: #fff; align-items: center; justify-content: center; gap: calc(var(--u) * 8); }
+  .is-editing .qs-rowctl { display: flex; }
+  .qs-rowctl button { width: calc(var(--u) * 22); height: calc(var(--u) * 22); border-radius: 999px; border: 1px solid #aeb5af; background: #fff; font-size: calc(var(--u) * 14); font-weight: 700; line-height: 1; }
+  .qs-rowctl button:disabled { opacity: .4; }
+  .qs-rowctl span { color: #737b75; font-size: calc(var(--u) * 10); font-weight: 600; }
+  /* 작업 정보 */
+  .qs-work { display: grid; grid-template-columns: calc(var(--u) * 46) 1.05fr 1fr; margin-top: calc(var(--u) * 8); border-top: 1px solid #222; border-left: 1px solid #222; }
+  .qs-work > * { border-right: 1px solid #222; border-bottom: 1px solid #222; }
+  .qs-vlabel { display: grid; place-items: center; padding: calc(var(--u) * 8); line-height: 1.7; writing-mode: vertical-rl; letter-spacing: .35em; font-weight: 600; }
+  .qs-opts { display: flex; flex-direction: column; padding: calc(var(--u) * 4) calc(var(--u) * 10); }
+  .qs-opt { display: grid; grid-template-columns: calc(var(--u) * 54) 1fr calc(var(--u) * 64); align-items: center; gap: calc(var(--u) * 4); padding: calc(var(--u) * 3) 0; border-bottom: 1px dashed #bbb; }
+  .qs-opt:last-child { border-bottom: 0; }
+  .qs-opt .cost { display: flex; align-items: center; gap: calc(var(--u) * 3); }
+  .qs-opt .cost input { text-align: right; }
+  .qs-choice { display: inline-flex; align-items: center; gap: calc(var(--u) * 2); color: #111; white-space: nowrap; }
+  .qs-choice [data-box] { font-size: calc(var(--u) * 10); }
+  .qs-details { display: grid; grid-template-rows: auto auto auto 1fr; }
+  .qs-details > div { display: grid; grid-template-columns: calc(var(--u) * 58) 1fr; border-bottom: 1px solid #222; }
+  .qs-details > div:last-child { border-bottom: 0; }
+  .qs-details b, .qs-details .v { display: flex; align-items: center; padding: calc(var(--u) * 5) calc(var(--u) * 7); }
+  .qs-details b { justify-content: center; border-right: 1px solid #222; background: #fafafa; }
+  .qs-details .v { flex-wrap: wrap; gap: calc(var(--u) * 2) calc(var(--u) * 7); }
+  .qs-transport { display: flex; flex-direction: column; align-items: flex-start !important; gap: calc(var(--u) * 2) !important; }
+  .qs-transport > span { display: flex; gap: calc(var(--u) * 4); white-space: nowrap; }
+  .qs-transport > span > em { font-style: normal; min-width: calc(var(--u) * 42); }
+  /* 비용 */
+  .qs-cost { display: grid; grid-template-columns: 1fr 1fr; margin-top: calc(var(--u) * 8); border-top: 1px solid #222; border-left: 1px solid #222; }
+  .qs-col { border-right: 1px solid #222; }
+  .qs-col > b { min-height: calc(var(--u) * 23); display: grid; place-items: center; border-bottom: 1px solid #222; background: #fafafa; }
+  .qs-col > div { min-height: calc(var(--u) * 25); display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #222; }
+  .qs-col span, .qs-col strong { display: flex; align-items: center; padding: calc(var(--u) * 5) calc(var(--u) * 8); }
+  .qs-col span { justify-content: center; border-right: 1px solid #222; white-space: nowrap; }
+  .qs-col strong { font-weight: 400; gap: calc(var(--u) * 4); }
+  .qs-col .total span, .qs-col .total strong { font-weight: 700; }
+  .qs-col span input { width: calc(var(--u) * 16); text-align: center; display: inline-block; }
+  .qs-pay { display: grid; grid-template-columns: 25% 25% 50%; border-left: 1px solid #222; }
+  .qs-pay > * { min-height: calc(var(--u) * 34); padding: calc(var(--u) * 8) calc(var(--u) * 10); box-sizing: border-box; border-right: 1px solid #222; border-bottom: 1px solid #222; display: flex; align-items: center; gap: calc(var(--u) * 4); }
+  .qs-pay > b { justify-content: center; font-weight: 500; }
+  .qs-pay .bal { font-weight: 700; }
+  .qs-pay .note { grid-column: 3; grid-row: 1 / span 2; align-items: flex-end; color: #777; font-size: calc(var(--u) * 9); }
+  .qs-sign { display: grid; grid-template-columns: calc(var(--u) * 80) 1fr calc(var(--u) * 70) calc(var(--u) * 150); margin-top: calc(var(--u) * 8); border-top: 1px solid #222; border-left: 1px solid #222; }
+  .qs-sign > * { min-height: calc(var(--u) * 31); padding: calc(var(--u) * 7) calc(var(--u) * 8); box-sizing: border-box; border-right: 1px solid #222; border-bottom: 1px solid #222; display: flex; align-items: center; }
+  .qs-sign > b { justify-content: center; }
+  /* 수정 모드: 칸 모양은 그대로, 입력 칸만 옅게 표시 */
+  [data-viewer].is-editing .qs input:not([readonly]) { background: #f3f8f1; box-shadow: inset 0 0 0 1px #cfe0cf; }
+  [data-viewer].is-editing .qs input:not([readonly]):focus { background: #e9f3e8; box-shadow: inset 0 0 0 1px #346538; }
+  .is-editing .qs [data-choice] { cursor: pointer; }
+</style>
+
+<!--/* 문서 본문 — 기본값은 견적 1번(홍길동) 더미. 품목 행: 전자기기 품목|수량|가구|수량|생활용품|수량|기타|수량 ('-' = 빈칸) */-->
+<article th:fragment="sheet" class="qs estimate-sheet [container-type:inline-size]"
+         th:with="itemRows=${ {'냉장고|1대|침대|1개|박스|25개|-|-', '세탁기|1대|책상|2개|-|-|-|-', '-|-|의자|4개|-|-|-|-',
+                               '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-'} }">
+  <div class="qs-in">
+    <div class="qs-top">
+      <div class="qs-brand"><strong>명품 익스프레스</strong><span>포장이사 전문업체 관허 2015-7호</span><span>(피해보상)보증보험 가입</span></div>
+      <div class="qs-title"><strong>견적서 / 계약서</strong><span>(ESTIMATE REPORT)</span></div>
+      <div class="qs-reg">
+        <div><b>등록 번호</b><span>398-51-00044</span></div>
+        <div><b>사무실전화</b><span>062) 252-0303</span></div>
+        <div><b>대표자전화</b><span>010-9445-8224</span></div>
+      </div>
+    </div>
+
+    <!--/* 업체명 · 담당자(고객) · TEL · 견적일 · 출발지 · 작업일 · 도착지 · 운송일 */-->
+    <div class="qs-cust">
+      <b>업체명</b><span><input readonly data-field="companyName" aria-label="업체명" value="명품익스프레스"></span>
+      <b>담당자</b><span><input readonly data-field="customer" aria-label="담당자" value="홍길동" class="!w-auto max-w-[70%] [field-sizing:content]"><em class="shrink-0 not-italic">(님)</em></span>
+      <b>TEL</b><span><input readonly data-field="phone" aria-label="연락처" value="010-1234-5678"></span>
+      <b>견적일</b><span><input readonly data-field="estimateDate" aria-label="견적일" value="26.03.25"></span>
+      <b>출발지</b><span><input readonly data-field="origin" aria-label="출발지" value="서울 강남구 테헤란로 123, 101동 1203호"></span>
+      <!--/* 작업일 = WORK_DATE + WORK_TIME(고정 시간대 08:00·10:00·13:00·15:00·17:00 중 하나, 고객 희망 시간대를 보고 정함) */-->
+      <b>작업일</b><span><input readonly data-field="moveDate" aria-label="작업일" placeholder="미정" th:value="${noDate == true} ? '' : '26.04.12 08:00'"></span>
+      <b>도착지</b><span><input readonly data-field="destination" aria-label="도착지" value="경기 성남시 분당구 판교로 45, 2층"></span>
+      <b>운송일</b><span><input readonly data-field="transportDate" aria-label="운송일" value="26.04.12"></span>
+    </div>
+
+    <!--/* 품목 / 수량 — 그룹 4개 고정 (ERD Q14), 수량 칸 = 수량 + 단위 */-->
+    <div class="qs-items">
+      <div class="qs-groups"><b>전자기기</b><b>가구</b><b>생활용품</b><b>기타</b></div>
+      <div class="qs-ihead"><th:block th:each="i : ${#numbers.sequence(1, 4)}"><b>품목</b><b>수량</b></th:block></div>
+      <div data-item-rows>
+        <div th:each="row : ${itemRows}" th:with="t=${#strings.arraySplit(row, '|')}" class="qs-irow" data-item-row>
+          <th:block th:each="c : ${#numbers.sequence(0, 3)}">
+            <input readonly data-item-name aria-label="품목" th:value="${t[c * 2] == '-'} ? '' : ${t[c * 2]}">
+            <input readonly data-item-qty aria-label="수량" th:value="${t[c * 2 + 1] == '-'} ? '' : ${t[c * 2 + 1]}">
+          </th:block>
+        </div>
+      </div>
+      <!--/* 수정 모드에서만: 품목 행 추가/삭제 (문서 아래 경계선 위에 겹쳐 배치 — 배치가 밀리지 않음) */-->
+      <div class="qs-rowctl">
+      <button type="button" aria-label="품목 행 삭제" data-item-row-change="-1">−</button>
+      <span data-item-row-count>8행</span>
+      <button type="button" aria-label="품목 행 추가" data-item-row-change="1">+</button>
+      </div>
+    </div>
+
+    <!--/* 작업 정보: 옵션 8종(선택 2 + 비용) · 작업내용 · 운반방법 · 이사물량 · 비고 */-->
+    <div class="qs-work">
+      <b class="qs-vlabel">작업 정보</b>
+      <div class="qs-opts">
+        <div th:each="o, s : ${ {'피아노|일반|그랜드|N|N|0', '돌침대|분해|조립|N|N|0', '조립장|분해|조립|N|N|0', '벽걸이TV|탈착|설치|Y|Y|20,000',
+                                 '홈씨어터|분리|설치|N|N|0', '수작업|계단|승강기|N|N|0', '안마의자|분리|설치|N|N|0', '에어컨|탈착|설치|N|N|0'} }"
+             th:with="t=${#strings.arraySplit(o, '|')}" class="qs-opt" data-option-row>
+          <span th:text="${t[0]}">피아노</span>
+          <span class="flex items-center gap-[calc(var(--u)*6)]">
+            <button th:each="k : ${ {1, 2} }" type="button" data-choice class="qs-choice" th:attr="data-value=${t[k]}, aria-pressed=${t[k + 2] == 'Y'}">
+              <span th:text="${t[k]}">일반</span><span data-box th:text="${t[k + 2] == 'Y'} ? '■' : '□'">□</span>
+            </button>
+          </span>
+          <span class="cost">₩<input readonly inputmode="numeric" th:attr="data-field='option' + ${s.index}, data-money=true, aria-label=|${t[0]} 옵션 비용|" th:value="${t[5]}"></span>
+        </div>
+      </div>
+      <div class="qs-details">
+        <div><b>작업내용</b>
+          <span class="v" data-radio="workMethod">
+            <button th:each="m : ${ {'포장', '반포장', '일반', '보관'} }" type="button" data-choice class="qs-choice" th:attr="data-value=${m}, aria-pressed=${m == '반포장'}">
+              <span th:text="${m}">포장</span><span data-box th:text="${m == '반포장'} ? '■' : '□'">□</span>
+            </button>
+          </span></div>
+        <div><b>운반방법</b>
+          <span class="v qs-transport">
+            <span th:each="m : ${ {'사다리차|Y|Y', '승강기|N|N', '계단작업|N|N'} }" th:with="t=${#strings.arraySplit(m, '|')}" data-transport>
+              <em th:text="${t[0]}">사다리차</em>
+              <button type="button" data-choice class="qs-choice" data-value="전" th:attr="aria-pressed=${t[1] == 'Y'}">전<span data-box th:text="${t[1] == 'Y'} ? '■' : '□'">■</span></button>/
+              <button type="button" data-choice class="qs-choice" data-value="후" th:attr="aria-pressed=${t[2] == 'Y'}">후<span data-box th:text="${t[2] == 'Y'} ? '■' : '□'">■</span></button>
+            </span>
+          </span></div>
+        <div><b>이사물량</b><span class="v"><input readonly data-field="volume" aria-label="이사물량" value="3.5톤"></span></div>
+        <div><b>비고</b><span class="v"><input readonly data-field="note" aria-label="비고" maxlength="500" value="파손 주의 물품 별도 포장"></span></div>
+      </div>
+    </div>
+
+    <!--/* A. 작업 비용(총 비용 = 이사비용 + 사다리비용 + 옵션비용) · B. 별도 비용 (사다리 층수 입력) */-->
+    <div class="qs-cost">
+      <div class="qs-col">
+        <b>A. 작업 비용</b>
+        <div th:each="m : ${ {'이사비용|movingCost|1,050,000|', '사다리비용|extraCost|270,000|', '옵션비용|optionCost|20,000|', '총 비용|total|1,340,000|total'} }" th:with="t=${#strings.arraySplit(m + ' ', '|')}"
+             th:classappend="${#strings.trim(t[3]) == 'total'} ? 'total'">
+          <span th:text="${t[0]}">이사비용</span><strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=${t[0]}" th:value="${t[2]}"></strong>
+        </div>
+      </div>
+      <div class="qs-col">
+        <b>B. 별도 비용</b>
+        <div th:each="m : ${ {'출발지|departureLadder|150,000|fromLadderFloor|3', '도착지|destinationLadder|120,000|toLadderFloor|8'} }" th:with="t=${#strings.arraySplit(m, '|')}">
+          <span><th:block th:text="${t[0]}">출발지</th:block>&nbsp;사다리(<input readonly inputmode="numeric" maxlength="3" th:attr="data-field=${t[3]}, aria-label=|${t[0]} 사다리 층수|" th:value="${t[4]}">)층</span>
+          <strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=|${t[0]} 사다리 비용|" th:value="${t[2]}"></strong>
+        </div>
+        <div aria-hidden="true"><span></span><strong></strong></div><!--/* A칸과 줄 높이 맞춤 */-->
+        <div class="total"><span>사다리 소계</span><strong>₩<input readonly inputmode="numeric" data-field="ladderSubtotal" data-money="true" aria-label="사다리 소계" value="270,000"></strong></div>
+      </div>
+    </div>
+    <div class="qs-pay">
+      <b>계약금 10%</b><span>₩<input readonly inputmode="numeric" data-field="deposit" data-money="true" aria-label="계약금" value="134,000"></span>
+      <b class="bal">잔금</b><span class="bal">₩<input readonly inputmode="numeric" data-field="balance" data-money="true" aria-label="잔금" value="1,206,000"></span>
+      <div class="note">※ 현장 상황 및 요청사항 변경 시 비용이 조정될 수 있습니다.</div>
+    </div>
+
+    <div class="qs-sign">
+      <b>견적 담당자</b><span>김선국　(서명) / H.P　010-9445-8224</span>
+      <b>고객 확인</b><span>(서명)</span>
+    </div>
+  </div>
+</article>
+
+</body>
+</html>

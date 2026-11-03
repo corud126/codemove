@@ -1,0 +1,40 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientTransform="translate(42 29) rotate(51.8) scale(111)">
+      <stop stop-color="#F4F7DD"/>
+      <stop offset="1" stop-color="#B9D2BB"/>
+    </radialGradient>
+    <linearGradient id="shirt" x1="43" y1="82" x2="84" y2="123" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F8B58"/>
+      <stop offset="1" stop-color="#285C31"/>
+    </linearGradient>
+    <linearGradient id="skin" x1="45" y1="39" x2="82" y2="83" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD2A3"/>
+      <stop offset="1" stop-color="#D98958"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="39" y1="20" x2="79" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4D83CE"/>
+      <stop offset="1" stop-color="#174A92"/>
+    </linearGradient>
+    <filter id="drop" x="15" y="11" width="102" height="124" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#17391F" flood-opacity=".22"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <g filter="url(#drop)">
+    <path d="M29 128C29 101.49 44.67 86 64 86C83.33 86 99 101.49 99 128H29Z" fill="url(#shirt)"/>
+    <path d="M52 82H76V97C76 103.627 70.6274 109 64 109C57.3726 109 52 103.627 52 97V82Z" fill="#DC9563"/>
+    <ellipse cx="64" cy="58" rx="30" ry="35" fill="url(#skin)"/>
+    <path d="M36 56C36 35.5655 46.7452 24 64 24C81.2548 24 92 35.5655 92 56V61C87 54 83 47 81 40C69 48 55 51 36 49V56Z" fill="#593C2F"/>
+    <path d="M37 43C39.5 24.5 51.5 17 66 18C82 19.1 90 28.5 91 43C75 34 58 33 37 43Z" fill="url(#cap)"/>
+    <path d="M35 42C48 36 66 35 83 41C69 45 50 47 34 46C31 45.8 31 43.7 35 42Z" fill="#194D95"/>
+    <ellipse cx="53" cy="61" rx="3" ry="3.5" fill="#363339"/>
+    <ellipse cx="76" cy="61" rx="3" ry="3.5" fill="#363339"/>
+    <path d="M57 74C61.5 77 67 77 72 73.5" stroke="#9C4F3F" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M89 48C99 53 99 72 90 78" stroke="#346538" stroke-width="5" stroke-linecap="round"/>
+    <rect x="87" y="68" width="9" height="17" rx="4.5" fill="#2B6234"/>
+    <path d="M91 83C88 89 82 91 77 89" stroke="#2B6234" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="76" cy="89" r="3" fill="#2B6234"/>
+    <path d="M44 103L64 117L84 103" stroke="#76A57C" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+</svg>

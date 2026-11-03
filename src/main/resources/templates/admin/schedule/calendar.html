@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!--/* SCR-A-020 예약 일정 — 예약을 확인하는 뷰어 (보기 전용, 등록 없음). 디자인 기준: docs/ui/관리자디자인기준.md
+  개인 일정 · 휴무일 · 공휴일 관리는 일정 관리(/admin/schedule/manage)로 분리
+  1행 제목 / 월 달력(예약 건수만큼 크림색 점 · 휴무일 회색 '휴무' · 예약 불가 = 회색 '마감', ‹ › 달 이동, [오늘], [달력 접기] = 고른 날의 주만)
+  / 고른 날 예약 — 모든 날 같은 박스 목록(시간 · 이름 / 출발 → 도착), 오늘은 지난 이사 흐리게 · 다음 이사 이름 옆 남은 시간. 결제 상태는 예약 상세에서
+  예약을 누르면 간단한 예약 정보 시트(날짜 · 시간 · 이름 · 유형 · 출발·도착 · 전화) → [예약 상세 보기] = 예약 관리
+  ERD: TBL_RESERVATION 예약 완료(01)·이사 완료(02)만 (취소 미표시), PAY_STATUS 는 예약 정보 시트에만, 휴무일(정기 · 공휴일 · 임시 TBL_CLOSED_DAY)은 표시만
+  state: (기본) 오늘 고름 · day(9/29) · closed(휴무일 9/20) · next-month(10월) · collapsed(달력 접기) · detail(예약 정보 시트)
+  더미 데이터·동작: js/admin/schedule.js (오늘 = 26.09.27 가정) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='예약 일정', active='schedule', fixed=false, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div id="scheduleCalendar" class="px-4 pb-28 pt-5"
+       th:with="ic=@{/images/admin/icons-v2.svg}, st=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${st}">
+    <!--/* 1행: 페이지 제목만 */-->
+    <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">예약 일정</h2>
+
+
+    <div data-view-body></div>
+
+    <!--/* 간단한 예약 정보 — 아래에서 올라오는 시트 (하단 탭까지 덮음) */-->
+    <div id="reservationSheet" data-layer hidden class="absolute inset-x-0 bottom-0 top-0 z-50 flex items-end bg-[#1a1a1a]/40">
+      <div role="dialog" aria-modal="true" aria-label="예약 정보" class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
+        <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+        <!--/* 블록은 [예약 상세 보기] 하나만 — 머리(오늘 · 날짜 + X) / 시간 · 이름 / 유형 / 출발·도착(상자 없이) / 전화(동그란 아이콘) + [예약 상세 보기] · 결제 상태·예약 번호는 예약 상세에서 */-->
+        <div class="mt-3 flex items-center justify-between">
+          <p class="text-[14px] font-semibold text-[#888]"><span data-r-today hidden class="text-[#346538]">오늘 · </span><span data-r-date>9월 27일 (일)</span></p>
+          <button type="button" aria-label="닫기" data-close class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#555] hover:bg-[#f0f1ef]">
+            <svg class="icon" width="22" height="22"><use th:href="${ic} + '#i-x'"/></svg>
+          </button>
+        </div>
+        <div class="flex items-baseline gap-2.5">
+          <b class="text-[30px] font-extrabold leading-10 tabular-nums tracking-[-0.02em] text-[#1a1a1a]" data-r-time>13:00</b>
+          <b class="min-w-0 truncate text-[20px] font-bold text-[#292929]" data-r-name>홍서윤</b>
+          <span data-r-service>원룸이사</span>
+        </div>
+        <!--/* 경로: 상자 없이 · 한 줄에 점 + 출발/도착 + 주소, 점 사이 점선 */-->
+        <div class="relative mt-4 border-t border-[#eef0ee] pt-4">
+          <span class="absolute bottom-[11px] left-[5px] top-[27px] border-l-[1.5px] border-dashed border-[#b9c9bb]"></span>
+          <p class="relative flex items-start gap-3"><i class="mt-[5px] h-[11px] w-[11px] shrink-0 rounded-full border-[2.5px] border-[#346538] bg-white"></i>
+            <span class="w-7 shrink-0 text-[14px] font-semibold text-[#9a9f9b]">출발</span><span class="min-w-0 text-[15px] text-[#292929]" data-r-origin>-</span></p>
+          <p class="relative mt-3 flex items-start gap-3"><i class="mt-[5px] h-[11px] w-[11px] shrink-0 rounded-full bg-[#346538]"></i>
+            <span class="w-7 shrink-0 text-[14px] font-semibold text-[#9a9f9b]">도착</span><span class="min-w-0 text-[15px] text-[#292929]" data-r-destination>-</span></p>
+        </div>
+        <div class="mt-6 flex items-center gap-3">
+          <a data-r-tel href="#" aria-label="고객에게 전화" class="grid h-14 w-14 shrink-0 place-items-center rounded-full text-[#346538] ring-1 ring-inset ring-[#cfdccf] hover:bg-[#eef4f0]">
+            <svg class="icon" width="22" height="22"><use th:href="${ic} + '#i-phone'"/></svg></a>
+          <a data-r-link th:href="@{/admin/reservations}" class="btn-primary flex-1">예약 상세 보기</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/schedule.js}"></script></th:block>
+</body>
+</html>

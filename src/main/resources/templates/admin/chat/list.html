@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<!--/* 채팅 (받은 채팅함) — SCR-A-005 채팅 관리 + SCR-A-006 채팅 목록 통합. 디자인 기준: docs/ui/관리자디자인기준.md
+  하단 탭 '채팅' → 이 화면 바로. 설정은 제목 줄 톱니 → 채팅 설정(/admin/chats/settings)
+  ?tab   : (기본) waiting 대기 · active 상담 중 · ended 종료 · bot 챗봇(챗봇만 응대 중인 방)
+  ?state : search(검색 열림 · '김') · empty(검색 결과 없음)
+  - 탭 = 글자 + 초록 밑줄. 대기 · 상담 중에 건수(대기 건수 주황 = 조치 필요). 챗봇 탭은 맨 끝, 건수 없음
+  - 대기 탭은 오래 기다린 순(WAITING_AT 오름차순) 고정, 상담 중 · 종료 · 챗봇은 '최신 순 ⌄'(최신 순 · 안 읽은 순)
+  - 행: 이니셜 원 · 이름(+ 대기 탭이면 'N분 대기') · 마지막 메시지 한 줄 · 시간 · 안 읽은 수
+  - 검색은 탭과 상관없이 전체 방에서 (이름 · 휴대폰 · 대화 내용)
+  ERD: TBL_CHAT_ROOM.STATUS(01 챗봇 응대 · 02 대기 중 · 03 상담 중 · 04 종료), WAITING_AT(대기 시간·정렬), 마지막 메시지 SENT_AT,
+       안 읽은 수 = 고객 메시지 IS_READ='N', 회원 이름 · PHONE, 채팅방 주소 = MEMBER_ID (?member=)
+  행: 이름|마지막 메시지|시간|STATUS|안 읽은 수|최근 활동 순번|MEMBER_ID|대기 분|휴대폰 */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='채팅', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <div class="flex h-full min-h-0 flex-col" data-chat-list
+       th:with="tabCls='relative h-12 text-[15px] font-semibold text-[#888] after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 aria-selected:font-bold aria-selected:text-[#346538] aria-selected:after:bg-[#346538]'">
+    <!--/* 제목 · 검색 · 설정 */-->
+    <div class="flex shrink-0 items-center px-4 pt-5">
+      <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">채팅</h2>
+      <button type="button" aria-label="채팅 검색" aria-expanded="false" data-search-open
+              class="ml-auto grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee] aria-expanded:bg-[#eef0ee]">
+        <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+      </button>
+      <a th:href="@{/admin/chats/settings}" aria-label="채팅 설정"
+         class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+        <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-settings'"/></svg>
+      </a>
+    </div>
+
+    <!--/* 검색창 (전체 방: 이름 · 휴대폰 · 대화 내용) */-->
+    <div data-search hidden class="relative mx-4 mt-3 shrink-0">
+      <svg class="icon pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+      <input type="search" data-search-input autocomplete="off" aria-label="이름, 휴대폰 번호 또는 대화 내용 검색" placeholder="이름·휴대폰·대화 내용"
+             class="h-12 w-full rounded-[14px] bg-white pl-11 pr-12 text-[15px] text-[#1a1a1a] outline-none ring-1 ring-[#e5e7eb] placeholder:text-[#b0b4b1] focus:ring-2 focus:ring-[#346538] [&::-webkit-search-cancel-button]:hidden">
+      <button type="button" aria-label="검색 닫기" data-search-close class="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-[#888] hover:bg-[#f0f1ef]">
+        <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+      </button>
+    </div>
+
+    <!--/* 탭: 대기 · 상담 중 · 종료 · 챗봇 */-->
+    <div data-tabs class="mt-2 grid shrink-0 grid-cols-4 border-b border-[#e5e7eb] px-4" role="tablist" aria-label="채팅 상태">
+      <button type="button" role="tab" data-tab="waiting" aria-selected="true" th:class="${tabCls}">대기 <span class="tabular-nums text-[#f5831a]" data-tab-count>5</span></button>
+      <button type="button" role="tab" data-tab="active" aria-selected="false" th:class="${tabCls}">상담 중 <span class="tabular-nums" data-tab-count>2</span></button>
+      <button type="button" role="tab" data-tab="ended" aria-selected="false" th:class="${tabCls}">종료</button>
+      <button type="button" role="tab" data-tab="bot" aria-selected="false" th:class="${tabCls}">챗봇</button>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-3">
+      <!--/* 머리 줄: 건수 · 정렬 */-->
+      <div class="relative mb-2 flex h-8 items-center px-1">
+        <span class="text-[13px] font-semibold text-[#888]"><span data-count-label>채팅</span> <b class="font-bold tabular-nums text-[#292929]" data-count>5</b></span>
+        <span data-sort-fixed class="ml-auto text-[13px] text-[#888]">오래 기다린 순</span>
+        <button type="button" data-menu-toggle hidden aria-expanded="false" aria-label="정렬 기준"
+                class="-mr-2 ml-auto flex h-8 items-center gap-0.5 rounded-full px-2 text-[13px] font-semibold text-[#555] hover:bg-[#eef0ee] aria-expanded:bg-[#eef0ee]">
+          <span data-sort-label>최신 순</span>
+          <svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevron'"/></svg>
+        </button>
+        <div data-menu hidden role="menu"
+             class="absolute right-0 top-9 z-30 w-40 rounded-[14px] bg-white p-1.5 shadow-[0_12px_32px_rgba(26,26,26,.14)] ring-1 ring-[#eef0ee]">
+          <button type="button" role="menuitemradio" th:each="o, st : ${ {'latest|최신 순', 'unread|안 읽은 순'} }"
+                  th:with="t=${#strings.arraySplit(o, '|')}" th:attr="data-sort=${t[0]},aria-checked=${st.first}"
+                  class="group flex h-11 w-full items-center justify-between rounded-[10px] px-3 text-left text-[15px] font-semibold text-[#555] hover:bg-[#f7f8f6] aria-checked:text-[#346538]">
+            <span th:text="${t[1]}">최신 순</span>
+            <svg class="icon invisible group-aria-checked:visible" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-check'"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!--/* 메신저(카카오톡 · 토스)처럼 카드·구분선 없이 바탕 위에 한 줄씩 · 큰 프로필 원 · 안 읽은 수는 주황(= 처리할 것) */-->
+      <section class="-mx-4">
+        <div data-rooms>
+          <a th:each="r : ${ {'홍길동|혹시 사다리차 추가 비용이 발생하나요?|방금|02|3|15|1015|3|010-2481-3375', '김명품|엘리베이터를 사용하지 못하는데요?|2분 전|02|2|14|1014|5|010-7720-1184', '박철수|네, 알겠습니다. 내일 뵙겠습니다.|오후 3:30|03|0|13|1013|0|010-3391-0627', '최지우|에어컨 이전 설치도 같이 되나요?|8분 전|02|4|12|1012|9|010-5108-4492', '강민주|포장 박스는 언제 가져다 주시나요?|12분 전|02|2|11|1011|13|010-6645-2019', '이서준|견적서 확인했습니다.|오전 10:15|04|0|10|1010|0|010-9012-7731', '윤아름|귀중품은 따로 챙겨야 하나요?|18분 전|02|1|9|1009|18|010-4473-5580', '송지호|이사 시작 시간은 몇 시인가요?|어제|01|0|8|1008|0|010-2290-6613', '정현우|주소 변경은 어디서 하나요?|어제|03|1|7|1007|0|010-8834-1902', '한유진|계약금 입금 완료했습니다.|어제|04|0|6|1006|0|010-1157-4426', '오도현|방문 견적 일정을 변경하고 싶어요.|월요일|01|1|5|1005|0|010-6302-8875', '문지안|침대 분해와 조립도 부탁드려요.|월요일|04|0|4|1004|0|010-7469-3308', '임지수|주차 공간 사진 보내드립니다.|일요일|04|0|3|1003|0|010-5521-9064', '김도윤|카드 결제가 가능한가요?|토요일|01|0|2|1002|0|010-3087-2251', '이지민|친절한 안내 감사합니다.|금요일|04|0|1|1001|0|010-9946-1738'} }"
+             th:with="t=${#strings.arraySplit(r, '|')}"
+             th:href="@{/admin/chats/{id}(id=${t[6]})}"
+             th:attr="data-name=${t[0]},data-msg=${t[1]},data-status=${t[3]},data-unread=${t[4]},data-activity=${t[5]},data-wait=${t[7]},data-phone=${t[8]}"
+             class="flex items-center gap-3.5 px-5 py-3 transition hover:bg-[#eef0ee]/70 active:bg-[#eef0ee]">
+            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#e3ece4] text-[18px] font-bold text-[#346538]"
+                  th:text="${#strings.substring(t[0], 0, 1)}" aria-hidden="true">홍</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex min-w-0 items-baseline gap-1.5">
+                <strong class="truncate text-[16px] font-semibold text-[#1a1a1a]" th:text="${t[0]}">홍길동</strong>
+                <span data-wait-label hidden class="shrink-0 text-[13px] font-semibold text-[#d9701a]" th:text="|${t[7]}분 대기|">3분 대기</span>
+              </span>
+              <span class="mt-1 block truncate text-[14px] text-[#777]" th:text="${t[1]}">혹시 사다리차 추가 비용이 발생하나요?</span>
+            </span>
+            <span class="flex shrink-0 flex-col items-end gap-1">
+              <span data-time class="text-[12px] tabular-nums text-[#9a9f9b]" th:text="${t[2]}">방금</span>
+              <span th:if="${t[4] != '0'}" th:text="${t[4]}" th:attr="aria-label=|안 읽은 메시지 ${t[4]}개|"
+                    class="grid h-5 min-w-5 place-items-center rounded-full bg-[#f5831a] px-1.5 text-[12px] font-bold leading-none text-white">3</span>
+              <span th:if="${t[4] == '0'}" class="h-5"></span>
+            </span>
+          </a>
+        </div>
+        <div data-empty hidden class="py-14 text-center">
+          <p class="text-[15px] font-semibold text-[#555]" data-empty-text>일치하는 채팅이 없습니다</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/chat.js}"></script></th:block>
+</body>
+</html>

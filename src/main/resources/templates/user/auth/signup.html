@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--/* SCR-U 회원가입 본인인증 정보 (G-A07, G-A10)
+  state: (기본) 미입력 | filled (이름·번호 입력 + 개인정보 수집 동의 완료)
+  /signup?terms=agreed : 개인정보 수집 안내(G-A08)에서 '내용을 확인했어요' 후 복귀
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='회원가입', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/auth.css}">
+</head>
+<body>
+<div class="app-shell auth-shell"
+     th:with="state=${param.state != null ? param.state[0] : (state ?: '')},
+              filled=${state == 'filled'},
+              agreed=${filled or (param.terms != null and param.terms[0] == 'agreed')}">
+  <div class="screen form-page auth-form-page" data-signup th:attr="data-agreed=${agreed}">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/onboarding})}"></a>
+    </div>
+    <div class="form-content">
+      <div class="signup-copy">본인인증을 위해<br>이름과 전화번호를 입력해주세요.</div>
+      <div class="field-wrap">
+        <label class="field-label" for="signupName">이름</label>
+        <input class="field" id="signupName" type="text" name="name" autocomplete="name"
+               placeholder="이름을 입력해주세요." data-name-input th:value="${filled} ? '김무브' : ''">
+      </div>
+      <div class="field-wrap">
+        <label class="field-label" for="signupPhone">휴대폰 번호</label>
+        <input class="field" id="signupPhone" type="tel" inputmode="tel" name="phone" autocomplete="tel" maxlength="13"
+               placeholder="휴대폰 번호를 입력해주세요." data-phone-input th:value="${filled} ? '010-1234-5678' : ''">
+      </div>
+
+      <div class="signup-bottom">
+        <div class="terms-row">
+          <span data-terms-check th:classappend="${agreed} ? 'terms-checked'"><svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5.2 4.1 7.2 8 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <a class="action terms-link" th:href="@{/signup/terms}"><u>본인인증을 위한 개인정보 수집</u></a>
+          <a class="action terms-arrow" th:href="@{/signup/terms}" aria-label="개인정보 수집 내용 보기">
+            <img alt="" th:src="@{/images/user/ce2ac.svg}">
+          </a>
+        </div>
+        <a class="action form-submit next-button" th:href="@{/signup/verify}" data-signup-submit
+           th:classappend="${filled} ? '' : 'is-disabled'" th:attr="aria-disabled=${!filled}">다음</a>
+      </div>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/auth.js}"></script>
+</body>
+</html>

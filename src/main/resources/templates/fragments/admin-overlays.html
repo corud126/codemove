@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<body>
+<!--/* SCR-A-017 전체 메뉴 · SCR-A-018 메뉴 검색 · SCR-A-019 알림 패널(+ 상단 팝업 알림)
+  각 레이어는 hidden 으로 시작하고, 헤더/하단 탭의 data-open 으로 열린다 (전체 메뉴는 하단 탭 '전체'의 화면이라 닫기 버튼 없음).
+  상태 확인용 (어느 관리자 화면에서나) ?overlay=
+    menu                             전체 메뉴 (하단 탭 '전체' 화면)
+    search | search-initial | search-query | search-empty   메뉴 검색 / 초성 검색(ㅎㅇ) / 검색어(예약) / 결과 없음
+    notify | notify-unread | notify-read | notify-empty   알림 패널 / 안 읽음 탭 / 모두 읽음 후 / 최근 30일 알림 없음
+    toast                            A 상단 팝업 알림
+  상단 팝업은 화면 JS에서 window.AdminToast.show({title, message, href}) 로 띄운다. */-->
+<th:block th:fragment="overlays">
+
+  <!--/* 메뉴 목록 (전체 메뉴·메뉴 검색 공용): 구역|이름|아이콘|주소 — 검색에만 쓰는 항목은 구역 '-' */-->
+  <!--/* 아이콘: images/admin/menu-icons.svg (색 아이콘 28px, #m-이름) — 하단 탭 선 아이콘과 겹치지 않게 */-->
+  <th:block th:with="menus=${ {'견적|견적 관리|estimate|/admin/estimates', '견적|견적서 등록|estimateNew|/admin/estimates/new',
+                               '예약·일정|예약 관리|reservation|/admin/reservations', '예약·일정|예약 일정|schedule|/admin/schedule', '예약·일정|일정 관리|scheduleManage|/admin/schedule/manage',
+                               '고객|채팅|chat|/admin/chats', '고객|리뷰 관리|review|/admin/reviews', '고객|회원 관리|members|/admin/members',
+                               '설정|알림 관리|notification|/admin/notifications', '설정|채팅 설정|chatSettings|/admin/chats/settings',
+                               '-|채팅 시작 화면|chatSettings|/admin/chats/entry', '-|챗봇 답변 관리|chatSettings|/admin/chats/answers', '-|자주 쓰는 답변|chatSettings|/admin/chats/replies',
+                               '-|홈|home|/admin', '-|비밀번호 변경|password|/admin/password'} }">
+
+  <!--/* SCR-A-017 전체 메뉴 — 하단 탭 '전체'의 화면. 헤더·하단 탭은 그대로, 내용 영역만 덮는다 (닫기 버튼 없음) */-->
+  <div id="allMenu" hidden
+       class="absolute inset-x-0 bottom-0 top-[var(--hdr)] z-[25] overflow-y-auto bg-[#f7f8f6] px-4 pb-[calc(var(--nav)+24px)] pt-5">
+    <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">전체</h2>
+
+    <!--/* 메뉴 검색 진입 — 입력칸 모양(밑줄), 누르면 메뉴 검색 화면 */-->
+    <button type="button" data-open="#globalSearch"
+            class="relative mt-4 flex h-11 w-full items-center border-b border-[#d9dcd8] pl-8 text-left text-[15px] text-[#b0b4b1]">
+      <svg class="icon pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+      메뉴 검색
+    </button>
+
+    <!--/* 계정: 관리자 이름 · 사번 — 지금은 더미. TODO 로그인 세션의 TBL_ADMIN.ADMIN_NAME / LOGIN_ID 로 표시 */-->
+    <section class="mt-5 flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+      <!--/* 임시 프로필 그림 (사진 기능 없음 · 메뉴 아이콘과 같은 색 톤) */-->
+      <svg class="h-12 w-12 shrink-0" viewBox="0 0 48 48" aria-hidden="true">
+        <defs><clipPath id="adminAvatar"><circle cx="24" cy="24" r="24"/></clipPath></defs>
+        <g clip-path="url(#adminAvatar)">
+          <rect width="48" height="48" fill="#e3efe4"/>
+          <path d="M8 50c0-10 7-16 16-16s16 6 16 16Z" fill="#346538"/>
+          <path d="M19 34h10l-5 6Z" fill="#fff"/>
+          <rect x="20.5" y="27" width="7" height="7" rx="3" fill="#f0c9a6"/>
+          <circle cx="24" cy="20" r="8.5" fill="#f6d5b8"/>
+          <path d="M15.4 19.5c-.3-6 3.6-9.7 8.8-9.7 5.4 0 9 3.6 8.4 9.4-1.6-2.8-4.2-4.3-7.7-4.3-3.8 0-7 1.6-9.5 4.6Z" fill="#3a3330"/>
+          <circle cx="21" cy="21" r="1" fill="#3a3330"/><circle cx="27" cy="21" r="1" fill="#3a3330"/>
+          <path d="M21.8 24.6c1.4 1 3 1 4.4 0" stroke="#d98b6a" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <p class="min-w-0 flex-1 truncate">
+        <strong class="text-[17px] font-bold text-[#1a1a1a]">김관리</strong>
+        <span class="ml-1 text-[14px] text-[#888]">· A001</span>
+      </p>
+      <a th:href="@{/admin/password}" class="flex shrink-0 items-center text-[13px] font-medium text-[#555]">
+        비밀번호 변경<svg class="icon text-[#b0b4b1]" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+      </a>
+    </section>
+
+    <!--/* 구역별 메뉴 — 구역 제목 + 흰 카드 하나, 줄 높이 52px */-->
+    <section th:each="sec : ${ {'견적', '예약·일정', '고객', '설정'} }" class="mt-6">
+      <h3 class="px-1 pb-2 text-[13px] font-semibold text-[#888]" th:text="${sec}">견적</h3>
+      <div class="overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+        <a th:each="m : ${menus}" th:if="${#strings.startsWith(m, sec + '|')}" th:with="t=${#strings.arraySplit(m, '|')}" th:href="@{${t[3]}}"
+           class="flex h-[52px] items-center gap-3 border-b border-[#eef0ee] px-5 last:border-none active:bg-[#f7f8f6]">
+          <svg class="shrink-0" width="28" height="28" aria-hidden="true"><use th:href="@{/images/admin/menu-icons.svg} + '#m-' + ${t[2]}"/></svg>
+          <span class="flex-1 text-[16px] font-medium text-[#292929]" th:text="${t[1]}">견적 관리</span>
+          <svg class="icon text-[#b0b4b1]" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <div class="mt-8 text-center">
+      <a th:href="@{/admin/logout}" class="inline-flex h-11 items-center px-4 text-[14px] text-[#888]">로그아웃</a>
+      <p class="text-[12px] text-[#b0b4b1]">v1.0.0</p>
+    </div>
+  </div>
+
+  <!--/* SCR-A-018 메뉴 검색 — 헤더까지 덮는 화면, 하단 탭은 위에 그대로 (z-26 < 하단 탭 z-30)
+    검색어 없음 = 최근 검색(칩, 전체 삭제) / 입력 = 이름 또는 초성(ㅎㅇ) 검색, 일치 부분 초록 / 결과 없음 */-->
+  <div id="globalSearch" data-layer hidden
+       class="absolute inset-0 z-[26] flex flex-col bg-white pt-[var(--safe-top)]">
+    <div class="flex h-[var(--header-h,68px)] shrink-0 items-center gap-1 pl-3 pr-5">
+      <button type="button" aria-label="뒤로" data-close
+              class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#292929] hover:bg-[#f2f3f1]">
+        <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronLeft'"/></svg>
+      </button>
+      <label class="relative flex-1">
+        <span class="sr-only">메뉴 검색</span>
+        <svg class="icon pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+        <input id="globalSearchInput" type="search" autocomplete="off" placeholder="메뉴 검색"
+               class="h-11 w-full border-b border-[#d9dcd8] bg-transparent pl-8 pr-2 text-[16px] text-[#1a1a1a] outline-none placeholder:text-[#b0b4b1] focus:border-[#346538] [&::-webkit-search-cancel-button]:hidden">
+      </label>
+    </div>
+    <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(var(--nav)+24px)]">
+      <!--/* 최근 검색 (검색어 없을 때, 기록이 없으면 숨김) */-->
+      <section id="globalSearchRecent" hidden class="pt-5">
+        <div class="flex items-center justify-between">
+          <h3 class="text-[13px] font-semibold text-[#888]">최근 검색</h3>
+          <button type="button" id="globalSearchRecentClear" class="h-8 text-[13px] text-[#888]">전체 삭제</button>
+        </div>
+        <!--/* 칩은 overlays.js 가 localStorage(adminMenuRecent, 최근 5개)로 채운다 */-->
+        <div id="globalSearchRecentList" class="mt-2 flex flex-wrap gap-2"></div>
+      </section>
+      <!--/* 결과 */-->
+      <div id="globalSearchResults" hidden class="pt-2">
+        <a th:each="m : ${menus}" th:with="t=${#strings.arraySplit(m, '|')}" th:href="@{${t[3]}}" th:attr="data-search-item=${t[1]}"
+           class="flex h-[52px] items-center gap-3 border-b border-[#eef0ee] last:border-none active:bg-[#f7f8f6]">
+          <svg class="shrink-0" width="28" height="28" aria-hidden="true"><use th:href="@{/images/admin/menu-icons.svg} + '#m-' + ${t[2]}"/></svg>
+          <span class="flex-1 text-[16px] font-medium text-[#292929]" data-search-label th:text="${t[1]}">견적 관리</span>
+          <svg class="icon text-[#b0b4b1]" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+        </a>
+      </div>
+      <div id="globalSearchEmpty" hidden class="py-20 text-center">
+        <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#f2f3f1] text-[#a3a8a4]">
+          <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+        </span>
+        <p class="mt-3 text-[15px] font-semibold text-[#555]">검색 결과가 없습니다.</p>
+      </div>
+    </div>
+  </div>
+  </th:block>
+
+  <!--/* SCR-A-019 알림 패널 — 헤더까지 덮는 페이지(오른쪽에서 밀려 들어옴), 하단 탭은 위에 그대로 보인다 (z-25 < 하단 탭 z-30)
+    TBL_NOTIFICATION 중 RECEIVER_TYPE = '02'(관리자 수신)만, 최근 30일, CREATED_AT 내림차순 → 오늘 / 어제 / 이전 으로 묶음
+    분류 = NTF_DETAIL 이름(code-data.sql) · 내용 = NTF_CONTENT · 시간 = CREATED_AT(오늘: 상대 시간, 어제: 시각, 이전: 날짜)
+    탭: 전체 / 안 읽음(IS_READ = 'N') · 행 클릭 = IS_READ = 'Y' 처리 후 LINK_URL 이동 · [모두 읽음] = 관리자 수신 알림 전체 IS_READ = 'Y' (관리자 공용)
+    IS_IMPORTANT = 'Y' → 아이콘 칸·분류 주황 + 왼쪽 얇은 주황 선 · 안 읽음(data-unread) = 주황 점 + 진한 글자, 읽음 = 회색 글자 */-->
+  <div id="notificationPanel" data-layer hidden role="dialog" aria-modal="true" aria-labelledby="notificationTitle"
+       class="absolute inset-0 z-[25] flex flex-col bg-white pt-[var(--safe-top)] transition-transform duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-x-full">
+    <!--/* 머리줄 높이 = 앱 헤더(--header-h)와 같게 · 안전 영역(상태바·노치)은 위 pt-[var(--safe-top)] · 양옆은 둥근 화면 모서리에 걸리지 않게 안쪽으로 */-->
+    <header class="relative flex h-[var(--header-h,68px)] shrink-0 items-center justify-center px-4">
+      <button type="button" aria-label="뒤로" data-close
+              class="absolute left-3 grid h-11 w-11 place-items-center rounded-full text-[#292929] hover:bg-[#f2f3f1]">
+        <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronLeft'"/></svg>
+      </button>
+      <h2 id="notificationTitle" class="text-[17px] font-bold text-[#1a1a1a]">알림</h2>
+      <button type="button" id="notificationReadAll"
+              class="absolute right-4 h-11 rounded-[12px] px-2 text-[14px] font-semibold text-[#346538] disabled:text-[#b0b4b1]">모두 읽음</button>
+    </header>
+    <!--/* 글자 탭 — 선택: 초록 굵게 + 밑줄 2px, 나머지 회색 (견적 확인 탭과 같은 모양) */-->
+    <div class="flex shrink-0 gap-6 border-b border-[#e5e7eb] px-5" role="tablist">
+      <button th:each="tb : ${ {'all|전체', 'unread|안 읽음'} }" th:with="t=${#strings.arraySplit(tb, '|')}"
+              type="button" role="tab" th:attr="data-notification-tab=${t[0]}" th:classappend="${t[0] == 'all'} ? 'is-active'"
+              class="relative h-12 text-[15px] font-semibold text-[#888] after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 [&.is-active]:font-bold [&.is-active]:text-[#346538] [&.is-active]:after:bg-[#346538]">
+        <span th:text="${t[1]}">전체</span><span th:if="${t[0] == 'unread'}" id="notificationUnreadCount" class="ml-1">4</span>
+      </button>
+    </div>
+    <div class="min-h-0 flex-1 overflow-y-auto pb-[calc(var(--nav)+24px)]">
+      <!--/* 더미: NTF_DETAIL 이름|NTF_CONTENT|CREATED_AT 표시|아이콘|LINK_URL|IS_IMPORTANT|IS_READ */-->
+      <section th:each="g : ${ {'오늘', '어제', '이전'} }" data-notification-group
+               th:with="items=${g == '오늘'
+                 ? {'채팅 대기|강민주 고객님이 상담원 연결을 요청했습니다.|10분 전|chat|/admin/chats/1011|Y|N',
+                    '오늘의 일정|오늘 이서준 고객님의 이사가 있습니다.|2시간 전|truck|/admin/schedule|N|N',
+                    '계약금 결제|최지우 고객님이 계약금 결제를 완료했습니다.|3시간 전|card|/admin/reservations|N|N',
+                    '예약 확정|최지우 고객님이 견적을 확정해 예약이 생성되었습니다.|5시간 전|calendarCheck|/admin/reservations|N|N'}
+                 : (g == '어제'
+                 ? {'견적 접수|홍길동 고객님의 견적 요청이 접수되었습니다.|오후 4:20|document|/admin/estimates|N|Y',
+                    '이사 D-3|김명품 고객님의 이사가 3일 남았습니다.|오전 9:00|clock|/admin/reservations|N|Y'}
+                 : {'예약 취소|박철수 고객님이 11월 14일 이사 예약을 취소했습니다.|10.26|x|/admin/reservations|N|Y',
+                    '신규 가입|윤서연 고객님(010-2345-4412)이 회원으로 가입했습니다.|10.22|user|/admin/members|N|Y',
+                    '견적 접수|정하늘 고객님의 견적 요청이 접수되었습니다.|10.19|document|/admin/estimates|N|Y'})}">
+        <h3 class="px-5 pb-1 pt-5 text-[13px] font-semibold text-[#888]" th:text="${g}">오늘</h3>
+        <a th:each="n : ${items}" th:with="t=${#strings.arraySplit(n, '|')}, important=${t[5] == 'Y'}, unread=${t[6] == 'N'}"
+           th:href="@{${t[4]}}" th:attr="data-unread=${unread} ? 'Y' : null" data-notification
+           class="group relative flex items-start gap-3 border-b border-[#eef0ee] px-5 py-3.5 last:border-none active:bg-[#f7f8f6]">
+          <span th:if="${important}" class="absolute inset-y-2.5 left-0 w-[3px] rounded-r-full bg-[#f5831a]"></span>
+          <!--/* 왼쪽 아이콘 칸 (연회색 원, 중요 알림만 연주황) · 오른쪽에 분류·시간 / 내용 두 줄 */-->
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                th:classappend="${important} ? 'bg-[#fff3e6] text-[#d9701a]' : 'bg-[#f2f3f1] text-[#7d827e]'">
+            <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-' + ${t[3]}"/></svg>
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="flex items-center justify-between gap-2">
+              <strong class="truncate text-[15px] font-medium group-data-unread:font-semibold"
+                      th:classappend="${important} ? 'text-[#d9701a]' : 'text-[#888] group-data-unread:text-[#292929]'" th:text="${t[0]}">채팅 대기</strong>
+              <span class="flex shrink-0 items-center gap-1.5 text-[13px] text-[#888]">
+                <span th:text="${t[2]}">10분 전</span>
+                <span class="hidden h-2 w-2 rounded-full bg-[#f5831a] group-data-unread:block" aria-label="안 읽음"></span>
+              </span>
+            </span>
+            <span class="mt-0.5 line-clamp-2 text-[14px] leading-[1.5] text-[#888] group-data-unread:text-[#555]" th:text="${t[1]}">알림 내용</span>
+          </span>
+        </a>
+      </section>
+      <div id="notificationEmpty" hidden class="py-20 text-center">
+        <span class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#f2f3f1] text-[#a3a8a4]">
+          <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-bell'"/></svg>
+        </span>
+        <p id="notificationEmptyText" class="mt-3 text-[15px] font-semibold text-[#555]">최근 30일 알림이 없습니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <!--/* SCR-A-019 A 상단 팝업 알림 — 클릭 시 관련 화면, 오른쪽으로 밀면 닫힘, 10초 후 자동 닫힘. 일반 푸시 알림 배너 형태(앱 아이콘 · 제목 · '지금' · 내용, 반투명 카드) */-->
+  <div id="adminToast" hidden class="absolute inset-x-0 top-0 z-[300] flex justify-center px-2.5 pt-[calc(8px+var(--safe-top))]">
+    <a href="#" data-toast-card
+       class="block w-full max-w-[410px] touch-pan-y select-none rounded-[22px] bg-white/85 px-3.5 py-3 text-left shadow-[0_8px_30px_rgba(0,0,0,.14)] ring-1 ring-black/5 backdrop-blur-xl [animation:slideDown_.35s_cubic-bezier(0.22,1,0.36,1)]">
+      <div class="flex gap-3">
+        <!--/* 앱 아이콘 (헤더 로고와 같은 집 마크) */-->
+        <span class="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[10px] bg-[#346538]">
+          <svg class="h-[22px] w-[22px]" viewBox="0 0 132 130" aria-hidden="true">
+            <path fill="#fff" d="M54 5a18 18 0 0 1 24 0l44 38a29 29 0 0 1 10 22v42a23 23 0 0 1-23 23H23A23 23 0 0 1 0 107V65a29 29 0 0 1 10-22L54 5Z"/>
+            <path fill="none" stroke="#346538" stroke-width="12" stroke-linecap="round" d="M35 80c17 16 45 16 62 0"/>
+          </svg>
+        </span>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-baseline justify-between gap-2">
+            <p class="truncate text-[15px] font-semibold text-[#1a1a1a]" data-toast-title>견적서 등록 완료</p>
+            <span class="shrink-0 text-[13px] text-[#8a8f8b]" data-toast-time>지금</span>
+          </div>
+          <p class="mt-0.5 line-clamp-2 text-[14px] leading-[1.4] text-[#3d423e]" data-toast-message>홍길동 고객님의 견적서가 등록되었습니다.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <script th:src="@{/js/admin/overlays.js}" defer></script>
+</th:block>
+</body>
+</html>

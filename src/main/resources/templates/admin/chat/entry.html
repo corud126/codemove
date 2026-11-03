@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<!--/* SCR-A-009 채팅 시작 화면 — 디자인 기준: docs/ui/관리자디자인기준.md (실제 화면: admin/chat/entry.html) · 뒤로 = 채팅 설정
+  모양: 위 = 미리 보기 편집기(고객 채팅 첫 화면 모양) · 아래 = 고른 것의 편집 칸
+        미리 보기: 인사말 · 버튼을 누르면 고름(초록 테두리) → 아래 편집 칸이 그것으로 바뀜 · 버튼을 꾹 누르거나 왼쪽 손잡이를 잡고 끌어서 순서(SORT_ORDER)
+                   [+ 퀵메뉴 추가](점선) → 주제 고르기 → 버튼이 붙고 그 버튼이 골라짐 · [상담사 연결]은 고정 버튼 · 숨긴 버튼 = 흐린 점선 + '숨김'
+        편집 칸: 인사말 → 인사말 입력칸 / 버튼 → 버튼 글자(MENU_NAME) · 연결된 주제(TOPIC_ID, 눌러서 바꾸기) · 숨기기/보이기(IS_ACTIVE) | 삭제
+        아래 고정 [저장] 한 번 · 최대 5개(차면 편집기 아래 회색 한 줄)
+  state: (기본) 인사말 고름 · button(첫 버튼 고름) · menu(주제 고르기) · topic(연결된 주제 바꾸기) · added(주제 고른 직후) · drag(꾹 눌러 끄는 중) · delete(삭제 확인) · full(5개 · 숨긴 버튼) · saved(저장 후)
+  ERD 수정안 Q20: 최대 5개, TBL_QUICK_MENU.MENU_NAME(버튼 글자, 50자), TOPIC_ID 선택, [상담사 연결]은 고정 버튼 */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='채팅 시작 화면', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content"><th:block th:with="state=${param.state != null ? param.state[0] : ''}, ic=@{/images/admin/icons-v2.svg},
+    boxCls='block w-full rounded-[12px] bg-[#f5f6f4] px-3.5 text-[16px] text-[#1a1a1a] outline-none transition-colors placeholder:text-[#a9aea9] focus:bg-white focus:ring-2 focus:ring-inset focus:ring-[#346538]',
+    labelCls='mb-2 block text-[15px] font-semibold text-[#292929]'">
+  <div class="relative flex h-full min-h-0 flex-col overflow-hidden" id="chatEntry" th:attr="data-state=${state}">
+    <!--/* 1행: 뒤로(→ 채팅 설정) · 페이지 제목 */-->
+    <div class="relative z-20 box-content flex h-9 shrink-0 items-center gap-1 bg-[#f7f8f6] px-4 pb-3 pt-5 transition-shadow" data-scroll-head>
+      <a th:href="@{/admin/chats/settings}" aria-label="채팅 설정으로 돌아가기"
+         class="-ml-2 grid h-9 w-9 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+        <svg class="icon" width="24" height="24"><use th:href="${ic} + '#i-chevronLeft'"/></svg>
+      </a>
+      <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">채팅 시작 화면</h2>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-32 pt-2" data-entry-body data-scroll-body>
+      <!--/* 미리 보기 편집기 — 누르면 고름 · 끌어서 순서 */-->
+      <div class="rounded-[20px] bg-[#e7ebe6] p-4">
+        <div class="flex items-center gap-2.5 px-1">
+          <span class="h-8 w-8 overflow-hidden rounded-[9px] bg-[#e7f1e8]"><img alt="" class="h-full w-full object-cover" th:src="@{/images/user/mover-assistant-3d.svg}"></span>
+          <strong class="text-[13px] font-semibold text-[#777]">명품 이사 도우미</strong>
+        </div>
+        <div class="mt-2.5 rounded-[4px_20px_20px_20px] bg-white p-3">
+          <button type="button" data-pick="greeting" aria-label="인사말 고르기"
+                  class="block w-full whitespace-pre-line rounded-[12px] px-2.5 py-2 text-left text-[15px] leading-relaxed text-[#444] ring-inset ring-[#346538] aria-pressed:ring-2" data-pv-greeting></button>
+          <div class="relative mt-3 flex flex-col gap-1.5" data-menu-rows></div>
+          <button type="button" data-menu-add class="mt-1.5 flex min-h-11 w-full items-center justify-center gap-1 rounded-[12px] border border-dashed border-[#b9d0bc] text-[14px] font-semibold text-[#346538] data-[full]:hidden">
+            <svg class="icon" width="17" height="17"><use th:href="${ic} + '#i-plus'"/></svg>퀵메뉴 추가
+          </button>
+          <span class="mt-1.5 flex min-h-11 items-center justify-center rounded-[12px] bg-[#fbeedf] text-[14px] font-semibold text-[#b8601d]">상담사 연결</span>
+        </div>
+      </div>
+      <p data-full-note hidden class="mt-2.5 px-1 text-[13px] text-[#9a9f9b]">퀵메뉴는 5개까지 넣을 수 있어요</p>
+
+      <!--/* 편집 칸 — 위에서 고른 것 */-->
+      <section class="mt-8" data-edit="greeting">
+        <h3 class="px-1 text-[17px] font-bold text-[#1a1a1a]">인사말</h3>
+        <!--/* 칸이 하나뿐이라 바깥 카드 없이 입력칸 자체를 카드 모양으로 */-->
+        <span class="group/f relative mt-3 block">
+          <textarea data-greeting data-grow maxlength="500" rows="2" aria-label="인사말" placeholder="예: 안녕하세요! 궁금한 내용을 편하게 물어보세요."
+                    class="block min-h-14 w-full resize-none overflow-hidden rounded-[20px] bg-white/90 px-5 pb-7 pt-4 text-[16px] leading-6 text-[#1a1a1a] outline-none ring-1 ring-inset ring-[#e5e8e4] transition-colors placeholder:text-[#a9aea9] focus:bg-white focus:ring-2 focus:ring-[#346538]">안녕하세요, 명품익스프레스입니다.
+궁금하신 내용을 선택해주세요.</textarea>
+          <span class="pointer-events-none absolute bottom-2 right-4 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-greeting-count>0/500</span>
+        </span>
+      </section>
+      <section class="mt-8" data-edit="menu" hidden>
+        <h3 class="px-1 text-[17px] font-bold text-[#1a1a1a]">퀵메뉴 버튼</h3>
+        <div class="mt-3 rounded-[20px] bg-white/90 p-5 ring-1 ring-inset ring-[#e5e8e4]">
+          <label class="block">
+            <span th:class="${labelCls}">버튼 글자</span>
+            <span class="group/f relative block">
+              <input type="text" data-menu-input maxlength="50" autocomplete="off" th:class="${boxCls} + ' h-12 pr-16'">
+              <span class="pointer-events-none absolute bottom-1.5 right-3 hidden text-[12px] tabular-nums text-[#b0b4b1] group-focus-within/f:block" data-menu-count>0/50</span>
+            </span>
+          </label>
+          <div class="mt-5">
+            <span th:class="${labelCls}">연결된 주제</span>
+            <button type="button" data-topic-change class="flex h-12 w-full items-center justify-between rounded-[12px] bg-[#f5f6f4] px-3.5 text-left text-[16px] text-[#1a1a1a]">
+              <span data-topic-name></span><svg class="icon text-[#888]" width="18" height="18"><use th:href="${ic} + '#i-chevronRight'"/></svg>
+            </button>
+          </div>
+          <div class="mt-4 flex items-center justify-end gap-1 text-[15px] font-semibold">
+            <button type="button" data-menu-active class="h-9 px-2 text-[#555]">숨기기</button>
+            <span class="h-3.5 w-px bg-[#dcdfdc]"></span>
+            <button type="button" data-menu-delete class="-mr-2 h-9 px-2 text-[#d8663d]">삭제</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!--/* 안내 알약 · 저장 — 아래 고정 (하단 탭에서 20px) */-->
+    <div data-pill hidden class="absolute bottom-[96px] left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-[#346538] px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_24px_rgba(26,26,26,.2)] [animation:slideUp_.2s_ease-out]"></div>
+    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#f7f8f6] from-70% to-transparent px-4 pb-5 pt-6">
+      <button type="button" data-save class="btn-primary" disabled>저장</button>
+    </div>
+
+    <!--/* 주제 고르기 — 퀵메뉴 추가 · 연결된 주제 바꾸기 */-->
+    <div id="menuLayer" data-layer hidden class="absolute inset-0 z-30 flex flex-col bg-[#f7f8f6]">
+      <div class="relative z-20 box-content flex h-9 shrink-0 items-center gap-1 bg-[#f7f8f6] px-4 pb-3 pt-5 transition-shadow" data-scroll-head>
+        <button type="button" data-close aria-label="뒤로" class="-ml-2 grid h-9 w-9 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee]">
+          <svg class="icon" width="24" height="24"><use th:href="${ic} + '#i-chevronLeft'"/></svg>
+        </button>
+        <h3 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">주제 고르기</h3>
+      </div>
+      <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-2" data-scroll-body>
+        <div class="overflow-hidden rounded-[20px] bg-white" data-menu-candidates></div>
+      </div>
+    </div>
+  </div>
+
+  <!--/* 퀵메뉴 삭제 확인 */-->
+  <div id="deleteModal" data-layer hidden class="absolute inset-0 z-50 grid place-items-center bg-[#1a1a1a]/40 p-6">
+    <div role="alertdialog" aria-modal="true" class="w-full rounded-[20px] bg-white p-6 text-center shadow-[0_18px_50px_rgba(26,26,26,.18)] [animation:slideUp_.2s_ease-out]">
+      <p class="text-[18px] font-bold text-[#1a1a1a]">정말 삭제하시겠습니까?</p>
+      <p class="mt-2 text-[14px] text-[#888]">삭제된 데이터는 복구할 수 없습니다.</p>
+      <div class="mt-6 grid grid-cols-2 gap-2">
+        <button type="button" data-close class="h-12 rounded-[14px] bg-[#f0f1ef] text-[15px] font-semibold text-[#555]">취소</button>
+        <button type="button" data-delete-confirm class="h-12 rounded-[14px] bg-[#d8663d] text-[15px] font-semibold text-white">삭제</button>
+      </div>
+    </div>
+  </div>
+</th:block></th:block>
+<th:block th:fragment="scripts">
+  <script>
+    // 머리줄: 아래 내용이 스크롤되면 얇은 구분선 (머리는 z-20 · 바탕색으로 내용을 가림)
+    document.querySelectorAll("[data-scroll-body]").forEach((sb) => { const head = sb.previousElementSibling; sb.addEventListener("scroll", () => head.classList.toggle("shadow-[0_1px_0_#e5e7eb]", sb.scrollTop > 0)); });
+  </script>
+  <script th:inline="javascript">
+    (function () {
+      const root = document.getElementById('chatEntry');
+      const state = root.dataset.state;
+      const SPRITE = /*[[@{/images/admin/icons-v2.svg}]]*/ '/images/admin/icons-v2.svg';
+      const $ = (s, r = document) => r.querySelector(s);
+      const icon = (n, z, cls = '') => `<svg class="icon ${cls}" width="${z}" height="${z}"><use href="${SPRITE}#i-${n}"/></svg>`;
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+      // 답변 주제(SCR-A-010 TBL_CHATBOT_TOPIC) = 퀵메뉴 후보
+      const TOPICS = [
+        { id: 1, title: '이사 견적', intro: '이사 비용과 방문 견적 과정을 안내합니다.' },
+        { id: 2, title: '예약 방법', intro: '상담부터 예약 확정까지의 절차를 안내합니다.' },
+        { id: 3, title: '포장 이사', intro: '포장 서비스 범위와 준비 사항을 확인합니다.' },
+        { id: 4, title: '사다리차 이용', intro: '사다리차 필요 여부와 추가 비용을 안내합니다.', inactive: true },
+        { id: 5, title: '내 예약 확인', intro: '예약 일정과 진행 상태를 알려 드립니다.' },
+        { id: 6, title: '내 견적 확인', intro: '견적 진행 상태를 알려 드립니다.' },
+        { id: 7, title: '영상 분석 견적', intro: '영상으로 짐 부피를 분석하는 견적을 안내합니다.' },
+        { id: 8, title: '이사 준비', intro: '이사 전에 챙길 준비 사항을 안내합니다.' },
+        { id: 9, title: '결제 · 환불', intro: '계약금 결제와 취소·환불 기준을 안내합니다.' },
+      ];
+      const MAX = 5;
+      const topic = (id) => TOPICS.find((t) => t.id === id);
+      // 퀵메뉴 (TBL_QUICK_MENU): TOPIC_ID · MENU_NAME · SORT_ORDER(배열 순서) · IS_ACTIVE — 고객 채팅 첫 화면의 5개와 같은 글자·순서
+      let menus = [
+        { id: 1, topicId: 6, label: '이사 견적 알아보기', active: true },
+        { id: 2, topicId: 5, label: '예약 및 일정 확인', active: true },
+        { id: 3, topicId: 7, label: '영상 분석 견적', active: true },
+        { id: 4, topicId: 8, label: '이사 준비 체크리스트', active: true },
+        { id: 5, topicId: 9, label: '결제 및 환불 문의', active: true },
+      ];
+      if (state === 'full') menus[3] = { ...menus[3], active: false };   // 검토용: 숨긴 버튼
+      if (state === 'menu' || state === 'added') menus = menus.slice(0, 4);   // 검토용: 빈자리가 있어야 추가 가능
+      let selected = 'greeting';   // 'greeting' | 퀵메뉴 id
+
+      const rows = $('[data-menu-rows]', root);
+      const addBtn = $('[data-menu-add]', root);
+      const greeting = $('[data-greeting]', root);
+      const menuInput = $('[data-menu-input]', root);
+      const saveBtn = $('[data-save]', root);
+      const grow = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 1}px`; };
+      const snapshot = () => JSON.stringify({ g: greeting.value.trim(), menus });
+      const current = () => menus.find((m) => m.id === selected);
+      let original = '';
+
+      // 미리 보기 버튼: 왼쪽 손잡이 · 가운데 버튼 글자 · 고르면 초록 테두리 · 숨긴 버튼은 흐린 점선 + '숨김'
+      function button(m) {
+        const look = m.active ? 'bg-[#f5f6f3] text-[#333]' : 'border border-dashed border-[#d5d8d5] text-[#a9aea9]';
+        const on = m.id === selected ? 'ring-2 ring-inset ring-[#346538]' : '';
+        return `<div role="button" tabindex="0" data-menu="${m.id}" aria-pressed="${m.id === selected}" aria-label="${esc(m.label)} 고르기"
+                     class="relative flex min-h-11 cursor-pointer select-none items-center justify-center rounded-[12px] px-11 text-center text-[14px] font-semibold [-webkit-touch-callout:none] ${look} ${on}">
+          <span data-grip aria-hidden="true" class="absolute left-0.5 top-1/2 grid h-10 w-9 -translate-y-1/2 cursor-grab touch-none place-items-center text-[#b0b4b1]">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="4.5" cy="3" r="1.3"/><circle cx="9.5" cy="3" r="1.3"/><circle cx="4.5" cy="7" r="1.3"/><circle cx="9.5" cy="7" r="1.3"/><circle cx="4.5" cy="11" r="1.3"/><circle cx="9.5" cy="11" r="1.3"/></svg></span>
+          <span class="truncate">${esc(m.label) || '&nbsp;'}</span>
+          ${m.active ? '' : '<span class="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[#9a9f9b]">숨김</span>'}
+        </div>`;
+      }
+      function render() {
+        if (selected !== 'greeting' && !current()) selected = 'greeting';
+        rows.innerHTML = menus.map(button).join('');
+        rows.hidden = !menus.length;
+        addBtn.toggleAttribute('data-full', menus.length >= MAX);
+        $('[data-full-note]', root).hidden = menus.length < MAX;
+        const pg = $('[data-pv-greeting]', root);
+        pg.textContent = greeting.value.trim() || '인사말을 입력해 주세요';
+        pg.setAttribute('aria-pressed', String(selected === 'greeting'));
+        // 편집 칸
+        $('[data-edit="greeting"]', root).hidden = selected !== 'greeting';
+        $('[data-edit="menu"]', root).hidden = selected === 'greeting';
+        const m = current();
+        if (m) {
+          if (document.activeElement !== menuInput) menuInput.value = m.label;
+          $('[data-menu-count]', root).textContent = `${m.label.length}/50`;
+          $('[data-topic-name]', root).textContent = topic(m.topicId).title;
+          $('[data-menu-active]', root).textContent = m.active ? '숨기기' : '보이기';
+        }
+        $('[data-greeting-count]', root).textContent = `${greeting.value.length}/500`;
+        saveBtn.disabled = !greeting.value.trim() || menus.some((x) => !x.label.trim()) || snapshot() === original;
+      }
+      const select = (id) => { selected = id; render(); };
+
+      // 미리 보기에서 고르기
+      $('[data-pv-greeting]', root).addEventListener('click', () => select('greeting'));
+      rows.addEventListener('click', (e) => {
+        const row = e.target.closest('[data-menu]');
+        if (row && Date.now() - dropped > 300) select(Number(row.dataset.menu));
+      });
+
+      // 편집 칸
+      greeting.addEventListener('input', () => { grow(greeting); render(); });
+      menuInput.addEventListener('input', () => { menus = menus.map((m) => (m.id === selected ? { ...m, label: menuInput.value } : m)); render(); });
+      $('[data-menu-active]', root).addEventListener('click', () => { menus = menus.map((m) => (m.id === selected ? { ...m, active: !m.active } : m)); render(); });
+      const delModal = document.getElementById('deleteModal');
+      $('[data-menu-delete]', root).addEventListener('click', () => { delModal.hidden = false; });
+      $('[data-delete-confirm]', delModal).addEventListener('click', () => { menus = menus.filter((m) => m.id !== selected); delModal.hidden = true; selected = 'greeting'; render(); });
+
+      // 안내 알약 · 저장
+      const pill = $('[data-pill]', root);
+      let timer;
+      function showPill(msg) { pill.textContent = msg; pill.hidden = false; clearTimeout(timer); timer = setTimeout(() => { pill.hidden = true; }, 1800); }
+      saveBtn.addEventListener('click', () => { if (saveBtn.disabled) return; original = snapshot(); render(); showPill('저장되었습니다'); });
+
+      // 순서 바꾸기: 버튼을 꾹 누르면(0.4초) 들려서 위아래로 끌 수 있음 · 왼쪽 손잡이는 바로 끌기
+      let press = null, drag = null, dropped = 0;
+      const LIFT = ['z-10', 'scale-[1.03]', 'shadow-[0_8px_20px_rgba(26,26,26,.18)]', 'bg-white'];
+      function startDrag(row, y) {
+        navigator.vibrate?.(15);
+        row.classList.add(...LIFT);
+        drag = { row, y, top: row.offsetTop };
+      }
+      function moveDrag(y) {
+        const { row } = drag;
+        const prev = row.previousElementSibling, next = row.nextElementSibling;
+        const pos = drag.top + (y - drag.y) + row.offsetHeight / 2;   // 끌고 있는 버튼의 가운데
+        if (prev && pos < prev.offsetTop + prev.offsetHeight / 2) rows.insertBefore(row, prev);
+        else if (next && pos > next.offsetTop + next.offsetHeight / 2) rows.insertBefore(next, row);
+        row.style.transform = `translateY(${drag.top + (y - drag.y) - row.offsetTop}px)`;
+      }
+      function endDrag() {
+        const { row } = drag;
+        dropped = Date.now();   // 놓은 직후의 클릭은 '고르기'로 보지 않음
+        row.style.transform = '';
+        row.classList.remove(...LIFT);
+        const order = Array.from(rows.children).map((el) => Number(el.dataset.menu));
+        menus = order.map((id) => menus.find((m) => m.id === id));
+        drag = null;
+        render();
+      }
+      rows.addEventListener('pointerdown', (e) => {
+        const row = e.target.closest('[data-menu]');
+        if (!row || menus.length < 2) return;
+        if (e.target.closest('[data-grip]')) { e.preventDefault(); startDrag(row, e.clientY); return; }
+        press = { row, y: e.clientY, timer: setTimeout(() => { startDrag(row, press.y); press = null; }, 400) };
+      });
+      document.addEventListener('pointermove', (e) => {
+        if (press && Math.abs(e.clientY - press.y) > 8) { clearTimeout(press.timer); press = null; }   // 스크롤로 보고 취소
+        if (drag) moveDrag(e.clientY);
+      });
+      const release = () => { if (press) { clearTimeout(press.timer); press = null; } if (drag) endDrag(); };
+      document.addEventListener('pointerup', release);
+      document.addEventListener('pointercancel', release);
+      document.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });   // 끄는 동안 화면 스크롤 막기
+      rows.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      // 주제 고르기: 퀵메뉴 추가(새 버튼) · 연결된 주제 바꾸기(고른 버튼)
+      const menuLayer = document.getElementById('menuLayer');
+      const cands = $('[data-menu-candidates]', menuLayer);
+      let picking = 'add';
+      function openTopics(mode) {
+        picking = mode;
+        const mine = mode === 'change' ? current().topicId : null;
+        cands.innerHTML = TOPICS.map((t) => {
+          const used = t.id !== mine && menus.some((m) => m.topicId === t.id);
+          const off = used || t.inactive;   // 이미 넣은 주제 · 사용 안 함 주제는 고를 수 없음
+          return `<button type="button" data-pick-topic="${t.id}" ${off ? 'disabled' : ''} class="flex w-full items-center gap-3 border-b border-[#eef0ee] px-5 py-3.5 text-left last:border-none hover:bg-[#f7f8f6] disabled:hover:bg-transparent ${t.id === mine ? 'bg-[#eef4f0] hover:bg-[#eef4f0]' : ''}">
+            <span class="min-w-0 flex-1"><strong class="block truncate text-[16px] font-semibold ${t.id === mine ? 'text-[#346538]' : off ? 'text-[#b0b4b1]' : 'text-[#292929]'}">${esc(t.title)}</strong>
+              <span class="mt-0.5 block truncate text-[14px] ${off ? 'text-[#c4c8c5]' : 'text-[#888]'}">${esc(t.intro)}</span></span>
+            ${t.id === mine ? icon('check', 20, 'shrink-0 text-[#346538]') : off ? `<span class="shrink-0 text-[14px] text-[#b0b4b1]">${used ? '추가됨' : '사용 안 함'}</span>` : ''}</button>`;
+        }).join('');
+        menuLayer.hidden = false;
+      }
+      function pickTopic(topicId) {
+        menuLayer.hidden = true;
+        if (picking === 'change') { menus = menus.map((m) => (m.id === selected ? { ...m, topicId } : m)); render(); return; }
+        const id = Date.now();
+        menus.push({ id, topicId, label: topic(topicId).title, active: true });
+        select(id);
+        menuInput.focus(); menuInput.select();
+      }
+      addBtn.addEventListener('click', () => openTopics('add'));
+      $('[data-topic-change]', root).addEventListener('click', () => openTopics('change'));
+      cands.addEventListener('click', (e) => { const b = e.target.closest('[data-pick-topic]'); if (b && !b.disabled) pickTopic(Number(b.dataset.pickTopic)); });
+      document.addEventListener('click', (e) => { const c = e.target.closest('[data-close]'); if (c) c.closest('[data-layer]').hidden = true; });
+
+      grow(greeting);
+      original = snapshot();
+      render();
+      if (state === 'button') select(menus[0].id);
+      if (state === 'menu') openTopics('add');
+      if (state === 'topic') { select(menus[0].id); openTopics('change'); }
+      if (state === 'added') pickTopic(3);
+      if (state === 'drag') { startDrag(rows.children[2], 0); moveDrag(-62); }   // 검토용: '영상 분석 견적'을 끌어 올리는 중
+      if (state === 'delete') { select(menus[0].id); delModal.hidden = false; }
+      if (state === 'saved') { greeting.value += ' '; render(); saveBtn.click(); clearTimeout(timer); }
+    })();
+  </script>
+</th:block>
+</body>
+</html>

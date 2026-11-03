@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:with="paymentOpen=${param.payment != null and param.payment[0] == 'open'},
+               editing=${param.edit != null and param.edit[0] == 'true'}">
+<!--/* SCR 예약 상세 (G-F01~F04)
+  G-F01 (기본) · G-F02 ?payment=open(결제 금액 펼침) · G-F03 ?edit=true(요청사항 수정) · G-F04 ?cancel=open(예약 취소 확인)
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='예약 상세', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/move.css}">
+</head>
+<body>
+<div class="app-shell">
+  <div class="screen form-page rd-page">
+    <div class="form-head">
+      <a th:replace="~{fragments/user-layout :: back(href=@{/move(tab='booking')})}"></a>
+      <div class="form-title">예약 상세</div>
+    </div>
+
+    <div class="form-content reservation-detail-page">
+      <div class="reservation-detail-hero">
+        <span>예약 확정 · D-30</span>
+        <strong>안전하고 편안한 이사를 준비할게요</strong>
+        <small>예약 번호 ME-20260318-1042</small>
+      </div>
+
+      <div class="reservation-info-card">
+        <div class="reservation-address-row">
+          <i class="reservation-address-dot from"></i>
+          <div><span>출발지</span><strong>서울 강남구 테헤란로 123, 301호</strong></div>
+        </div>
+        <div class="reservation-address-row">
+          <i class="reservation-address-dot to"></i>
+          <div><span>도착지</span><strong>서울 서초구 서초대로 456, 804호</strong></div>
+        </div>
+        <div class="reservation-info-row"><span>이사 일시</span><b>2026. 03. 18 (수) 오전 10:00</b></div>
+        <div class="reservation-info-row"><span>이사 유형</span><b>원룸 / 오피스텔 · 일반포장</b></div>
+        <div class="reservation-payment">
+          <div class="action reservation-payment-toggle" role="button" tabindex="0" data-accordion="#paymentDetails"
+               th:attr="aria-expanded=${paymentOpen}">
+            <span>결제 금액</span>
+            <div>
+              <b>410,000원</b>
+              <svg aria-hidden="true" viewBox="0 0 24 24" th:classappend="${paymentOpen} ? 'open'"><path d="m7 10 5 5 5-5"/></svg>
+            </div>
+          </div>
+          <div id="paymentDetails" class="reservation-payment-details" th:hidden="${!paymentOpen}">
+            <div><span>이사비용</span><b>370,000원</b></div>
+            <div><span>도착지 사다리 (8층)</span><b>20,000원</b></div>
+            <div><span>옵션 (벽걸이TV)</span><b>20,000원</b></div>
+            <div class="reservation-payment-status"><span>계약금 41,000원</span><b>26.03.10 결제 완료</b></div>
+            <div><span>잔금 369,000원</span><b>이사 당일 결제</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reservation-request-section">
+        <div class="reservation-section-head">
+          <strong>요청사항</strong>
+          <div class="action" role="button" tabindex="0" data-request-edit="#requestCard" th:text="${editing} ? '저장' : '수정'">수정</div>
+        </div>
+        <p id="requestCard" spellcheck="false" class="reservation-request-card" th:classappend="${editing} ? 'editing'" aria-label="요청사항">냉장고는 전날 비워둘게요. 도착지 주차는 지하 2층에 가능합니다.</p>
+      </div>
+
+      <div class="reservation-detail-actions">
+        <a class="action reservation-contact-button" th:href="@{/chat}">업체에 문의하기</a>
+        <div class="reservation-secondary-actions">
+          <a class="action" th:href="@{/chat}">일정 변경</a>
+          <span></span>
+          <div class="action" role="button" tabindex="0" data-open="#cancelModal">예약 취소</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!--/* 예약 취소 확인 (G-F04, 11/02 시안: 바텀시트) */-->
+  <div id="cancelModal" class="rd-cancel-layer" data-layer th:hidden="${param.cancel == null}">
+    <div class="rd-cancel-scrim" data-close></div>
+    <div class="rd-cancel-sheet" role="dialog" aria-modal="true" aria-labelledby="rd-cancel-title" aria-describedby="rd-cancel-desc">
+      <i class="rd-cancel-grabber" aria-hidden="true"></i>
+      <svg class="rd-cancel-icon" aria-hidden="true" viewBox="0 0 48 48" width="48" height="48">
+        <rect x="0" y="5" width="48" height="43" rx="12" fill="#eef1ea"/>
+        <path d="M12 5h24a12 12 0 0 1 12 12H0A12 12 0 0 1 12 5Z" fill="#346538"/>
+        <rect x="12.5" y="0" width="4" height="10" rx="2" fill="#2a3d2c"/>
+        <rect x="31.5" y="0" width="4" height="10" rx="2" fill="#2a3d2c"/>
+        <path d="m18 26 12 12M30 26 18 38" stroke="#df8436" stroke-width="3.4" stroke-linecap="round"/>
+      </svg>
+      <strong id="rd-cancel-title">예약을 취소하시겠어요?</strong>
+      <span id="rd-cancel-desc">3월 18일 (수) 오전 10:00 일정이 사라져요</span>
+      <div class="action rd-cancel-keep" role="button" tabindex="0" data-close>예약 유지하기</div>
+      <a class="action rd-cancel-confirm" th:href="@{/move(tab='booking', state='none')}">예약 취소할게요</a>
+    </div>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:src="@{/js/user/move.js}"></script>
+</body>
+</html>

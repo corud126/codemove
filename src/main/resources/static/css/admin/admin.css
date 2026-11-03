@@ -1,0 +1,44 @@
+/* 관리자 공통 스타일 — 레이아웃·색상은 Tailwind 유틸리티 클래스로 작성하고, 여기에는 클래스로 표현하기 어려운 것만 둔다 */
+:root {
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+  color: #222a24;
+  background: #e8ebe8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button { cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 2px solid #346538; outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* Tailwind 유틸리티(hidden 등)가 이기도록 base 레이어에 둔다 */
+@layer base {
+  .icon { display: block; flex-shrink: 0; }
+}
+
+/* ── 반응형 프레임 (사용자 앱과 같은 방식) ──
+   모든 기기에서 설계 크기 430px 폭으로 그리고, layout head 스크립트가 배율(--frame-zoom)과 높이(--app-h)를 정한다.
+   - 휴대폰: 기기 폭에 꽉 차게 확대·축소, 높이 = 기기 높이 ÷ 배율 / PC: 430 × 874 프레임, 창이 작으면 축소
+   - 안전 영역(상태바·노치·다이나믹 아일랜드·홈 인디케이터)은 --safe-top / --safe-bottom 만큼 헤더·하단 탭을 늘린다
+   프레임 안에서는 vh/dvh 대신 var(--frame-h), 헤더·하단 탭 사이를 덮는 레이어는 top-[var(--hdr)] bottom-[var(--nav)] 를 쓴다. */
+#adminFrame {
+  --frame-h: var(--app-h, 874px);
+  --safe-top: calc(env(safe-area-inset-top, 0px) / var(--frame-zoom, 1));
+  --safe-bottom: calc(env(safe-area-inset-bottom, 0px) / var(--frame-zoom, 1));
+  --hdr: calc(var(--header-h, 68px) + var(--safe-top));
+  --nav: calc(var(--nav-h, 82px) + var(--safe-bottom));
+  width: 430px;
+  height: var(--frame-h);
+  flex-shrink: 0;
+  zoom: var(--frame-zoom, 1);
+}
+/* 하단 탭을 숨기는 화면(채팅방): 본문에 data-hide-nav — --nav-h 는 #adminFrame 인라인 값이라 !important */
+#adminFrame:has([data-hide-nav]) { --nav-h: 0px !important; }
+#adminFrame:has([data-hide-nav]) .admin-nav { display: none; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { border-radius: 999px; background: #cdd5ce; }
+
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }

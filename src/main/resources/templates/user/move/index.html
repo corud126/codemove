@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:with="tab=${param.tab != null ? param.tab[0] : 'booking'},
+               state=${param.state != null ? param.state[0] : ''}">
+<!--/* SCR 내 이사 (G-D01~D09, D06 삭제)
+  tab: booking(예약 정보) | estimate(견적 정보) | done(완료)
+  tab=booking  state: none(G-D01 예약 없음) | (기본) G-D02 예약 정보
+  tab=estimate state: none(G-D03) | reviewing(G-D04) | (기본) arrived(G-D05) | confirmed(G-D07)
+  tab=done     state: (기본) G-D08 | reviewed(G-D09 리뷰 작성 후)
+*/-->
+<head th:replace="~{fragments/user-layout :: head(title='내 이사', links=~{::link})}">
+  <link rel="stylesheet" th:href="@{/css/user/move.css}">
+</head>
+<body>
+<div class="app-shell">
+  <div class="screen page-with-nav move-screen">
+    <div th:replace="~{fragments/user-layout :: header(notificationCount=1)}"></div>
+
+    <main class="sub-content">
+      <div class="move-sticky-nav">
+        <div class="page-title">내 이사</div>
+        <div class="tabs">
+          <a class="action" th:href="|?tab=booking|" th:classappend="${tab == 'booking'} ? 'tab-active'">예약 정보</a>
+          <a class="action" th:href="|?tab=estimate|" th:classappend="${tab == 'estimate'} ? 'tab-active'">견적 정보</a>
+          <a class="action" th:href="|?tab=done|" th:classappend="${tab == 'done'} ? 'tab-active'">완료</a>
+        </div>
+      </div>
+
+      <!--/* ── 예약 정보 ── */-->
+      <th:block th:if="${tab == 'booking'}">
+        <!--/* G-D01 예약 없음 */-->
+        <div class="mv-empty" th:if="${state == 'none'}">
+          <svg aria-hidden="true" fill="none" height="30" viewBox="0 0 30 30" width="30">
+            <rect height="21" rx="4" stroke="currentColor" stroke-width="1.8" width="25" x="2.5" y="5.5"/>
+            <path d="M2.5 11.5h25M9 2.5v5M21 2.5v5M11 18h8" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"/>
+          </svg>
+          <strong>아직 확정된 예약이 없어요</strong>
+          <span>견적을 확정하면 이사 일정이 여기에 표시돼요</span>
+          <a class="action mv-empty-button" href="?tab=estimate">견적 확인하기</a>
+        </div>
+
+        <!--/* G-D02 예약 정보 */-->
+        <th:block th:unless="${state == 'none'}">
+          <div class="mv-booking-card">
+            <div class="mv-booking-head">
+              <div><span class="mv-booking-badge">예약 확정</span><span class="mv-booking-type">원룸 / 오피스텔 · 일반포장</span></div>
+              <b class="mv-booking-dday">D-30</b>
+            </div>
+            <div class="mv-booking-body">
+              <div class="mv-booking-date"><b>3월 18일 (수)</b><span>오전 10:00</span></div>
+              <div class="mv-booking-route">
+                <span>강남구</span>
+                <i class="dot from"></i><i class="line"></i><i class="dot to"></i>
+                <span>서초구</span>
+              </div>
+              <a class="action mv-booking-link" th:href="@{/reservations/1}">
+                <span>예약 상세 보기</span>
+                <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 18 18" width="18"><path d="m7 4 5 5-5 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>
+              </a>
+            </div>
+          </div>
+          <a class="action mv-more-link" th:href="@{/more/reservations}">예약 내역 전체 보기
+            <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 14 14" width="14"><path d="m5 3 4 4-4 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.3"/></svg>
+          </a>
+        </th:block>
+      </th:block>
+
+      <!--/* ── 견적 정보 ── */-->
+      <th:block th:if="${tab == 'estimate'}">
+        <!--/* G-D03 견적 없음 */-->
+        <div class="mv-empty" th:if="${state == 'none'}">
+          <svg aria-hidden="true" fill="none" height="30" viewBox="0 0 30 30" width="30">
+            <path d="M7 3.5h16a1.5 1.5 0 0 1 1.5 1.5v21.5l-2.8-1.8-2.9 1.8-2.9-1.8-2.9 1.8-2.9-1.8-2.6 1.8V5A1.5 1.5 0 0 1 7 3.5Z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8"/>
+            <path d="M11 13h8" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"/>
+          </svg>
+          <strong>아직 받은 견적이 없어요</strong>
+          <span>이사 정보를 입력하면 맞춤 견적을 보내드려요</span>
+          <a class="action mv-empty-button" th:href="@{/quote}">견적 요청하기</a>
+        </div>
+
+        <!--/* G-D04 검토 중 */-->
+        <div class="mv-card" th:if="${state == 'reviewing'}">
+          <div class="mv-card-top"><span class="mv-badge sage">검토 중</span></div>
+          <strong class="mv-card-title">견적 요청을 검토하고 있어요</strong>
+          <span class="mv-card-meta">담당자가 확인하면 견적서를 보내드려요</span>
+        </div>
+
+        <!--/* G-D05 견적 도착 / G-D07 확정 완료 */-->
+        <th:block th:if="${state == '' or state == 'arrived' or state == 'confirmed'}">
+          <div class="mv-card">
+            <div class="mv-card-top">
+              <span class="mv-badge orange" th:text="${state == 'confirmed'} ? '견적 확정' : '견적 도착'">견적 도착</span>
+              <span class="mv-timer" th:unless="${state == 'confirmed'}">
+                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 14 14" width="14"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.4"/><path d="M7 4.2V7l1.9 1.3" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"/></svg>
+                23:41:08 남음
+              </span>
+              <span class="mv-card-date" th:if="${state == 'confirmed'}">10.27 확정</span>
+            </div>
+            <b class="mv-price">410,000원</b>
+            <span class="mv-card-meta">원룸 / 오피스텔 · 일반포장 · 3월 18일</span>
+            <a class="action mv-primary" th:unless="${state == 'confirmed'}" href="?tab=estimate&amp;state=confirmed">견적 확정</a>
+          </div>
+
+          <div class="receipt-wrap">
+            <section class="mv-receipt">
+              <div class="mv-receipt-brand">명품익스프레스</div>
+              <div class="mv-receipt-sub">견적번호 QT-20260310-0042</div>
+              <div class="mv-receipt-rows">
+                <div class="mv-receipt-row"><div><span>이사비용</span></div><b>370,000원</b></div>
+                <div class="mv-receipt-row"><div><span>도착지 사다리 (8층)</span></div><b>20,000원</b></div>
+                <div class="mv-receipt-row"><div><span>옵션</span><small>벽걸이TV 탈착·설치</small></div><b>20,000원</b></div>
+              </div>
+              <div class="mv-receipt-total"><span>합계</span><b>410,000원</b></div>
+              <a class="action mv-receipt-link" th:href="${state == 'confirmed'} ? @{/estimates/1(state='confirmed')} : @{/estimates/1}">AI 분석 · 견적 상세 보기
+                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 14 14" width="14"><path d="m5 3 4 4-4 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.3"/></svg>
+              </a>
+            </section>
+          </div>
+
+          <section class="mv-other">
+            <div class="mv-other-head">
+              <strong>다른 진행 중 견적</strong>
+              <a class="action" th:href="@{/more/estimates}">전체 보기
+                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 14 14" width="14"><path d="m5 3 4 4-4 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.3"/></svg>
+              </a>
+            </div>
+            <p>현재 진행 중인 추가 견적이 없어요</p>
+          </section>
+        </th:block>
+      </th:block>
+
+      <!--/* ── 완료 (G-D08 / G-D09) ── */-->
+      <th:block th:if="${tab == 'done'}">
+        <div class="mv-card">
+          <div class="mv-card-top">
+            <span class="mv-badge gray">이사 완료</span>
+            <span class="mv-card-date">25.11.04</span>
+          </div>
+          <strong class="mv-route-title">마포구
+            <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 18 18" width="18"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>
+            서대문구</strong>
+          <span class="mv-card-meta">원룸 / 오피스텔 · 반포장</span>
+          <a class="action mv-primary" th:unless="${state == 'reviewed'}" th:href="@{/more/reviews/new}">리뷰 작성</a>
+          <a class="action mv-review-done" th:if="${state == 'reviewed'}" th:href="@{/more/reviews}">
+            <svg aria-hidden="true" height="12" viewBox="0 0 14 14" width="12"><path d="m7 1 1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5L7 1Z" fill="#df8436"/></svg>
+            <b>5.0</b><span>리뷰 작성 완료</span>
+            <svg class="mv-review-chevron" aria-hidden="true" fill="none" height="18" viewBox="0 0 18 18" width="18"><path d="m7 4 5 5-5 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"/></svg>
+          </a>
+        </div>
+        <a class="action mv-more-link dark" th:href="@{/more/reviews}">지난 후기 보기
+          <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16"><path d="m6 3.5 4.5 4.5L6 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"/></svg>
+        </a>
+      </th:block>
+    </main>
+
+    <nav th:replace="~{fragments/user-layout :: bottomNav(active='move', locked=false)}"></nav>
+  </div>
+</div>
+<th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+</body>
+</html>

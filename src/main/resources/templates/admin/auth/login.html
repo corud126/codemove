@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!--/* 관리자 스플래시 + 로그인 (ERD 수정안 Q10) — 디자인 기준: docs/ui/관리자디자인기준.md 5번
+  스플래시: 브라우저 세션당 처음 한 번 표시 후 사라짐. ?splash=hold 이면 멈춤, ?splash=off 이면 표시 안 함
+  상태: ?state=error (아이디·비밀번호 불일치) */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-bare :: bare(title='로그인', frameClass='bg-[#f7f8f6]', content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <form id="loginForm" th:action="@{/admin/login}" method="post" th:with="err=${param.state != null and param.state[0] == 'error'}"
+        class="flex h-full flex-col px-6 pb-[calc(28px+var(--safe-bottom))] pt-[calc(96px+var(--safe-top))]">
+    <div class="flex items-center gap-2.5">
+      <svg class="h-9 w-9" viewBox="0 0 132 130" aria-hidden="true">
+        <path fill="#346538" d="M54 5a18 18 0 0 1 24 0l44 38a29 29 0 0 1 10 22v42a23 23 0 0 1-23 23H23A23 23 0 0 1 0 107V65a29 29 0 0 1 10-22L54 5Z"/>
+        <path fill="none" stroke="#e8e8cd" stroke-width="10" stroke-linecap="round" d="M35 80c17 16 45 16 62 0"/>
+      </svg>
+      <span class="rounded-md bg-[#eef4f0] px-2 py-0.5 text-[13px] font-bold text-[#346538]">관리자</span>
+    </div>
+    <h1 class="mt-5 text-[26px] font-extrabold leading-[1.35] tracking-[-0.03em] text-[#1a1a1a]">명품익스프레스<br>관리자 로그인</h1>
+
+    <div class="mt-9 space-y-5">
+      <label class="block">
+        <span class="mb-2 block text-[14px] font-semibold text-[#555]">아이디</span>
+        <input id="loginId" name="id" class="field-input" type="text" autocomplete="username" maxlength="20"
+               th:classappend="${err} ? 'is-error'">
+      </label>
+      <label class="block">
+        <span class="mb-2 block text-[14px] font-semibold text-[#555]">비밀번호</span>
+        <span class="relative block">
+          <input id="loginPw" name="pw" class="field-input pr-14" type="password" autocomplete="current-password"
+                 th:classappend="${err} ? 'is-error'">
+          <button type="button" id="pwToggle" aria-label="비밀번호 보기" class="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-[#888] hover:bg-[#f0f1ef]">
+            <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-eye'"/></svg>
+          </button>
+        </span>
+      </label>
+      <p th:if="${err}" class="flex items-center gap-1.5 text-[14px] text-[#d8663d]">
+        <svg class="icon" width="17" height="17"><use th:href="@{/images/admin/icons-v2.svg} + '#i-alert'"/></svg>
+        아이디 또는 비밀번호가 맞지 않아요. 다시 확인해 주세요.
+      </p>
+    </div>
+
+    <div class="mt-auto">
+      <button id="loginSubmit" type="submit" class="btn-primary" disabled>로그인</button>
+      <p class="mt-4 text-center text-[14px] text-[#888]">비밀번호를 잊으셨다면 담당자에게 문의해 주세요.</p>
+    </div>
+  </form>
+
+  <!--/* 스플래시 — 사용자 앱 스플래시와 같은 모양 + "관리자" */-->
+  <div id="adminSplash" class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-[#346538] transition-opacity duration-200">
+    <svg class="h-[65px] w-[66px]" viewBox="0 0 132 130" aria-hidden="true">
+      <path fill="#e8e8cd" d="M54 5a18 18 0 0 1 24 0l44 38a29 29 0 0 1 10 22v42a23 23 0 0 1-23 23H23A23 23 0 0 1 0 107V65a29 29 0 0 1 10-22L54 5Z"/>
+      <path fill="none" stroke="#346538" stroke-width="10" stroke-linecap="round" d="M35 80c17 16 45 16 62 0"/>
+    </svg>
+    <div class="flex flex-col items-center gap-3">
+      <p class="brand-font text-[26px] text-[#e8e8cd]">명품익스프레스</p>
+      <span class="rounded-full border border-[#e8e8cd]/50 px-3 py-1 text-[13px] font-semibold tracking-[.08em] text-[#e8e8cd]/90">관리자</span>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts">
+  <script>
+    (function () {
+      // 스플래시: 세션당 처음 한 번
+      const KEY = 'codemove.adminSplashShown';
+      const splash = document.getElementById('adminSplash');
+      const param = new URLSearchParams(location.search).get('splash');
+      let shown = false;
+      try { shown = sessionStorage.getItem(KEY) === '1'; sessionStorage.setItem(KEY, '1'); } catch (_) { /* 저장 불가 시 매번 표시 */ }
+      if ((shown && param !== '1' && param !== 'hold') || param === 'off') splash.remove();
+      else if (param !== 'hold') setTimeout(() => { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 220); }, 1100);
+
+      // 두 칸을 채워야 로그인 활성화, 비밀번호 보기/숨기기
+      const id = document.getElementById('loginId');
+      const pw = document.getElementById('loginPw');
+      const submit = document.getElementById('loginSubmit');
+      const toggle = document.getElementById('pwToggle');
+      function update() {
+        submit.disabled = !(id.value.trim() && pw.value);
+        [id, pw].forEach((el) => el.classList.remove('is-error'));
+      }
+      [id, pw].forEach((el) => el.addEventListener('input', update));
+      toggle.addEventListener('click', () => {
+        const show = pw.type === 'password';
+        pw.type = show ? 'text' : 'password';
+        toggle.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 보기');
+        toggle.querySelector('use').setAttribute('href', '/images/admin/icons-v2.svg#i-' + (show ? 'eyeOff' : 'eye'));
+      });
+    })();
+  </script>
+</th:block>
+</body>
+</html>

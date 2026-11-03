@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<!--/* 채팅방 — SCR-A-007 채팅 상세. 디자인 기준: docs/ui/관리자디자인기준.md (실제 화면: admin/chat/detail.html)
+  state: (기본) 대기 중 · info(고객 정보 시트) · menu(⋯ 시트) · replies(자주 쓰는 답변 시트) · attach(첨부 시트)
+         · end-confirm(상담 종료 확인) · ended(종료된 상담) · reply(대기 메시지 왼쪽으로 밀어 답장 대상 지정)
+         · replied(관리자 답장 후 — 고객 안 읽음 '1', 상담 중)
+  채팅방 더미: /admin/chats/{MEMBER_ID 1001~1015} → js/admin/chat.js 의 ROOMS (기본 1015 홍길동 · 1013 상담 중 · 1010 종료 · 1008 챗봇 응대)
+  - 헤더: 뒤로 · 이름(누르면 고객 정보) · 상태 글자(대기 중 주황 · 상담 중 초록 · 종료/챗봇 응대 회색) · ⋯(고객 정보 · 상담 종료 · 취소)
+  - 시트는 하단 탭까지 덮는다(adminFrame 기준 absolute inset-0)
+  - 말풍선: 사용자 앱 채팅과 같은 모양. 관리자 메시지는 고객이 안 읽었으면 옆에 회색 '1'
+  - 입력: [+](사진 · 파일) · [자주 쓰는 답변] · 입력칸 · 보내기. 종료된 방은 '종료된 상담입니다'
+  ERD
+  - TBL_CHAT_ROOM: STATUS · STARTED_AT · WAITING_AT · ENDED_AT · ADMIN_ID → ADMIN_NAME(담당자) → 고객 정보 시트
+    상담 종료 = STATUS 04 + ENDED_AT
+  - TBL_MEMBER: MEMBER_NAME · PHONE(전화 걸기) / 진행 중인 견적(TBL_QUOTE.QUOTE_NO · QUOTE_STATUS) · 예약(TBL_RESERVATION · RSV_STATUS)
+  - TBL_CHAT_MESSAGE: SENDER_TYPE(고객 · AI · 관리자 + ADMIN_NAME) · SENT_AT · TOPIC_ID → 주제 제목 · MESSAGE_TYPE 02 파일(ATTACHMENT_NAME, 다운로드) · IS_READ
+  - 신규(사용자 확인 후 ddl.sql 반영): TBL_SAVED_REPLY 자주 쓰는 답변
+      REPLY_ID NUMBER(19) PK · TITLE VARCHAR2(30 CHAR) NOT NULL · CONTENT VARCHAR2(500 CHAR) NOT NULL (순서 기능 없음 · 등록순)
+      · ADMIN_ID NUMBER(19) FK NULL(마지막 수정 관리자) · UPDATED_AT DATE NOT NULL / 시퀀스 SEQ_SAVED_REPLY
+      관리 화면: /admin/chats/replies */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{fragments/admin-layout :: layout(title='채팅방', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
+<body>
+<th:block th:fragment="content">
+  <!--/* 채팅방은 메신저처럼 하단 탭 없이 화면 전체를 쓴다 (뒤로 가기로 상담함). --nav 를 안전 영역만큼으로 줄여 입력창·시트가 맨 아래에 붙는다 */-->
+  <!--/* 채팅방은 하단 탭을 숨김 — admin.css 의 [data-hide-nav] */-->
+  <div class="flex h-full min-h-0 flex-col bg-[#f4f5f2]" data-chat-detail data-hide-nav>
+    <header class="flex h-14 shrink-0 items-center gap-1 border-b border-[#eef0ee] bg-white px-2">
+      <a th:href="@{/admin/chats}" aria-label="채팅 목록으로 돌아가기"
+         class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#292929] hover:bg-[#f0f1ef]">
+        <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronLeft'"/></svg>
+      </a>
+      <button type="button" data-open="#infoSheet" class="flex min-w-0 items-baseline gap-2 rounded-lg px-1 py-1 text-left hover:bg-[#f7f8f6]" aria-label="고객 정보 보기">
+        <h2 class="truncate text-[17px] font-bold text-[#1a1a1a]" data-room-name>홍길동</h2>
+        <span class="shrink-0 text-[13px] font-semibold text-[#d9701a]" data-room-status>대기 중</span>
+      </button>
+      <button type="button" data-open="#menuSheet" aria-label="더보기"
+              class="ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#292929] hover:bg-[#f0f1ef]">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+      </button>
+    </header>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-5" data-messages-area>
+      <div class="mb-5 text-center">
+        <span class="rounded-full bg-[#e9ebe7] px-3 py-1 text-[12px] font-medium text-[#888]">오늘</span>
+      </div>
+      <div class="flex flex-col gap-[17px]" data-messages>
+        <!--/* 고객 — 메신저처럼 연달아 보낸 묶음의 첫 말풍선에만 프로필 원 + 이름, 이어지는 말풍선은 같은 줄에 맞춰 들여 씀 */-->
+        <div class="flex max-w-[90%] gap-2" data-role="customer">
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e3ece4] text-[15px] font-bold text-[#346538]" data-cust-initial aria-hidden="true">홍</span>
+          <div class="min-w-0">
+            <p class="mb-1 text-[12px] font-medium text-[#777]" data-cust-name>홍길동</p>
+            <div class="flex items-end gap-1.5">
+              <div class="rounded-[4px_18px_18px_18px] bg-white px-[15px] py-[13px] text-[15px] leading-[1.6] text-[#444] shadow-[0_1px_3px_rgba(0,0,0,.03)]" data-text>이번 주 금요일 이사 예정인데, 비가 오면 어떻게 되나요?</div>
+              <time class="shrink-0 text-[12px] tabular-nums text-[#aaa]">14:02</time>
+            </div>
+          </div>
+        </div>
+        <!--/* AI 답변 — 주제(TOPIC_ID → 제목) + 고객에게 보였던 답변 버튼(읽기 전용) */-->
+        <div class="ml-auto flex max-w-[86%] flex-col items-end gap-1.5" data-role="ai">
+          <span class="text-[12px] font-semibold text-[#555]">AI <span class="font-medium text-[#888]">· 우천 시 이사</span></span>
+          <div class="flex items-end gap-1.5">
+            <time class="shrink-0 text-[12px] tabular-nums text-[#aaa]">14:02</time>
+            <div class="rounded-[18px_4px_18px_18px] bg-[#e9ece7] px-[15px] py-[13px] text-[15px] leading-[1.6] text-[#333]" data-text>우천 시에도 기본적으로 이사는 진행되며, 가구와 짐은 방수 포장 후 안전하게 운반해 드립니다.</div>
+          </div>
+          <!--/* 고객 화면에 보였던 답변 버튼 — 관리자가 누르는 버튼이 아니므로 회색 기록 모양 */-->
+          <span class="inline-flex h-8 items-center rounded-full px-3 text-[12px] font-medium text-[#888] ring-1 ring-inset ring-[#dcdfdc]">상담원 연결</span>
+        </div>
+        <!--/* WAITING_AT */-->
+        <div class="text-center" data-role="system" data-waiting-marker>
+          <span class="rounded-full bg-[#e9ebe7] px-3 py-1 text-[12px] font-medium text-[#888]">상담 대기 시작 · 14:03</span>
+        </div>
+        <!--/* 사진 (MESSAGE_TYPE 02, 이미지) — 사진을 그대로 보여 주고 누르면 원본 · 더미 사진은 Unsplash (리뷰 관리와 같은 방식) */-->
+        <div class="flex max-w-[90%] gap-2" data-role="customer">
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e3ece4] text-[15px] font-bold text-[#346538]" data-cust-initial aria-hidden="true">홍</span>
+          <div class="min-w-0">
+            <p class="mb-1 text-[12px] font-medium text-[#777]" data-cust-name>홍길동</p>
+            <div class="flex items-end gap-1.5">
+              <a href="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200&amp;q=80&amp;fm=jpg" target="_blank" rel="noopener"
+                 class="block overflow-hidden rounded-[4px_18px_18px_18px] bg-[#e9ebe7] shadow-[0_1px_3px_rgba(0,0,0,.03)]" aria-label="고객이 보낸 사진 크게 보기">
+                <img src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=480&amp;q=70&amp;fm=jpg" alt="고객이 보낸 거실 사진" data-text
+                     class="block aspect-[4/3] w-[210px] object-cover" loading="lazy">
+              </a>
+              <time class="shrink-0 text-[12px] tabular-nums text-[#aaa]">14:04</time>
+            </div>
+          </div>
+        </div>
+        <!--/* 답변 대기 메시지 — 같은 묶음이라 프로필 없이 들여 씀(9 + 2 = 44px) · 왼쪽으로 밀면 답장 대상 */-->
+        <div class="-mt-2.5 flex max-w-[90%] touch-pan-y select-none items-end gap-1.5 pl-11 transition-transform" data-role="customer" data-waiting data-swipe>
+          <div class="rounded-[4px_18px_18px_18px] bg-white px-[15px] py-[13px] text-[15px] leading-[1.6] text-[#444] shadow-[0_1px_3px_rgba(0,0,0,.03)]" data-text data-room-message>혹시 사다리차 추가 비용이 발생하나요?</div>
+          <time class="shrink-0 text-[12px] tabular-nums text-[#aaa]">14:05</time>
+        </div>
+      </div>
+    </div>
+
+    <!--/* 입력 */-->
+    <!--/* 입력 (화면에 붙은 바가 아니라 떠 있는 흰 입력 상자): 왼쪽 첨부 · 가운데 입력 · 오른쪽은 비었을 때 자주 쓰는 답변, 글자를 쓰면 위 화살표 보내기 버튼(카카오톡 방식) */-->
+    <form data-send-form class="shrink-0 px-3 pb-[calc(16px+var(--safe-bottom))] pt-1.5">
+      <div data-reply hidden class="mb-2 flex items-center gap-2 rounded-[14px] border-l-[3px] border-[#346538] bg-white py-2 pl-3 pr-1.5 shadow-[0_2px_10px_rgba(0,0,0,.04)]">
+        <div class="min-w-0 flex-1">
+          <span class="block text-[12px] font-bold text-[#346538]">답장</span>
+          <span class="block truncate text-[13px] text-[#555]" data-reply-text></span>
+        </div>
+        <button type="button" aria-label="답장 취소" data-reply-cancel class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#888] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <div class="flex min-h-[52px] items-center gap-0.5 rounded-[26px] bg-white p-1.5 shadow-[0_4px_16px_rgba(26,26,26,.07)] ring-1 ring-[#eceee9]">
+        <button type="button" data-open="#attachSheet" aria-label="파일 첨부"
+                class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#666] hover:bg-[#f4f5f2]">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <div class="flex min-w-0 flex-1 items-center pl-1">
+          <input type="text" aria-label="메시지 입력" placeholder="메시지 입력" data-send-input autocomplete="off"
+                 class="h-10 min-w-0 flex-1 bg-transparent text-[16px] text-[#1a1a1a] outline-none placeholder:text-[#a3a8a4]">
+          <button type="button" data-open="#repliesSheet" aria-label="자주 쓰는 답변" data-replies-button
+                  class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#888] hover:bg-[#f4f5f2]">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/></svg>
+          </button>
+          <button type="submit" aria-label="메시지 전송" hidden disabled data-send-button
+                  class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#346538] text-white">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </form>
+    <p data-ended-bar hidden class="mx-3 mb-[calc(16px+var(--safe-bottom))] mt-1.5 flex h-[52px] shrink-0 items-center justify-center rounded-[26px] bg-[#e9ebe7] text-[14px] text-[#888]">종료된 상담입니다</p>
+  </div>
+
+  <!--/* ===== 시트 (하단 탭까지 덮음) ===== */-->
+  <!--/* ⋯ 메뉴 */-->
+  <div id="menuSheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div role="dialog" aria-modal="true" aria-label="채팅방 메뉴"
+         class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
+      <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+      <div class="mt-3">
+        <button type="button" data-open="#infoSheet" data-close="#menuSheet"
+                class="flex h-14 w-full items-center gap-3 rounded-[14px] px-2 text-left text-[16px] font-semibold text-[#292929] hover:bg-[#f7f8f6]">
+          <svg class="icon text-[#555]" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-user'"/></svg>고객 정보
+        </button>
+        <button type="button" data-open="#endConfirm" data-close="#menuSheet" data-end-open
+                class="flex h-14 w-full items-center gap-3 rounded-[14px] px-2 text-left text-[16px] font-semibold text-[#d8663d] hover:bg-[#fff1e9]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-logout'"/></svg>상담 종료
+        </button>
+      </div>
+      <button type="button" data-close class="mt-3 h-14 w-full rounded-[14px] bg-[#f0f1ef] text-[16px] font-semibold text-[#555]">취소</button>
+    </div>
+  </div>
+
+  <!--/* 고객 정보 */-->
+  <div id="infoSheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div role="dialog" aria-modal="true" aria-labelledby="infoTitle"
+         class="max-h-[85%] w-full overflow-y-auto rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
+      <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+      <div class="mt-3 flex items-center justify-between">
+        <h3 id="infoTitle" class="text-[18px] font-bold text-[#1a1a1a]">고객 정보</h3>
+        <button type="button" data-close aria-label="닫기" class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#555] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <!--/* 이름 · 휴대폰 · 전화 */-->
+      <div class="mt-4 flex items-center gap-3">
+        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eef4f0] text-[17px] font-bold text-[#346538]" data-info-initial>홍</span>
+        <div class="min-w-0 flex-1">
+          <p class="text-[17px] font-bold text-[#1a1a1a]" data-info-name>홍길동</p>
+          <p class="text-[14px] tabular-nums text-[#555]" data-info-phone>010-2481-3375</p>
+        </div>
+        <a href="tel:01024813375" data-info-tel aria-label="전화 걸기" class="tone-green grid h-11 w-11 shrink-0 place-items-center rounded-full">
+          <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons-v2.svg} + '#i-phone'"/></svg>
+        </a>
+      </div>
+      <!--/* 진행 중인 견적 · 예약 */-->
+      <div class="mt-5 overflow-hidden rounded-[16px] ring-1 ring-inset ring-[#eef0ee]" data-info-links>
+        <a th:href="@{/admin/estimates/1(tab='info')}" class="flex items-center gap-3 border-b border-[#eef0ee] px-4 py-3 hover:bg-[#f7f8f6]">
+          <span class="chip chip-progress shrink-0">견적 승인</span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[15px] font-semibold text-[#292929]">견적</span>
+            <span class="block text-[13px] tabular-nums text-[#888]">QT-20261028-0412</span>
+          </span>
+          <svg class="icon shrink-0 text-[#b0b4b1]" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+        </a>
+        <a th:href="@{/admin/reservations}" class="flex items-center gap-3 px-4 py-3 hover:bg-[#f7f8f6]">
+          <span class="chip chip-done shrink-0">예약 완료</span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[15px] font-semibold text-[#292929]">예약 <span class="font-medium text-[#555]">· 11.15 오전 9시</span></span>
+            <span class="block text-[13px] tabular-nums text-[#888]">ME-20261030-0031</span>
+          </span>
+          <svg class="icon shrink-0 text-[#b0b4b1]" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+        </a>
+      </div>
+      <!--/* 상담 시각 · 담당자 */-->
+      <dl class="mt-5 grid grid-cols-[72px_1fr] gap-y-2.5 text-[14px] tabular-nums">
+        <dt class="text-[#888]">상담 시작</dt><dd class="text-[#292929]" data-info-started>14:02</dd>
+        <dt class="text-[#888]" data-info-waiting-row>대기 시작</dt><dd class="text-[#292929]" data-info-waiting-row data-info-waiting>14:03</dd>
+        <dt class="text-[#888]" data-info-ended-row hidden>종료</dt><dd class="text-[#292929]" data-info-ended-row data-info-ended hidden>—</dd>
+        <dt class="text-[#888]">담당자</dt><dd class="text-[#292929]" data-info-admin>미배정</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!--/* 자주 쓰는 답변 — 누르면 입력칸에 넣기 */-->
+  <div id="repliesSheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div role="dialog" aria-modal="true" aria-labelledby="repliesTitle"
+         class="flex max-h-[80%] w-full flex-col rounded-t-[24px] bg-white px-5 pb-[calc(16px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
+      <div class="mx-auto h-1 w-9 shrink-0 rounded-full bg-[#dcdfdc]"></div>
+      <div class="mt-3 flex shrink-0 items-center justify-between">
+        <h3 id="repliesTitle" class="text-[18px] font-bold text-[#1a1a1a]">자주 쓰는 답변</h3>
+        <button type="button" data-close aria-label="닫기" class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#555] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <div class="relative mt-3 shrink-0">
+        <svg class="icon pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#888]" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
+        <input type="search" data-replies-search autocomplete="off" aria-label="자주 쓰는 답변 검색" placeholder="제목·내용 검색"
+               class="h-11 w-full rounded-[14px] bg-[#f7f8f6] pl-11 pr-4 text-[15px] text-[#1a1a1a] outline-none ring-1 ring-[#eef0ee] placeholder:text-[#b0b4b1] focus:ring-2 focus:ring-[#346538] [&::-webkit-search-cancel-button]:hidden">
+      </div>
+      <div class="-mx-2 mt-2 min-h-0 flex-1 overflow-y-auto" data-replies>
+        <!--/* TBL_SAVED_REPLY: TITLE | CONTENT (등록순) — 자주 쓰는 답변(chat-replies) 더미와 같은 내용 */-->
+        <button type="button" th:each="r : ${ {'방문 견적 안내|방문 견적은 담당자가 현장을 확인한 뒤 확정 금액을 안내해 드립니다. 원하시는 방문 날짜와 시간을 알려주세요.', '계약금 입금 안내|견적 확인 후 계약금을 입금해 주시면 이사 일정이 확정됩니다. 입금 계좌는 예약 상세에서 확인하실 수 있습니다.', '사다리차 비용 안내|사다리차 비용은 층수와 작업 환경에 따라 달라집니다. 현장 확인 후 정확한 금액을 안내해 드리겠습니다.', '이사 당일 준비물|귀중품과 중요 서류는 직접 챙겨 주시고, 냉장고는 전날 미리 비워 두시면 좋습니다.', '상담 종료 인사|문의해 주셔서 감사합니다. 더 궁금한 점이 있으시면 언제든 채팅으로 남겨 주세요.'} }"
+                th:with="t=${#strings.arraySplit(r, '|')}" th:attr="data-reply-content=${t[1]}"
+                class="block w-full rounded-[14px] px-3 py-3 text-left hover:bg-[#f7f8f6]">
+          <span class="block text-[15px] font-semibold text-[#292929]" data-reply-title th:text="${t[0]}">방문 견적 안내</span>
+          <span class="mt-0.5 block truncate text-[14px] text-[#888]" th:text="${t[1]}">내용</span>
+        </button>
+        <p data-replies-empty hidden class="py-10 text-center text-[14px] text-[#888]">일치하는 답변이 없습니다</p>
+      </div>
+      <a th:href="@{/admin/chats/replies}" class="mt-2 flex h-11 shrink-0 items-center justify-center gap-0.5 text-[14px] font-semibold text-[#346538]">
+        자주 쓰는 답변 관리
+        <svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <!--/* 첨부: 사진 · 파일 */-->
+  <div id="attachSheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+    <div role="dialog" aria-modal="true" aria-labelledby="attachTitle"
+         class="w-full rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
+      <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
+      <div class="mt-3 flex items-center justify-between">
+        <h3 id="attachTitle" class="text-[18px] font-bold text-[#1a1a1a]">첨부</h3>
+        <button type="button" data-close aria-label="닫기" class="-mr-2 grid h-10 w-10 place-items-center rounded-full text-[#555] hover:bg-[#f0f1ef]">
+          <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-x'"/></svg>
+        </button>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <label th:each="a : ${ {'camera|사진|image/*', 'document|파일|*'} }" th:with="t=${#strings.arraySplit(a, '|')}"
+               class="flex cursor-pointer flex-col items-center gap-2 rounded-[16px] py-5 ring-1 ring-inset ring-[#eef0ee] hover:bg-[#f7f8f6]">
+          <span class="tone-green grid h-11 w-11 place-items-center rounded-[14px]">
+            <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-' + ${t[0]}"/></svg>
+          </span>
+          <span class="text-[15px] font-semibold text-[#292929]" th:text="${t[1]}">사진</span>
+          <input type="file" hidden th:attr="accept=${t[2]}">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!--/* 상담 종료 확인 */-->
+  <div id="endConfirm" data-layer hidden role="dialog" aria-modal="true" aria-labelledby="endTitle"
+       class="absolute inset-0 z-50 grid place-items-center bg-[#1a1a1a]/40 p-6">
+    <div class="w-full rounded-[20px] bg-white p-6 text-center shadow-[0_18px_50px_rgba(26,26,26,.18)] [animation:slideUp_.2s_ease-out]">
+      <p id="endTitle" class="text-[18px] font-bold text-[#1a1a1a]">상담을 종료할까요?</p>
+      <p class="mt-2 text-[14px] text-[#888]">고객이 다시 문의하면 새 채팅으로 시작됩니다.</p>
+      <div class="mt-6 grid grid-cols-2 gap-2">
+        <button type="button" data-close class="h-12 rounded-[14px] bg-[#f0f1ef] text-[15px] font-semibold text-[#555]">취소</button>
+        <button type="button" data-end-ok class="h-12 rounded-[14px] bg-[#d8663d] text-[15px] font-semibold text-white">종료</button>
+      </div>
+    </div>
+  </div>
+</th:block>
+<th:block th:fragment="scripts"><script th:src="@{/js/admin/chat.js}"></script></th:block>
+</body>
+</html>
