@@ -151,3 +151,11 @@ $RECYCLE.BIN/
 *.rar
 # 설계 산출물(프로토타입·화면캡처)은 저장소에 보관
 !docs/**/*.zip
+
+############################################
+# 관리자 화면 개편 시안 (로컬 검토용, 저장소에 올리지 않음)
+# 화면마다 시안 → 확인 → 실제 화면 반영 후 시안 파일은 삭제
+############################################
+src/main/resources/templates/admin/redesign/
+src/main/resources/static/js/admin/redesign/
+src/main/resources/templates/dev/compare-admin.html
