@@ -16,5 +16,9 @@ public class WebConfig implements WebMvcConfigurer {
 	@Override
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(new LoginCheckInterceptor()).addPathPatterns(MEMBER_ONLY);
+		// 관리자: 로그인·로그아웃 외 모든 관리자 화면은 관리자 로그인(+ 비밀번호 변경 완료) 필요
+		registry.addInterceptor(new AdminLoginInterceptor())
+				.addPathPatterns("/admin", "/admin/**")
+				.excludePathPatterns("/admin/login", "/admin/logout");
 	}
 }
