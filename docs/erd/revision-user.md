@@ -1,11 +1,12 @@
 # ERD 수정안 (확정)
 
-진행 순서: 0단계 공통 코드값 → 1단계 사용자앱이 생성하는 테이블 → 2단계 공유 테이블(QUOTE·RESERVATION·NOTIFICATION) → 3단계 관리자 전용 테이블
+진행 순서: 0단계 공통 코드값 → 1단계 사용자앱이 생성하는 테이블 → 2단계 공유 테이블(QUOTE·RESERVATION·NOTIFICATION) → 3단계 관리자 전용 테이블 → 4단계 관리자 화면 반영
 
-상태: **0~3단계 모두 확정 (2026-11-02)**. 다음 작업: ERD 도면 반영 → DDL 작성 → 화면 수정
+상태: **0~3단계 확정 (2026-11-02) · 4단계 확정 (2026-11-03)**. DDL(ddl.sql·sequence.sql·code-data.sql) 반영 완료. 다음 작업: ERD 도면 반영 → 백엔드
+- 4단계에서 바뀐 내용은 앞 단계 본문보다 우선한다 (앞 단계에는 바뀐 곳마다 '→ 4단계' 표시)
 
 - 기준: 현재 사용자앱 화면(`templates/user/**`, `static/js/user/**`)
-- 표기: 🟢 추가 · 🟡 변경 · ⚪ 변경 없음(규칙만 정함) · ❓ 팀 결정 필요
+- 표기: 🟢 추가 · 🟡 변경 · 🔴 삭제 · ⚪ 변경 없음(규칙만 정함) · ❓ 팀 결정 필요
 - 이미 정리된 ERD 오타는 [naming.md](naming.md)를 따름
 
 ---
@@ -198,7 +199,7 @@
 | 구분 | 컬럼 | 내용 | 화면 근거 |
 |---|---|---|---|
 | 🟡 | `HOUSE_TYPE`, `PACK_TYPE` CHAR(1) → CHAR(2) | 0단계 코드 | 이사 견적 3단계 |
-| ⚪ | `MOVE_DATE` / `MOVE_TIME` | 규칙: 날짜 미정 = 둘 다 NULL · "시간 상관없어요" = 날짜만 있고 시간 NULL | 이사 견적 5단계 (user/quote/index.html) |
+| 🟡 | `MOVE_DATE` / `MOVE_TIME` → `PREFER_TIME` CHAR(2) | **→ 4단계**: 고객은 날짜 + 희망 시간대(오전·오후·상관없음)만 고름. 날짜 미정 = 둘 다 NULL | 이사 견적 5단계 (user/quote/index.html) |
 | ⚪ | `AI_EST_*` | 규칙: 날짜 확정 시 `AI_EST_AMOUNT`(410,000) 표시 · 날짜 미정 시 `AI_EST_MIN`~`MAX`(400,000~480,000) 표시. 세 값 모두 저장 | 이사 견적 6단계 |
 | ⚪ | `AI_CBM` | `TBL_REQUEST_ITEM.VOLUME` 합계 | |
 | 🟡 | `STATUS` 삭제 | 진행 상태는 `TBL_QUOTE.STATUS`로 관리 (0단계 참고). 요청 제출과 견적서 초안 생성이 동시에 일어나므로 요청만 따로 상태를 가질 필요가 없음 | |
@@ -248,6 +249,8 @@
 ---
 
 ## 화면 수정 목록 (ERD 변경 아님, 나중에 일괄 반영)
+
+✅ 2026-11-03 사용자·관리자 화면 대조 때 모두 반영. 단, 'AI 분석 값이 NULL이면 숨김'은 백엔드 구현 때 처리
 
 사용자앱
 
@@ -361,7 +364,7 @@
 | 🟢 | `DEPOSIT_PAID_AT` DATE NULL | 계약금 결제 완료 일시 (관리자가 [결제 완료]를 누른 시각) | |
 | 🟡 | `MOVE_MEMO` 1500 → 500 CHAR | 요청사항 | 사용자 예약 상세 요청사항 수정 |
 | 🟡 | `REQUEST_ID` UNIQUE | 요청 1건 : 예약 1건 | |
-| ⚪ | `MOVE_DATE`, `MOVE_TIME` | 예약 생성 시 견적서 작업일을 복사. 이후 일정 변경(채팅 상담 → 관리자 수정)은 예약 쪽만 고침 | |
+| ⚪ | `MOVE_DATE`, `MOVE_TIME` | 예약 생성 시 견적서 작업일·작업시각(`WORK_DATE`·`WORK_TIME`, 4단계)을 복사. 이후 일정 변경(채팅 상담 → 관리자 수정)은 예약 쪽만 고침 | |
 
 - 잔금은 "이사 당일 결제" 안내만 있고 관리 화면이 없으므로 컬럼을 추가하지 않음
 - 예약 취소 시 결제 대기였다면 `03` 결제 취소. 결제 완료 후 취소(환불)는 화면이 없어 이번 범위에서 제외
@@ -537,6 +540,8 @@
 
 **✅ Q17. 일정 구조: 예약 중심 (확정)**
 
+> **→ 4단계**: `TBL_DAY_STATUS`·`DAY_STATUS` 코드 → `TBL_CLOSED_DAY`(임시 휴무만), `TBL_SCHEDULE`·`SCHEDULE_CATEGORY` 삭제 (사장님 개인 일정 등록 제외). 예약 캘린더 중심·공휴일 미저장은 그대로
+
 - 일정 캘린더의 핵심은 예약 확인 → **캘린더는 `TBL_RESERVATION`을 직접 조회** (예약을 일정 테이블에 복사하지 않음. 이사일이 한 곳에만 있어 일정 변경·취소가 바로 반영)
 - 예약 상세 팝업(회원·견적 번호·예약 번호·이사 유형·일시·주소)은 예약 → 견적 요청 → 견적서 조인으로 조회
 - 🟡 `TBL_RESERVATION.SCHEDULE_ID` 삭제, 🟢 `TBL_RESERVATION(MOVE_DATE)` 인덱스 추가
@@ -571,10 +576,14 @@
 
 **✅ Q18. 예약 가능 건수·마감 (확정)**
 
-- `TBL_SCHEDULE.CAPACITY` 삭제. **시간대당 예약 가능 건수는 설정값**(`application.yml`, 예: 1건)
-- 시간대의 예약 확정(`01`) 건수가 설정값에 도달하면 사용자 시간 선택에 '마감' 표시
-- 특정 날짜를 막을 때는 날짜 상태 '예약 불가' 사용
-- 화면 수정: 사용자 날짜 선택에서 휴무일·예약 불가일 선택 불가, '마감'은 실제 예약 수로 계산 (현재 "3:00 마감"은 더미 고정값)
+> **→ 4단계에서 다시 정함 (2026-11-03)**. 처음 안(시간대당 건수 `application.yml`, 시간대 '마감')은 폐기
+
+- **하루 예약 가능 건수** `TBL_RESERVATION_SETTING.DAILY_CAPACITY` (기본 3, 사장님이 일정 관리에서 변경)
+- 그날 **예약 확정(`01`) 건수**가 이 수에 닿으면 사용자 날짜 선택에 '마감'. 견적 요청은 건수에 들어가지 않음
+- 고객은 시간을 고르지 않고 **희망 시간대**(`PREFER_TIME`: 오전·오후·상관없음)만 고름 → 같은 시간 중복 예약이 생기지 않음
+- 정확한 시각은 관리자가 견적서 `WORK_TIME`에 고정 시간대(08:00·10:00·13:00·15:00·17:00) 중 하나로 정함. 예약 일정 변경도 같은 목록에서 고름
+- 날짜를 막을 때는 휴무(정기 휴무 요일·공휴일 쉬기·임시 휴무 `TBL_CLOSED_DAY`). 손 없는 날은 표시만, 휴무 아님
+- 동시 확정 처리: 고객이 견적을 확정(예약 생성)할 때 같은 트랜잭션에서 `TBL_RESERVATION_SETTING` 행을 잠그고(`SELECT … FOR UPDATE`) 그날 확정 건수를 다시 셈 → 다 찼으면 확정을 막고 날짜 변경 안내
 
 ### 3-4. 채팅 운영 · 챗봇
 
@@ -598,6 +607,8 @@
 | 🟡 | `START_TIME`, `END_TIME` TIMESTAMP → VARCHAR2(5) | "09:00" 형식 |
 | 🟢 | `HOURS_ENABLED` CHAR(1) NOT NULL | 운영 시간 사용 여부 |
 | 🟢 | `DELAY_MESSAGE` VARCHAR2(500 CHAR) NULL | 대응 규칙 문구 (상담 대기 지연 시 자동 발송) |
+
+> **→ 4단계**: `HOURS_ENABLED` → `CONSULT_ENABLED`(상담원 연결 받기), `AWAY_MESSAGE` 추가
 
 **✅ Q20. 챗봇 구조 (확정)**
 
@@ -693,11 +704,48 @@
 
 ---
 
+## 4단계. 관리자 화면 반영 (2026-11-03 확정)
+
+관리자 화면 개편과 사용자·관리자 화면 대조 결과. 앞 단계와 다르면 여기를 따른다.
+
+### 테이블·컬럼
+
+| 구분 | 대상 | 내용 | 화면 근거 |
+|---|---|---|---|
+| 🟢 | `TBL_ADMIN.PUSH_ENABLED` CHAR(1) DEFAULT 'Y' | 알림 받기 | 관리자 내 정보 |
+| 🟢 | `TBL_SAVED_REPLY` (+ `SEQ_SAVED_REPLY`) | 자주 쓰는 답변: `REPLY_ID`, `TITLE` 30, `CONTENT` 500, `UPDATED_AT`, `ADMIN_ID`. 순서 기능 없음 | 채팅 설정 > 자주 쓰는 답변 |
+| 🟡 | `TBL_CHAT_SETTING.HOURS_ENABLED` → `CONSULT_ENABLED` | 상담원 연결 받기. 끄면 운영 시간이어도 상담원 연결 대신 부재 안내 | 채팅 설정 |
+| 🟢 | `TBL_CHAT_SETTING.AWAY_MESSAGE` VARCHAR2(500 CHAR) NULL | 부재 안내 문구 (운영 시간 외·상담 끔) | 채팅 설정 > 부재 안내 메시지 |
+| 🟢 | `TBL_RESERVATION_SETTING` (+ `SEQ_RESERVATION_SETTING`) | 1행: `DAILY_CAPACITY` 1~10 (기본 3), `CLOSED_WEEKDAYS` (예: '0,1'), `HOLIDAY_CLOSED`, `UPDATED_AT`, `ADMIN_ID` | 일정 관리 > 예약 설정 |
+| 🟡 | `TBL_DAY_STATUS` → `TBL_CLOSED_DAY` | 임시 휴무 날짜만 (`CLOSED_DATE` PK). '예약 불가'는 '휴무'로 합침 → `DAY_STATUS` 코드 삭제 | 일정 관리 > 임시 휴무 |
+| 🔴 | `TBL_SCHEDULE`, `SEQ_SCHEDULE`, `SCHEDULE_CATEGORY` 코드 삭제 | 사장님 개인 일정 등록 제외. 예약 일정 = 예약 조회 전용 캘린더 | 예약 일정 |
+| 🟡 | `TBL_MOVE_REQUEST.MOVE_TIME` → `PREFER_TIME` CHAR(2) | 희망 시간대. 공통코드 `PREFER_TIME`: `01` 오전 · `02` 오후 · `03` 상관없음 | 이사 견적 5단계 |
+| 🟢 | `TBL_QUOTE.WORK_TIME` VARCHAR2(5) NULL | 작업시각. 고정 시간대(08:00·10:00·13:00·15:00·17:00) 중 하나 | 견적서 작업일 칸 |
+| 🟡 | `TBL_REVIEW.CONTENT`, `REPLY_CONTENT` → 500 CHAR | 후기·사장님 답변 500자 | 후기 쓰기, 관리자 리뷰 답변 |
+
+### 코드
+
+- 🟢 `PREFER_TIME` (위 표)
+- 🔴 `SCHEDULE_CATEGORY`, `DAY_STATUS` 그룹 삭제
+- 🔴 `NTF_TYPE` `02` 공지, `NTF_DETAIL` `11` 공지·이야기 · `12` 이사 팁 삭제 (공지는 범위에서 제외, 번호는 비워 둠)
+
+### 규칙
+
+- 휴무 = 정기 휴무 요일 + 공휴일(쉬기 켬) + 임시 휴무. 공휴일·손 없는 날은 외부 API로 가져오고 저장하지 않음 (Q17 유지)
+- 손 없는 날은 사용자 날짜 선택에 '손없음' 표시만, 휴무 아님
+- 하루 예약 가능 건수·희망 시간대·동시 확정 처리: Q18
+- 리뷰 답변 등록 시 고객 알림 없음. 사용자 후기 목록에 '사장님 답변'으로 표시
+- `TBL_QUOTE.TOTAL_AMOUNT` = `MOVING_COST` + 사다리 비용(`FROM/TO_LADDER_COST`) + 옵션 비용 합(`TBL_QUOTE_OPTION.OPTION_COST`). 계약금 10%, 잔금 = 총비용 − 계약금. 관리자 견적서 A칸에 '옵션비용' 줄 표시
+
+---
+
 ## 신규 시퀀스·테이블 요약 (sequence.sql 반영 대상)
 
 | 구분 | 대상 |
 |---|---|
-| 신규 테이블 | `TBL_CODE_GROUP`, `TBL_CODE`, `TBL_DAY_STATUS` (자연키, 시퀀스 없음) · `TBL_CHATBOT_TOPIC`, `TBL_CHATBOT_ACTION` |
+| 신규 테이블 | `TBL_CODE_GROUP`, `TBL_CODE`, `TBL_CLOSED_DAY` (자연키, 시퀀스 없음) · `TBL_CHATBOT_TOPIC`, `TBL_CHATBOT_ACTION`, `TBL_SAVED_REPLY`, `TBL_RESERVATION_SETTING` |
+| 삭제 테이블 | `TBL_SCHEDULE` |
 | 이름 변경 | `TBL_CHATBOT_SCENARIO` → `TBL_LOREBOOK` |
-| 시퀀스 추가 | `SEQ_CHATBOT_TOPIC`, `SEQ_CHATBOT_ACTION` |
+| 시퀀스 추가 | `SEQ_CHATBOT_TOPIC`, `SEQ_CHATBOT_ACTION`, `SEQ_SAVED_REPLY`, `SEQ_RESERVATION_SETTING` |
 | 시퀀스 변경 | `SEQ_CHATBOT_SCENARIO` → `SEQ_LOREBOOK` |
+| 시퀀스 삭제 | `SEQ_SCHEDULE` |

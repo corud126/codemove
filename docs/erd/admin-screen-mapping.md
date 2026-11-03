@@ -32,9 +32,9 @@
 
 ## SCR-A-002 견적 수정 — `TBL_QUOTE`, `TBL_QUOTE_ITEM`, `TBL_QUOTE_OPTION`, `TBL_MOVE_REQUEST`, `TBL_REQUEST_ITEM`, `TBL_RE_VIDEO`
 
-- 요청 정보(표시): HOUSE_TYPE, PACK_TYPE, MOVE_DATE·MOVE_TIME(희망), FROM/TO_ADDRESS + DETAIL, REQUESTED_AT, 영상(TBL_RE_VIDEO.FILE_NAME·UPLOADED_AT)
+- 요청 정보(표시): HOUSE_TYPE, PACK_TYPE, MOVE_DATE·PREFER_TIME(희망일·희망 시간대), FROM/TO_ADDRESS + DETAIL, REQUESTED_AT, 영상(TBL_RE_VIDEO.FILE_NAME·UPLOADED_AT)
 - AI 분석(표시): AI_CBM, AI_EST_AMOUNT·MIN·MAX, AI_ANALYSIS_SEC, AI_CONFIDENCE, 요청 품목(CATEGORY, ITEM_NAME, ITEM_SIZE 소·중·대, QUANTITY, VOLUME, CONFIDENCE, NEEDS_REVIEW, SOURCE AI 인식/사용자 추가)
-- 견적서(입력): QUOTE_NO(표시), COMPANY_NAME, CONTACT_NAME, CONTACT_PHONE, ESTIMATE_DATE, FROM/TO_ADDRESS, WORK_DATE(없으면 승인 불가), TRANSPORT_DATE, WORK_TYPE(포장 방식: 일반·반포장·보관·포장), 출발/도착 각각 LADDER·ELEVATOR·STAIRS 사용, VOLUME_TON, NOTE(500), MOVING_COST, FROM/TO_LADDER_FLOOR·COST, TOTAL_AMOUNT, DEPOSIT_AMOUNT, BALANCE_AMOUNT
+- 견적서(입력): QUOTE_NO(표시), COMPANY_NAME, CONTACT_NAME, CONTACT_PHONE, ESTIMATE_DATE, FROM/TO_ADDRESS, WORK_DATE(없으면 승인 불가)·WORK_TIME(고정 시간대 08:00·10:00·13:00·15:00·17:00), TRANSPORT_DATE, WORK_TYPE(포장 방식: 일반·반포장·보관·포장), 출발/도착 각각 LADDER·ELEVATOR·STAIRS 사용, VOLUME_TON, NOTE(500), MOVING_COST, FROM/TO_LADDER_FLOOR·COST, TOTAL_AMOUNT, DEPOSIT_AMOUNT, BALANCE_AMOUNT
 - 품목(입력): CATEGORY 4그룹(가구·전자기기·생활용품·기타 고정), ITEM_NAME, QUANTITY, UNIT
 - 옵션(입력): QUOTE_OPTION 8종 × CHOICE1_YN·CHOICE2_YN·OPTION_COST
 - 상태(표시): STATUS, APPROVED_AT, EXPIRES_AT. 견적 확정 후 [수정] 숨김
@@ -53,7 +53,7 @@
 | STATUS (예약 완료·이사 완료·예약 취소) | 칩·필터는 예약 완료·예약 취소 둘만 (이사 완료는 예약 완료로 묶음) | 표시 (이사 완료 포함) |
 | PAY_STATUS (결제 대기·완료·취소) | — | 표시 + [결제 완료] |
 | MOVE_DATE (= 예약일) | 표시·검색 | 표시 |
-| MOVE_TIME | — | 표시 |
+| MOVE_TIME | — | 표시 · 일정 변경은 고정 시간대에서 선택 |
 | 출발·도착 주소, 이사 유형·포장 방식 | — | 표시 |
 | TOTAL·DEPOSIT·BALANCE_AMOUNT | — | 표시 |
 | MOVE_MEMO | — | 표시 |
@@ -63,17 +63,18 @@
 ## SCR-A-012 리뷰 관리 — `TBL_REVIEW`, `TBL_REVIEW_PHOTO`
 
 - 표시: 작성자(회원 이름), RATING(필터), CONTENT(1000), CREATED_AT, 사진(TBL_REVIEW_PHOTO, SORT_ORDER 순), 연결 예약(예약 번호·이사일·이사 유형)
-- 답변: REPLY_CONTENT(입력, **1000자**), REPLIED_AT·답변 관리자(표시), 답변 여부(필터 후보)
+- 답변: REPLY_CONTENT(입력, **500자**), REPLIED_AT·답변 관리자(표시), 답변 여부(필터 후보). 답변 등록 시 고객 알림 없음 — 사용자 후기 목록에 '사장님 답변'으로 표시
 
 ## SCR-A-005~007 채팅 — `TBL_CHAT_ROOM`, `TBL_CHAT_MESSAGE`
 
-- 방(목록/상세 헤더): 회원 이름·휴대폰, STATUS(챗봇 응대·상담 대기·상담 중·종료) 칩·필터, STARTED_AT, WAITING_AT(대기 시작), ENDED_AT, 담당 관리자(ADMIN_ID), 안 읽은 수(IS_READ)
+- 방(목록/상세 헤더): 회원 이름·휴대폰, STATUS(챗봇 응대·대기 중·상담 중·종료) 칩·필터, STARTED_AT, WAITING_AT(대기 시작), ENDED_AT, 담당 관리자(ADMIN_ID), 안 읽은 수(IS_READ)
 - 메시지: SENDER_TYPE(고객·AI·관리자 — 관리자는 상담사 이름), MESSAGE_TYPE 02 파일(ATTACHMENT_NAME 표시·다운로드), AI 답변 주제(TOPIC_ID → 제목), SENT_AT, 읽음(IS_READ)
 - 동작: 상담 종료(STATUS 04, ENDED_AT)
 
 ## SCR-A-008 채팅 운영 설정 — `TBL_CHAT_SETTING`
 
-- 입력: BOT_ENABLED, HOURS_ENABLED(화면 이름 '상담 운영' — 끄면 운영 시간이어도 상담원 연결을 받지 않음, 휴무 등), START_TIME·END_TIME 은 늘 적용, DELAY_MESSAGE(500)
+- 입력: BOT_ENABLED, CONSULT_ENABLED(화면 이름 '상담 운영' — 끄면 운영 시간이어도 상담원 연결을 받지 않음, 휴무 등), START_TIME·END_TIME 은 늘 적용, DELAY_MESSAGE(500, 지연 안내), AWAY_MESSAGE(500, 부재 안내 — 운영 시간 밖·상담 운영 꺼짐)
+- 자주 쓰는 답변: `TBL_SAVED_REPLY` TITLE(30), CONTENT(500) — 순서 기능 없음, 등록순
 
 ## SCR-A-009 채팅 시작 화면 — `TBL_CHAT_SETTING.GREETING`, `TBL_QUICK_MENU`
 
@@ -85,11 +86,12 @@
 - 로어북(안내 주제만, 여러 개): KEYWORDS(200), CONTENT(1000), SORT_ORDER
 - 답변 버튼(여러 개): LABEL(20), ACTION_TYPE(화면 이동·이어서 질문·상담원 연결), ACTION_VALUE(200), SORT_ORDER
 
-## SCR-A-020 예약 일정 · SCR-A-022 일정 관리 — `TBL_RESERVATION`, `TBL_DAY_STATUS` (+ 예약 설정 신규, `TBL_SCHEDULE` 삭제 예정)
+## SCR-A-020 예약 일정 · SCR-A-022 일정 관리 — `TBL_RESERVATION`, `TBL_RESERVATION_SETTING`, `TBL_CLOSED_DAY`
 
-- 캘린더 표시: 예약(예약 완료·이사 완료, MOVE_DATE·MOVE_TIME), 일정(SCHEDULE_TIME·TITLE·CATEGORY), 날짜 상태
-- 일정 등록(TBL_SCHEDULE, SCR-A-021): **화면에서 뺌** (개인 일정 관리 안 함 — 아래 ERD 반영 대기)
-- 일정 관리: 휴무일(TBL_DAY_STATUS) — 종류 구분 없이 하루 1건 (예전 01 이사 예약 불가능 · 02 업체 휴무일을 하나로 합침, 아래 ERD 반영 대기)
+- 예약 일정(조회 전용 캘린더): 예약(예약 완료·이사 완료, MOVE_DATE·MOVE_TIME), 휴무, 손 없는 날·공휴일(외부 API, 저장 안 함). 일정 등록(SCR-A-021)은 뺌 — `TBL_SCHEDULE` 삭제
+- 일정 관리 > 예약 설정: DAILY_CAPACITY(하루 예약 가능 건수, 1~10), CLOSED_WEEKDAYS(정기 휴무 요일), HOLIDAY_CLOSED(공휴일에 쉬기)
+- 일정 관리 > 임시 휴무: `TBL_CLOSED_DAY.CLOSED_DATE` (하루 1행, 해제 = 행 삭제)
+- 사용자 앱 날짜 선택과 연결: 휴무(정기·공휴일·임시)는 선택 불가, 그날 예약 확정 건수가 DAILY_CAPACITY 에 닿으면 '마감', 손 없는 날은 '손없음' 표시만. 고객은 희망 시간대(PREFER_TIME)만 고르고 정확한 시각은 견적서 WORK_TIME 으로 정함 (revision-user.md Q18)
 
 ## SCR-A-013~015 알림 관리 · A-019 알림 패널 — `TBL_NOTIFICATION`, `TBL_NOTIFICATION_SETTING`, `TBL_ADMIN`
 
@@ -98,21 +100,25 @@
 - 발송 내역 (고객에게 보낸 알림만, RECEIVER_TYPE 01): 대상 회원, NTF_DETAIL, NTF_TITLE, NTF_CONTENT, NTF_CHANNEL(앱·알림톡·문자), CREATED_AT, SENT_AT(발송 시각 / 보류 중), 결과(발송됨·보류 중·문자 대체) — 필터: 채널·결과, 검색: 이름·날짜
 - 많아질 때: 기본 **최근 30일**, 20건씩 이어서 불러오기(무한 스크롤), 그 이전은 날짜 검색으로만. 검색·필터는 서버 쿼리로 처리. 인덱스 (RECEIVER_TYPE, CREATED_AT) · (MEMBER_ID). 보관 기간은 보류(11/03) — 정해지면 ERD 운영 규칙으로 추가
 - 알림 설정
-  - 내 알림: `TBL_ADMIN.PUSH_ENABLED`(알림 받기, 계정별) — **ERD 추가 컬럼** `CHAR(1) DEFAULT 'Y' NOT NULL`. 끄면 휴대폰 푸시만 끊기고 알림 패널에는 그대로 쌓임
+  - 내 알림: `TBL_ADMIN.PUSH_ENABLED`(알림 받기, 계정별) `CHAR(1) DEFAULT 'Y' NOT NULL`. 끄면 휴대폰 푸시만 끊기고 알림 패널에는 그대로 쌓임
   - 고객 발송: IS_ACTIVE, QUIET_ENABLED, QUIET_START·END, SMS_FALLBACK (알림톡·문자에만 적용, Q22)
 - 알림 패널: RECEIVER_TYPE 02(관리자 수신)만, NTF_DETAIL, NTF_CONTENT, IS_IMPORTANT, IS_READ(안 읽음 표시·읽음 처리·모두 읽음), CREATED_AT, LINK_URL(이동) — 화면 전체 페이지, 탭 전체·안 읽음, 묶음 오늘·어제·이전
 
-## ERD 반영 대기 (관리자 화면 정리 후 사용자·관리자 대조 때 한 번에 결정)
+## ERD 반영 결과 (2026-11-03, revision-user.md 4단계)
 
-| 항목 | 내용 | 근거 화면 |
-| --- | --- | --- |
-| `TBL_ADMIN.PUSH_ENABLED` | `CHAR(1) DEFAULT 'Y' NOT NULL` — 관리자 계정별 알림 받기. 실제 관리자 휴대폰 푸시 발송은 별도 범위 (Q22 는 앱 안 패널만) | 알림 설정 > 내 알림 |
-| `TBL_SAVED_REPLY` + `SEQ_SAVED_REPLY` | 자주 쓰는 답변: REPLY_ID, TITLE(30), CONTENT(500), ADMIN_ID, UPDATED_AT (순서 기능 없음 · 등록순) | 채팅 설정 > 자주 쓰는 답변, 채팅방 입력창 |
-| 알림 보관 기간 | 보류 (11/03) | 발송 내역 |
-| 부재 안내 메시지 (후보) | `TBL_CHAT_SETTING` 에 상담원 연결을 못 받을 때(운영 시간 밖 · 상담 운영 꺼짐) 고객에게 보낼 문구 컬럼 추가 여부. 지금 `DELAY_MESSAGE` 는 대기가 길어질 때만 | 채팅 설정 > 상담 |
-| `HOURS_ENABLED` 이름 (후보) | 뜻이 '운영 시간 사용' → '상담 운영(상담원 연결 받기)'으로 바뀜. `CONSULT_ENABLED` 등으로 이름 변경 여부 | 채팅 설정 > 상담 |
-| `TBL_DAY_STATUS.STATUS` 통일 | '이사 예약 불가능 · 업체 휴무일' 두 값을 '휴무일' 하나로 합침 (고객 앱 동작이 같음). STATUS 컬럼·공통코드 DAY_STATUS 삭제 또는 값 하나로 | 일정 관리 > 휴무일, 예약 일정 |
-| 공휴일 · 손 없는 날 저장 (후보) | 외부 API(공공데이터 특일 정보 · 음력)로 불러온 값을 테이블에 저장할지 (예전 Q17 '저장하지 않음') | 일정 관리 > 공휴일, 예약 일정 |
-| `TBL_SCHEDULE` + `SEQ_SCHEDULE` 삭제 | 사장님 개인 일정 등록 기능을 뺌 (11/03). 관련 FK · 공통코드(SCHEDULE_CATEGORY) 함께 정리 | 일정 관리 |
-| 예약 설정 (신규) | 하루 예약 가능 건수(`DAILY_CAPACITY`, 기본 3 — 그날 예약이 이 수만큼 차면 남은 시간대도 마감. Q18 의 '시간대당 건수 `application.yml` 설정값'을 하루 기준으로 바꾸고 사장님이 바꾸도록 DB 로) · 정기 휴무 요일(`CLOSED_WEEKDAYS` 예: '0,1') · 공휴일에 쉬기(`HOLIDAY_CLOSED` CHAR(1)) — 설정 테이블(1행) 신설. `TBL_DAY_STATUS` 는 임시 휴무만 | 일정 관리 > 예약 설정 |
-| 사용자 앱 날짜 선택 (화면 수정) | 고객이 이사 날짜를 고를 때 휴무일(정기 · 공휴일 · 임시)과 마감일(그날 예약이 하루 건수만큼 참)을 선택 불가로 표시. 관리자 예약 일정 달력에는 '마감'을 따로 표시하지 않음(사장님은 설정만 알면 됨) | 사용자 견적·예약 날짜 선택 |
+사용자·관리자 화면 대조 후 아래처럼 정해 ddl.sql · sequence.sql · code-data.sql 에 반영했다.
+
+| 항목 | 결정 |
+| --- | --- |
+| 관리자 알림 받기 | `TBL_ADMIN.PUSH_ENABLED` 추가 |
+| 자주 쓰는 답변 | `TBL_SAVED_REPLY` + `SEQ_SAVED_REPLY` 신설 (순서 기능 없음) |
+| 상담 운영 | `HOURS_ENABLED` → `CONSULT_ENABLED` |
+| 부재 안내 메시지 | `TBL_CHAT_SETTING.AWAY_MESSAGE` 추가 |
+| 휴무일 | `TBL_DAY_STATUS` → `TBL_CLOSED_DAY` (임시 휴무만, 상태 컬럼·`DAY_STATUS` 코드 삭제) |
+| 예약 설정 | `TBL_RESERVATION_SETTING` + `SEQ_RESERVATION_SETTING` 신설 |
+| 개인 일정 | `TBL_SCHEDULE` · `SEQ_SCHEDULE` · `SCHEDULE_CATEGORY` 삭제 |
+| 공휴일 · 손 없는 날 | 저장하지 않음 (외부 API, Q17 유지) |
+| 이사 시간 | 고객은 희망 시간대 `TBL_MOVE_REQUEST.PREFER_TIME`(오전·오후·상관없음), 정확한 시각은 `TBL_QUOTE.WORK_TIME` (고정 시간대) |
+| 후기 · 답변 길이 | `CONTENT` · `REPLY_CONTENT` 500자, 답변 알림 없음 |
+| 공지 알림 | `NTF_TYPE` 02, `NTF_DETAIL` 11·12 삭제 |
+| 알림 보관 기간 | 보류 — 정해지면 운영 규칙으로 추가 |
