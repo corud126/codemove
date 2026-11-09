@@ -231,7 +231,9 @@
 
 ### TBL_REVIEW_PHOTO
 
-- ⚪ 변경 없음 (최대 5장, `SORT_ORDER` 1~5)
+- ⚪ 최대 5장, `SORT_ORDER` 1~5 (올린 순서)
+- 🟡 (11/09 제안, 미적용) `CK_REVIEW_PHOTO_SORT` CHECK (`SORT_ORDER` 1~5), `UK_REVIEW_PHOTO_SORT` UNIQUE (`REVIEW_ID`, `SORT_ORDER`) — 한 후기에 같은 순서 · 6장 이상이 들어가지 않게. 이미 만든 DB 는 alter-20261109-review.sql 로 반영
+- 파일은 `uploads/reviews/{UUID}.{확장자}` (git 제외), `FILE_PATH` 에 서버 저장 경로. JPG · PNG · WEBP, 한 장 최대 10MB (`codemove.review.max-photo-mb`)
 
 ### TBL_CHAT_ROOM
 

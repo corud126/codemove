@@ -1,14 +1,32 @@
 package com.codemove.web.user;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.codemove.domain.Member;
+import com.codemove.domain.ReviewPhoto;
 import com.codemove.domain.Social;
 import com.codemove.member.LoginMember;
 import com.codemove.member.MemberService;
+import com.codemove.review.ReviewService;
+import com.codemove.review.ReviewTargetView;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 public class MoreController {
 
 	private final MemberService memberService;
+	private final ReviewService reviewService;
 
 	@GetMapping("/more")
 	public String more() {
@@ -62,14 +81,54 @@ public class MoreController {
 		return "user/more/reservations";
 	}
 
+	/** 후기 (G-H09 · H12): 내가 쓴 후기 + 사장님 답변, 위에 아직 후기를 안 쓴 최근 이사 완료 예약. ?state=done 등록 완료 토스트 */
 	@GetMapping("/more/reviews")
-	public String reviews() {
+	public String reviews(HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		model.addAttribute("reviews", reviewService.myReviews(login.memberId()));
+		model.addAttribute("reviewTarget", reviewService.target(login.memberId(), null));
 		return "user/more/reviews";
 	}
 
+	/** 후기 작성 (G-H10 · H11): ?reservation= 본인 · 이사 완료 · 후기 없는 예약만 (없으면 가장 최근 이사 완료 예약) */
 	@GetMapping("/more/reviews/new")
-	public String reviewNew() {
+	public String reviewNew(@RequestParam(required = false) Long reservation, HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		ReviewTargetView target = reviewService.target(login.memberId(), reservation);
+		if (target == null) {
+			return "redirect:/more/reviews";
+		}
+		model.addAttribute("reviewTarget", target);
 		return "user/more/review-new";
+	}
+
+	/** 후기 등록 (more.js 가 multipart 로 보냄) → {redirect} 또는 {message} */
+	@PostMapping("/more/reviews")
+	@ResponseBody
+	public ResponseEntity<Map<String, Object>> writeReview(@RequestParam(required = false) Long reservation,
+			@RequestParam(required = false) Integer rating, @RequestParam(defaultValue = "") String content,
+			@RequestParam(required = false) List<MultipartFile> photos, HttpSession session) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		try {
+			reviewService.write(login.memberId(), reservation, rating, content, photos);
+			return ResponseEntity.ok(Map.of("redirect", "/more/reviews?state=done"));
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+		} catch (IllegalStateException e) {
+			return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
+		}
+	}
+
+	/** 내 후기 사진 */
+	@GetMapping("/more/reviews/photos/{id}")
+	public ResponseEntity<Resource> reviewPhoto(@PathVariable Long id, HttpSession session) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		ReviewPhoto photo = reviewService.memberPhoto(login.memberId(), id);
+		if (photo == null || !Files.exists(Path.of(photo.getFilePath()))) {
+			return ResponseEntity.notFound().build();
+		}
+		MediaType type = MediaTypeFactory.getMediaType(photo.getFilePath()).orElse(MediaType.APPLICATION_OCTET_STREAM);
+		return ResponseEntity.ok().contentType(type).body(new FileSystemResource(photo.getFilePath()));
 	}
 
 	@GetMapping("/notifications")

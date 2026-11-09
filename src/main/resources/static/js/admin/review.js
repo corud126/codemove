@@ -1,7 +1,8 @@
 /*
- * SCR-A-012 리뷰 관리 (templates/admin/review/list.html) — 더미 데이터
+ * SCR-A-012 리뷰 관리 (templates/admin/review/list.html) — TBL_REVIEW (미리보기 /dev 는 예시 데이터로 화면에서만 동작)
  *  별점·답변 드롭다운(건수 갱신) · 내용 3줄 넘치면 [더보기] · 사진 크게 보기
  *  [답변 달기] → 입력 → [답변 등록](답변일 기록·답변 대기 칩 제거, 고객 알림 없음 — 사용자 앱 후기 목록에 표시) / [취소] · 답변 아래 [수정 | 삭제] → 입력창 [취소][저장] / 삭제 확인 후 답변 대기
+ *  data-live 이면 등록·수정 POST /admin/reviews/{id}/reply {content}, 삭제 POST /admin/reviews/{id}/reply/delete — {ok} 또는 {message}
  */
 (function () {
   const root = document.getElementById('reviewList');
@@ -9,6 +10,35 @@
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const layer = window.CodeMoveAdmin || { open: (el) => { el.hidden = false; }, close: (el) => { el.hidden = true; } };
+  const live = root.dataset.live === 'true';
+
+  /* 서버 요청 (JSON). 미리보기면 보내지 않고 성공으로 본다 */
+  async function post(url, data) {
+    if (!live) return { ok: true };
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+      return Object.assign({ ok: res.ok }, await res.json().catch(() => ({})));
+    } catch (_) {
+      return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+    }
+  }
+
+  // 저장 실패 안내 — 견적 관리(estimate.js)와 같은 회색 알약, 하단 탭 위
+  function snack(message) {
+    let el = $('#reviewSnack');
+    if (!el) {
+      el = document.createElement('p');
+      el.id = 'reviewSnack';
+      el.setAttribute('role', 'status');
+      el.style.cssText = 'position:absolute;left:50%;bottom:calc(var(--nav) + 20px);z-index:120;display:flex;align-items:center;height:31px;padding:0 14px;border-radius:999px;'
+        + 'background:#70746d;color:#f4f4f2;font-size:14px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);transition:opacity .4s';
+      ($('#adminFrame') || document.body).appendChild(el);
+    }
+    el.textContent = message;
+    el.style.opacity = '1';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
+  }
 
   const rating = $('#ratingFilter');
   const reply = $('#replyFilter');
@@ -82,7 +112,7 @@
     $('[data-reply-open]', card).hidden = false;
   }
 
-  $('#reviewCards').addEventListener('click', (e) => {
+  $('#reviewCards').addEventListener('click', async (e) => {
     const card = e.target.closest('[data-review]');
     if (!card) return;
 
@@ -114,6 +144,8 @@
     if (e.target.closest('[data-reply-submit]')) {
       const text = $('[data-reply-input]', card).value.trim();
       if (!text) { $('[data-reply-input]', card).focus(); return; }
+      const result = await post(`/admin/reviews/${card.dataset.review}/reply`, { content: text });
+      if (!result.ok) { snack(result.message || '답변을 등록하지 못했어요.'); return; }
       const answer = $('[data-answer]', card);
       $('[data-answer-text]', answer).textContent = text;
       $('[data-answer-input]', answer).value = text;
@@ -138,6 +170,8 @@
     if (e.target.closest('[data-answer-save]')) {
       const value = input.value.trim();
       if (!value) { input.focus(); return; }
+      const result = await post(`/admin/reviews/${card.dataset.review}/reply`, { content: value });
+      if (!result.ok) { snack(result.message || '답변을 저장하지 못했어요.'); return; }
       text.textContent = value;
       answer.classList.remove('is-editing');
       return;
@@ -159,8 +193,14 @@
   $$('[data-answer]', root).forEach(countAnswer);
 
   let deleting = null;
-  document.getElementById('answerDeleteOk')?.addEventListener('click', () => {
+  document.getElementById('answerDeleteOk')?.addEventListener('click', async () => {
     if (deleting) {
+      const result = await post(`/admin/reviews/${deleting.dataset.review}/reply/delete`);
+      if (!result.ok) {
+        layer.close(document.getElementById('answerDelete'));
+        snack(result.message || '답변을 삭제하지 못했어요.');
+        return;
+      }
       $('[data-answer]', deleting).hidden = true;
       $('[data-pending-chip]', deleting).hidden = false;
       $('[data-reply-open]', deleting).hidden = false;

@@ -1,22 +1,27 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U-08x 후기 작성 (G-H10~H11 / E-H10~H11) — 11/02 시안(06·07_review_new) 기준
+  model reviewTarget (ReviewTargetView: 본인 · 이사 완료 · 후기 없는 예약). 모델이 없으면(미리보기 /dev) 예시 값(SAMPLE)
   state: (없음) 빈 화면 (별점 미선택, 등록 버튼 비활성) | filled 입력 완료 (별점 4 '좋아요', 내용 38자, 사진 2장)
-  별점(라벨)·글자 수·사진 첨부(최대 5장, input file)·등록 버튼 활성화는 more.js → /more/reviews?state=done
+  별점(라벨)·글자 수·사진 첨부(최대 5장, input file)·등록 버튼 활성화는 more.js → POST /more/reviews (multipart) → /more/reviews?state=done
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='후기 작성', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/more.css}">
 </head>
 <body>
-<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}, filled=${state == 'filled'}, rating=${filled ? 4 : 0}">
+<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}, live=${reviewTarget != null},
+     target=${reviewTarget ?: T(com.codemove.review.ReviewTargetView).SAMPLE},
+     filled=${!live and state == 'filled'}, rating=${filled ? 4 : 0}">
   <div class="screen form-page review-new-page">
     <div class="form-head">
       <a th:replace="~{fragments/user-layout :: back(href=@{/more/reviews})}"></a>
       <div class="form-title">후기 작성</div>
     </div>
-    <form class="review-compose" id="reviewForm" th:action="@{/more/reviews}" method="get" novalidate>
+    <form class="review-compose" id="reviewForm" th:action="@{/more/reviews}" method="post" enctype="multipart/form-data" novalidate
+          th:attr="data-live=${live}">
+      <input type="hidden" name="reservation" th:value="${target.reservationId}">
       <h1 class="rv-title">이사 서비스는 어떠셨나요?</h1>
-      <p class="rv-sub">강남구 → 서초구 · 원룸 일반포장 · 3월 18일</p>
+      <p class="rv-sub" th:text="${target.sub}">강남구 → 서초구 · 원룸 일반포장 · 3월 18일</p>
 
       <div class="rv-rating" id="ratingRow" role="radiogroup" aria-label="별점" th:attr="data-rating=${rating}">
         <button type="button" class="rv-star" th:each="star : ${#numbers.sequence(1, 5)}"
