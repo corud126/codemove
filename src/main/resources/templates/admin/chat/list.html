@@ -81,7 +81,9 @@
             <span class="min-w-0 flex-1">
               <span class="flex min-w-0 items-baseline gap-1.5">
                 <strong class="truncate text-[16px] font-semibold text-[#1a1a1a]" th:text="${r.name}">홍길동</strong>
-                <span data-wait-label hidden class="shrink-0 text-[13px] font-semibold text-[#d9701a]" th:text="|${r.wait}분 대기|">3분 대기</span>
+                <!--/* 대기 시간: 1시간 미만 N분, 하루 미만 N시간, 그 이상 N일 (data-wait 는 정렬용 분) */-->
+                <span data-wait-label hidden class="shrink-0 text-[13px] font-semibold text-[#d9701a]"
+                      th:text="${r.wait < 60 ? r.wait + '분' : (r.wait < 1440 ? (r.wait / 60) + '시간' : (r.wait / 1440) + '일')} + ' 대기'">3분 대기</span>
               </span>
               <span class="mt-1 block truncate text-[14px] text-[#777]" th:text="${r.msg}">마지막 메시지</span>
             </span>

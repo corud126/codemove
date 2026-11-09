@@ -202,6 +202,6 @@ public class MoveRequestService {
 	}
 
 	private static String joinAddress(String road, String detail) {
-		return detail == null ? road : road + " " + detail;
+		return detail == null ? road : road + ", " + detail; // 화면 시안 형식: 테헤란로 123, 301호
 	}
 }

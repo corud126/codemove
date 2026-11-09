@@ -1,15 +1,10 @@
 package com.codemove.web.user;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -30,6 +25,7 @@ import com.codemove.notification.NotificationService;
 import com.codemove.reservation.HistoryService;
 import com.codemove.review.ReviewService;
 import com.codemove.review.ReviewTargetView;
+import com.codemove.web.FileResponses;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -193,11 +189,7 @@ public class MoreController {
 	public ResponseEntity<Resource> reviewPhoto(@PathVariable Long id, HttpSession session) {
 		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
 		ReviewPhoto photo = reviewService.memberPhoto(login.memberId(), id);
-		if (photo == null || !Files.exists(Path.of(photo.getFilePath()))) {
-			return ResponseEntity.notFound().build();
-		}
-		MediaType type = MediaTypeFactory.getMediaType(photo.getFilePath()).orElse(MediaType.APPLICATION_OCTET_STREAM);
-		return ResponseEntity.ok().contentType(type).body(new FileSystemResource(photo.getFilePath()));
+		return FileResponses.serve(photo == null ? null : photo.getFilePath());
 	}
 
 	/** 알림 (G-H13): 최근 알림 목록. 읽음 · 모두 읽음은 NotificationController */

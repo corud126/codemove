@@ -1,15 +1,10 @@
 package com.codemove.web.admin;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -24,6 +19,7 @@ import com.codemove.admin.LoginAdmin;
 import com.codemove.domain.ReviewPhoto;
 import com.codemove.review.AdminReviewView;
 import com.codemove.review.ReviewService;
+import com.codemove.web.FileResponses;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -77,10 +73,6 @@ public class AdminReviewController {
 	@GetMapping("/photos/{id:\\d+}")
 	public ResponseEntity<Resource> photo(@PathVariable Long id) {
 		ReviewPhoto photo = reviewService.photo(id);
-		if (photo == null || !Files.exists(Path.of(photo.getFilePath()))) {
-			return ResponseEntity.notFound().build();
-		}
-		MediaType type = MediaTypeFactory.getMediaType(photo.getFilePath()).orElse(MediaType.APPLICATION_OCTET_STREAM);
-		return ResponseEntity.ok().contentType(type).body(new FileSystemResource(photo.getFilePath()));
+		return FileResponses.serve(photo == null ? null : photo.getFilePath());
 	}
 }

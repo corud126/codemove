@@ -128,7 +128,7 @@ class QuoteFlowTest {
 		assertThat((String) quote.get("QUOTE_NO")).matches("QT-\\d{8}-\\d{4}");
 		assertThat(quote.get("CONTACT_NAME")).isEqualTo("견적테스트");
 		assertThat(quote.get("CONTACT_PHONE")).isEqualTo(phone);
-		assertThat(quote.get("FROM_ADDRESS")).isEqualTo("서울 강남구 테헤란로 123 301호");
+		assertThat(quote.get("FROM_ADDRESS")).isEqualTo("서울 강남구 테헤란로 123, 301호");
 		assertThat((BigDecimal) quote.get("VOLUME_TON")).isEqualByComparingTo("2.0");
 		long moving = ((BigDecimal) quote.get("MOVING_COST")).longValue();
 		assertThat(moving).isEqualTo(((BigDecimal) req.get("AI_EST_AMOUNT")).longValue());
