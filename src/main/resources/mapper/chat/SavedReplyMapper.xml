@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.chat.SavedReplyMapper">
+
+	<sql id="columns">
+		REPLY_ID, TITLE, CONTENT, UPDATED_AT, ADMIN_ID
+	</sql>
+
+	<select id="selectAll" resultType="SavedReply">
+		SELECT <include refid="columns"/>
+		  FROM TBL_SAVED_REPLY
+		 ORDER BY REPLY_ID
+	</select>
+
+	<select id="selectById" resultType="SavedReply">
+		SELECT <include refid="columns"/>
+		  FROM TBL_SAVED_REPLY
+		 WHERE REPLY_ID = #{replyId}
+	</select>
+
+	<insert id="insert" parameterType="SavedReply">
+		<selectKey keyProperty="replyId" resultType="long" order="BEFORE">
+			SELECT SEQ_SAVED_REPLY.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_SAVED_REPLY (REPLY_ID, TITLE, CONTENT, ADMIN_ID)
+		VALUES (#{replyId}, #{title}, #{content,jdbcType=VARCHAR}, #{adminId,jdbcType=NUMERIC})
+	</insert>
+
+	<update id="update" parameterType="SavedReply">
+		UPDATE TBL_SAVED_REPLY
+		   SET TITLE = #{title},
+		       CONTENT = #{content,jdbcType=VARCHAR},
+		       UPDATED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId,jdbcType=NUMERIC}
+		 WHERE REPLY_ID = #{replyId}
+	</update>
+
+	<delete id="delete">
+		DELETE FROM TBL_SAVED_REPLY WHERE REPLY_ID = #{replyId}
+	</delete>
+
+</mapper>

@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.chat.ChatMapper">
+
+	<!-- ==================== 채팅방 ==================== -->
+
+	<sql id="roomColumns">
+		R.ROOM_ID, R.MEMBER_ID, R.ADMIN_ID, R.STATUS, R.STARTED_AT, R.WAITING_AT, R.ENDED_AT,
+		M.MEMBER_NAME, M.PHONE, A.ADMIN_NAME
+	</sql>
+
+	<sql id="roomJoins">
+		  FROM TBL_CHAT_ROOM R
+		  JOIN TBL_MEMBER M ON M.MEMBER_ID = R.MEMBER_ID
+		  LEFT JOIN TBL_ADMIN A ON A.ADMIN_ID = R.ADMIN_ID
+	</sql>
+
+	<select id="selectLatestRoom" resultType="ChatRoom">
+		SELECT <include refid="roomColumns"/>
+		<include refid="roomJoins"/>
+		 WHERE R.ROOM_ID = (SELECT MAX(ROOM_ID) FROM TBL_CHAT_ROOM WHERE MEMBER_ID = #{memberId})
+	</select>
+
+	<select id="selectRoom" resultType="ChatRoom">
+		SELECT <include refid="roomColumns"/>
+		<include refid="roomJoins"/>
+		 WHERE R.ROOM_ID = #{roomId}
+	</select>
+
+	<select id="selectRoomsOfMember" resultType="ChatRoom">
+		SELECT <include refid="roomColumns"/>
+		<include refid="roomJoins"/>
+		 WHERE R.MEMBER_ID = #{memberId}
+		 ORDER BY R.ROOM_ID
+	</select>
+
+	<insert id="insertRoom" parameterType="ChatRoom">
+		<selectKey keyProperty="roomId" resultType="long" order="BEFORE">
+			SELECT SEQ_CHAT_ROOM.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_CHAT_ROOM (ROOM_ID, MEMBER_ID, STATUS, WAITING_AT)
+		VALUES (#{roomId}, #{memberId}, #{status},
+		        <choose><when test="status == '02'">SYSDATE</when><otherwise>NULL</otherwise></choose>)
+	</insert>
+
+	<update id="updateWaiting">
+		UPDATE TBL_CHAT_ROOM
+		   SET STATUS = '02',
+		       WAITING_AT = SYSDATE
+		 WHERE ROOM_ID = #{roomId}
+		   AND STATUS = '01'
+	</update>
+
+	<update id="updateActive">
+		UPDATE TBL_CHAT_ROOM
+		   SET STATUS = '03',
+		       ADMIN_ID = NVL(ADMIN_ID, #{adminId,jdbcType=NUMERIC})
+		 WHERE ROOM_ID = #{roomId}
+		   AND STATUS IN ('01', '02')
+	</update>
+
+	<update id="updateEnded">
+		UPDATE TBL_CHAT_ROOM
+		   SET STATUS = '04',
+		       ENDED_AT = SYSDATE,
+		       ADMIN_ID = NVL(ADMIN_ID, #{adminId,jdbcType=NUMERIC})
+		 WHERE ROOM_ID = #{roomId}
+		   AND STATUS != '04'
+	</update>
+
+	<update id="endIdleRooms">
+		UPDATE TBL_CHAT_ROOM R
+		   SET R.STATUS = '04',
+		       R.ENDED_AT = SYSDATE
+		 WHERE R.STATUS IN ('01', '03')
+		   <if test="memberId != null">AND R.MEMBER_ID = #{memberId}</if>
+		   AND NVL((SELECT MAX(C.SENT_AT) FROM TBL_CHAT_MESSAGE C WHERE C.ROOM_ID = R.ROOM_ID), R.STARTED_AT)
+		       &lt; SYSDATE - #{minutes} / 1440
+	</update>
+
+	<!-- 회원마다 가장 최근 방 한 줄 (채팅방 주소 = MEMBER_ID) -->
+	<select id="selectLatestRooms" resultType="ChatRoom">
+		SELECT <include refid="roomColumns"/>,
+		       L.CONTENT AS LAST_CONTENT, L.ATTACHMENT_NAME AS LAST_ATTACHMENT_NAME, L.SENT_AT AS LAST_SENT_AT,
+		       (SELECT COUNT(*) FROM TBL_CHAT_MESSAGE U
+		         WHERE U.ROOM_ID = R.ROOM_ID AND U.SENDER_TYPE = '01' AND U.IS_READ = 'N') AS UNREAD_COUNT
+		<include refid="roomJoins"/>
+		  LEFT JOIN (SELECT ROOM_ID, MAX(MESSAGE_ID) AS LAST_ID FROM TBL_CHAT_MESSAGE GROUP BY ROOM_ID) LM
+		    ON LM.ROOM_ID = R.ROOM_ID
+		  LEFT JOIN TBL_CHAT_MESSAGE L ON L.MESSAGE_ID = LM.LAST_ID
+		 WHERE R.ROOM_ID = (SELECT MAX(Z.ROOM_ID) FROM TBL_CHAT_ROOM Z WHERE Z.MEMBER_ID = R.MEMBER_ID)
+		 ORDER BY NVL(L.SENT_AT, R.STARTED_AT) DESC, R.ROOM_ID DESC
+	</select>
+
+	<select id="searchMemberIds" resultType="long">
+		SELECT DISTINCT R.MEMBER_ID
+		  FROM TBL_CHAT_ROOM R
+		  JOIN TBL_MEMBER M ON M.MEMBER_ID = R.MEMBER_ID
+		  LEFT JOIN TBL_CHAT_MESSAGE C ON C.ROOM_ID = R.ROOM_ID
+		 WHERE LOWER(M.MEMBER_NAME) LIKE '%' || LOWER(#{query}) || '%'
+		    OR LOWER(C.CONTENT) LIKE '%' || LOWER(#{query}) || '%'
+		    OR LOWER(C.ATTACHMENT_NAME) LIKE '%' || LOWER(#{query}) || '%'
+		   <if test="digits != null">OR REPLACE(M.PHONE, '-', '') LIKE '%' || #{digits} || '%'</if>
+	</select>
+
+	<select id="selectOverdueWaitingRooms" resultType="ChatRoom">
+		SELECT R.ROOM_ID, R.MEMBER_ID, R.STATUS, R.WAITING_AT
+		  FROM TBL_CHAT_ROOM R
+		 WHERE R.STATUS = '02'
+		   <if test="memberId != null">AND R.MEMBER_ID = #{memberId}</if>
+		   AND R.WAITING_AT &lt; SYSDATE - #{minutes} / 1440
+		   AND NOT EXISTS (SELECT 1 FROM TBL_CHAT_MESSAGE C
+		                    WHERE C.ROOM_ID = R.ROOM_ID
+		                      AND C.SENT_AT &gt;= R.WAITING_AT
+		                      AND (C.SENDER_TYPE = '03' OR (C.SENDER_TYPE = '02' AND C.CONTENT = #{notice})))
+	</select>
+
+	<!-- ==================== 메시지 ==================== -->
+
+	<sql id="messageColumns">
+		C.MESSAGE_ID, C.ROOM_ID, C.ADMIN_ID, C.TOPIC_ID, C.SENDER_TYPE, C.MESSAGE_TYPE, C.CONTENT,
+		C.ATTACHMENT_PATH, C.ATTACHMENT_NAME, C.IS_READ, C.SENT_AT,
+		A.ADMIN_NAME, T.TITLE AS TOPIC_TITLE
+	</sql>
+
+	<sql id="messageJoins">
+		  FROM TBL_CHAT_MESSAGE C
+		  LEFT JOIN TBL_ADMIN A ON A.ADMIN_ID = C.ADMIN_ID
+		  LEFT JOIN TBL_CHATBOT_TOPIC T ON T.TOPIC_ID = C.TOPIC_ID
+	</sql>
+
+	<insert id="insertMessage" parameterType="ChatMessage">
+		<selectKey keyProperty="messageId" resultType="long" order="BEFORE">
+			SELECT SEQ_CHAT_MESSAGE.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_CHAT_MESSAGE (MESSAGE_ID, ROOM_ID, ADMIN_ID, TOPIC_ID, SENDER_TYPE, MESSAGE_TYPE, CONTENT,
+		                              ATTACHMENT_PATH, ATTACHMENT_NAME, IS_READ)
+		VALUES (#{messageId}, #{roomId}, #{adminId,jdbcType=NUMERIC}, #{topicId,jdbcType=NUMERIC}, #{senderType}, #{messageType}, #{content,jdbcType=VARCHAR},
+		        #{attachmentPath,jdbcType=VARCHAR}, #{attachmentName,jdbcType=VARCHAR}, #{isRead})
+	</insert>
+
+	<select id="selectRoomMessages" resultType="ChatMessage">
+		SELECT <include refid="messageColumns"/>
+		<include refid="messageJoins"/>
+		 WHERE C.ROOM_ID = #{roomId}
+		 ORDER BY C.MESSAGE_ID
+	</select>
+
+	<select id="selectMemberMessagesAfter" resultType="ChatMessage">
+		SELECT <include refid="messageColumns"/>
+		<include refid="messageJoins"/>
+		 WHERE C.ROOM_ID IN (SELECT ROOM_ID FROM TBL_CHAT_ROOM WHERE MEMBER_ID = #{memberId})
+		   AND C.MESSAGE_ID &gt; #{afterId}
+		 ORDER BY C.MESSAGE_ID
+	</select>
+
+	<select id="selectRecentMemberMessages" resultType="ChatMessage">
+		SELECT * FROM (
+			SELECT <include refid="messageColumns"/>
+			<include refid="messageJoins"/>
+			 WHERE C.ROOM_ID IN (SELECT ROOM_ID FROM TBL_CHAT_ROOM WHERE MEMBER_ID = #{memberId})
+			 ORDER BY C.MESSAGE_ID DESC
+		) WHERE ROWNUM &lt;= #{limit}
+	</select>
+
+	<select id="selectMessageMemberId" resultType="long">
+		SELECT R.MEMBER_ID
+		  FROM TBL_CHAT_MESSAGE C
+		  JOIN TBL_CHAT_ROOM R ON R.ROOM_ID = C.ROOM_ID
+		 WHERE C.MESSAGE_ID = #{messageId}
+	</select>
+
+	<select id="selectMessage" resultType="ChatMessage">
+		SELECT <include refid="messageColumns"/>
+		<include refid="messageJoins"/>
+		 WHERE C.MESSAGE_ID = #{messageId}
+	</select>
+
+	<update id="markRead">
+		UPDATE TBL_CHAT_MESSAGE
+		   SET IS_READ = 'Y'
+		 WHERE IS_READ = 'N'
+		   AND SENDER_TYPE = #{senderType}
+		   AND ROOM_ID IN (SELECT ROOM_ID FROM TBL_CHAT_ROOM WHERE MEMBER_ID = #{memberId})
+	</update>
+
+	<!-- ==================== 운영 설정 ==================== -->
+
+	<select id="selectSetting" resultType="ChatSetting">
+		SELECT * FROM (
+			SELECT SETTING_ID, BOT_ENABLED, CONSULT_ENABLED, START_TIME, END_TIME, GREETING,
+			       DELAY_MESSAGE, AWAY_MESSAGE, UPDATED_AT, ADMIN_ID
+			  FROM TBL_CHAT_SETTING
+			 ORDER BY SETTING_ID
+		) WHERE ROWNUM = 1
+	</select>
+
+	<insert id="insertSetting" parameterType="ChatSetting">
+		<selectKey keyProperty="settingId" resultType="long" order="BEFORE">
+			SELECT SEQ_CHAT_SETTING.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_CHAT_SETTING (SETTING_ID, BOT_ENABLED, CONSULT_ENABLED, START_TIME, END_TIME, GREETING,
+		                              DELAY_MESSAGE, AWAY_MESSAGE, ADMIN_ID)
+		VALUES (#{settingId}, #{botEnabled}, #{consultEnabled}, #{startTime}, #{endTime}, #{greeting},
+		        #{delayMessage,jdbcType=VARCHAR}, #{awayMessage,jdbcType=VARCHAR}, #{adminId,jdbcType=NUMERIC})
+	</insert>
+
+	<update id="updateSetting" parameterType="ChatSetting">
+		UPDATE TBL_CHAT_SETTING
+		   SET BOT_ENABLED = #{botEnabled},
+		       CONSULT_ENABLED = #{consultEnabled},
+		       START_TIME = #{startTime},
+		       END_TIME = #{endTime},
+		       GREETING = #{greeting},
+		       DELAY_MESSAGE = #{delayMessage,jdbcType=VARCHAR},
+		       AWAY_MESSAGE = #{awayMessage,jdbcType=VARCHAR},
+		       UPDATED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId,jdbcType=NUMERIC}
+		 WHERE SETTING_ID = #{settingId}
+	</update>
+
+	<!-- ==================== 견적 · 예약 (읽기 전용) ==================== -->
+
+	<!-- 예약 완료(01)를 먼저, 그다음 이사일 최근 순 -->
+	<select id="selectMemberReservation" resultType="com.codemove.chat.MemberReservation">
+		SELECT * FROM (
+			SELECT V.RESERVATION_ID, V.RESERVATION_NO, V.STATUS, V.MOVE_DATE, V.MOVE_TIME,
+			       Q.FROM_ADDRESS, Q.TO_ADDRESS
+			  FROM TBL_RESERVATION V
+			  JOIN TBL_MOVE_REQUEST Q ON Q.REQUEST_ID = V.REQUEST_ID
+			 WHERE Q.MEMBER_ID = #{memberId}
+			 ORDER BY CASE WHEN V.STATUS = '01' THEN 0 ELSE 1 END, V.MOVE_DATE DESC, V.RESERVATION_ID DESC
+		) WHERE ROWNUM = 1
+	</select>
+
+	<select id="selectMemberQuote" resultType="com.codemove.chat.MemberQuote">
+		SELECT * FROM (
+			SELECT Q.QUOTE_ID, Q.QUOTE_NO, Q.STATUS, Q.TOTAL_AMOUNT
+			  FROM TBL_QUOTE Q
+			 WHERE Q.MEMBER_ID = #{memberId}
+			    OR Q.REQUEST_ID IN (SELECT REQUEST_ID FROM TBL_MOVE_REQUEST WHERE MEMBER_ID = #{memberId})
+			 ORDER BY Q.QUOTE_ID DESC
+		) WHERE ROWNUM = 1
+	</select>
+
+</mapper>
