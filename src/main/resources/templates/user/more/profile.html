@@ -2,13 +2,20 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U-08x 내 정보 수정 (G-H02~H04 / E-H02~H04)
   state: (없음) 내 정보 수정 H02 | phone 휴대폰 번호 변경 H03 | verify 휴대폰 번호 변경_인증 H04
-  번호 입력·인증번호 발송·타이머는 more.js 에서 시뮬레이션
+  번호 변경: 인증번호 발송 POST /more/profile/phone/send → 확인·변경 POST /more/profile/phone (more.js, 미리보기는 시뮬레이션)
+  model: member (TBL_MEMBER), loginTypes (연결된 LOGIN_TYPE 목록). 미리보기(/dev)에서는 기본 문구 표시
+  회원 탈퇴 → 확인 바텀시트(예약 취소 확인과 같은 모양) → POST /more/withdraw
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='내 정보 수정', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/more.css}">
+  <link rel="stylesheet" th:href="@{/css/user/move.css}">
 </head>
 <body>
-<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''}">
+<!--/* css/user/auth.css 의 .auth-error 와 같은 값 (auth.css 전체를 넣으면 입력칸 모양이 바뀌어 이 규칙만) */-->
+<style>.auth-error { margin-top: 12px; color: #ef5f3c; font-size: 12px; line-height: 1.5; } .auth-error[hidden] { display: none; }</style>
+<div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''},
+                               name=${member?.memberName ?: '김무브'},
+                               types=${loginTypes ?: {'02'}}">
   <div class="screen form-page">
     <div class="form-head">
       <a th:replace="~{fragments/user-layout :: back(href=@{/more})}"></a>
@@ -17,12 +24,12 @@
     <div class="form-content personal-page-content">
       <div class="personal-profile">
         <div class="personal-avatar-wrap">
-          <div class="avatar">김</div>
+          <div class="avatar" th:text="${#strings.substring(name, 0, 1)}">김</div>
           <div class="personal-verified-mark">
             <svg aria-hidden="true" width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="m2.5 6.2 2.3 2.3 4.7-4.8" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
         </div>
-        <strong>김무브님</strong>
+        <strong th:text="${name} + '님'">김무브님</strong>
         <span>본인인증 완료</span>
       </div>
 
@@ -30,12 +37,12 @@
       <div class="personal-settings-card">
         <div class="personal-setting-row">
           <span>이름</span>
-          <strong>김무브</strong>
+          <strong th:text="${name}">김무브</strong>
         </div>
         <div class="personal-setting-row personal-phone-row">
           <div class="personal-phone-copy">
             <span>휴대폰 번호</span>
-            <span id="currentPhone">010-1234-5678</span>
+            <span id="currentPhone" th:text="${member?.phone ?: '010-1234-5678'}">010-1234-5678</span>
           </div>
           <div class="action personal-change-button" role="button" tabindex="0" aria-label="휴대폰 번호 변경" data-open="#phoneSheet">변경</div>
         </div>
@@ -44,20 +51,24 @@
       <a class="action linked-login-card" href="#" aria-label="간편 로그인">
         <strong>간편 로그인</strong>
         <div class="linked-login-provider">
-          <img alt="네이버" class="linked-login-logo" th:src="@{/images/user/4a055.svg}">
+          <img th:if="${#lists.contains(types, '01')}" alt="카카오" class="linked-login-logo" th:src="@{/images/user/2a814.svg}">
+          <img th:if="${#lists.contains(types, '02')}" alt="네이버" class="linked-login-logo" th:src="@{/images/user/4a055.svg}">
           <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
         </div>
       </a>
 
       <div class="account-meta">
-        <div><strong>가입일</strong><b>2026. 02. 16</b></div>
+        <div><strong>가입일</strong><b th:text="${member != null ? #temporals.format(member.joinedAt, 'yyyy. MM. dd') : '2026. 02. 16'}">2026. 02. 16</b></div>
       </div>
-      <a class="action withdraw-link" href="#">회원 탈퇴</a>
+      <a class="action withdraw-link" href="#" data-open="#withdrawModal">회원 탈퇴</a>
     </div>
   </div>
 
   <!--/* 휴대폰 번호 변경 바텀시트 (H03, H04) */-->
-  <div id="phoneSheet" data-layer th:hidden="${state != 'phone' and state != 'verify'}" th:attr="data-step=${state == 'verify' ? 'verify' : 'input'}">
+  <div id="phoneSheet" data-layer th:hidden="${state != 'phone' and state != 'verify'}"
+       th:attr="data-step=${state == 'verify' ? 'verify' : 'input'},
+                data-send-url=${member != null} ? @{/more/profile/phone/send} : null,
+                data-change-url=${member != null} ? @{/more/profile/phone} : null">
     <div class="personal-modal-scrim" data-close></div>
     <div aria-labelledby="phone-change-title" aria-modal="true" class="personal-modal" role="dialog">
       <div class="sheet-grabber personal-sheet-grabber" data-close><div class="sheet-handle"></div></div>
@@ -89,8 +100,29 @@
         </div>
         <div class="phone-code-hint"><span id="codeHintPhone">010-9876-5432</span> 으로 인증번호가 발송되었어요.</div>
       </div>
+      <!--/* 서버 확인 결과 안내 (가입된 번호 · 인증번호 불일치 등) — 로그인 화면 .auth-error 와 같은 모양 */-->
+      <p class="auth-error" id="phoneError" hidden></p>
       <div class="action form-submit next-button phone-change-confirm" role="button" tabindex="0" id="confirmPhone"
            aria-label="인증하고 휴대폰 번호 변경" th:classappend="${state != 'verify'} ? 'is-disabled'">인증하고 변경</div>
+    </div>
+  </div>
+
+  <!--/* 회원 탈퇴 확인 — 예약 취소 확인 바텀시트(rd-cancel, move.css)와 같은 모양 */-->
+  <div id="withdrawModal" class="rd-cancel-layer" data-layer hidden>
+    <div class="rd-cancel-scrim" data-close></div>
+    <div class="rd-cancel-sheet" role="dialog" aria-modal="true" aria-labelledby="withdraw-title" aria-describedby="withdraw-desc">
+      <i class="rd-cancel-grabber" aria-hidden="true"></i>
+      <svg class="rd-cancel-icon" aria-hidden="true" viewBox="0 0 48 48" width="48" height="48">
+        <rect x="0" y="0" width="48" height="48" rx="12" fill="#eef1ea"/>
+        <path d="M24 13v14" stroke="#df8436" stroke-width="3.4" stroke-linecap="round"/>
+        <circle cx="24" cy="34.5" r="2.2" fill="#df8436"/>
+      </svg>
+      <strong id="withdraw-title">회원 탈퇴하시겠어요?</strong>
+      <span id="withdraw-desc">이름과 휴대폰 번호가 삭제되고 복구할 수 없어요</span>
+      <div class="action rd-cancel-keep" role="button" tabindex="0" data-close>계속 이용하기</div>
+      <form th:action="@{/more/withdraw}" method="post">
+        <button type="submit" class="action rd-cancel-confirm">탈퇴할게요</button>
+      </form>
     </div>
   </div>
 </div>

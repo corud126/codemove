@@ -8,6 +8,9 @@
   step=5  state: (없음) 날짜 선택 C14 | picked 선택 완료 C15 | time 시간 선택 C16 | unknown 날짜 미정 안내 C17
   step=6  state: (없음) 예상 견적 C18 | undecided 날짜 미정 C19
   쉬운 모드(E-C01~C19): 같은 파라미터 + mode=easy, 음성 안내 켜짐(E-C21): voice=on
+  model: pickable (품목 선택 시트 목록, 카테고리 코드 → 이름), catalog (quote.js 부피 계산표), today (yyyy-MM-dd)
+  서버: 영상 POST /quote/video · 분석 POST /quote/analyze · 주소 GET /quote/address · 휴무·마감 GET /quote/calendar
+        예상 금액 POST /quote/estimate · 제출 POST /quote (?step= 캡처 미리보기는 더미로 동작)
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='이사 견적', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/quote.css}">
@@ -15,7 +18,7 @@
 <body>
 <div class="app-shell">
   <div class="screen flow-screen quote-screen" id="quote"
-       th:attr="data-complete-url=@{/quote/complete}, data-img=@{/images/user/}">
+       th:attr="data-complete-url=@{/quote/complete}, data-img=@{/images/user/}, data-today=${today}">
     <div class="flow-head">
       <a class="action back q-back" th:href="@{/}" data-q-back aria-label="뒤로 가기">
         <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="m15 5-7 7 7 7" stroke="#292929" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -378,17 +381,18 @@
           <button type="button" class="action" role="tab" data-tab="etc">기타</button>
         </div>
         <div class="q-pick-scroll">
+          <!--/* 목록은 서버 품목 표(ItemCatalog) 기준. 미리보기(/dev)에서는 아래 기본 목록 */-->
           <ul class="q-pick-list" data-panel="furniture">
-            <li th:each="n : ${ {'침대', '소파', '옷장', '서랍장', '책상', '식탁·테이블', '의자', '책장', '화장대', 'TV장', '수납장'} }"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">침대</button></li>
+            <li th:each="n : ${pickable?.get('01') ?: {'침대', '소파', '옷장', '서랍장', '책상', '식탁·테이블', '의자', '책장', '화장대', 'TV장', '수납장'}}"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">침대</button></li>
           </ul>
           <ul class="q-pick-list" data-panel="appliance" hidden>
-            <li th:each="n : ${ {'냉장고', '세탁기', 'TV', '에어컨', '건조기', '김치냉장고', '전자레인지', '정수기', '컴퓨터'} }"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">냉장고</button></li>
+            <li th:each="n : ${pickable?.get('02') ?: {'냉장고', '세탁기', 'TV', '에어컨', '건조기', '김치냉장고', '전자레인지', '정수기', '컴퓨터'}}"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">냉장고</button></li>
           </ul>
           <ul class="q-pick-list" data-panel="living" hidden>
-            <li th:each="n : ${ {'이사박스', '이불·침구', '옷·행거', '주방용품', '자전거', '캐리어'} }"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">이사박스</button></li>
+            <li th:each="n : ${pickable?.get('03') ?: {'이사박스', '이불·침구', '옷·행거', '주방용품', '자전거', '캐리어'}}"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">이사박스</button></li>
           </ul>
           <ul class="q-pick-list" data-panel="etc" hidden>
-            <li th:each="n : ${ {'피아노', '화분', '운동기구', '안마의자', '어항'} }"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">피아노</button></li>
+            <li th:each="n : ${pickable?.get('04') ?: {'피아노', '화분', '운동기구', '안마의자', '어항'}}"><button type="button" class="action" th:attr="data-q-pick=${n}" th:text="${n}">피아노</button></li>
           </ul>
           <p class="q-pick-empty" data-q-pick-empty hidden>검색 결과가 없어요.</p>
         </div>
@@ -443,6 +447,7 @@
   </template>
 </div>
 <th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
+<script th:inline="javascript">window.QUOTE_CATALOG = /*[[${catalog}]]*/ null;</script>
 <script th:src="@{/js/user/quote.js}"></script>
 </body>
 </html>

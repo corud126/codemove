@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.notification.NotificationMapper">
+
+	<sql id="columns">
+		N.NOTIFICATION_ID, N.RECEIVER_TYPE, N.MEMBER_ID, N.NTF_TYPE, N.NTF_DETAIL, N.NTF_TITLE, N.NTF_CONTENT, N.LINK_URL,
+		N.IS_IMPORTANT, N.IS_READ, N.NTF_CHANNEL, N.CREATED_AT, N.SENT_AT
+	</sql>
+
+	<insert id="insert" parameterType="Notification">
+		<selectKey keyProperty="notificationId" resultType="long" order="BEFORE">
+			SELECT SEQ_NOTIFICATION.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_NOTIFICATION (NOTIFICATION_ID, RECEIVER_TYPE, MEMBER_ID, NTF_TYPE, NTF_DETAIL, NTF_TITLE, NTF_CONTENT,
+		                              LINK_URL, IS_IMPORTANT, IS_READ, NTF_CHANNEL, CREATED_AT, SENT_AT)
+		VALUES (#{notificationId}, #{receiverType}, #{memberId,jdbcType=NUMERIC}, #{ntfType}, #{ntfDetail}, #{ntfTitle}, #{ntfContent},
+		        #{linkUrl,jdbcType=VARCHAR}, #{isImportant}, 'N', #{ntfChannel}, SYSDATE,
+		        <choose><when test="sentAt != null">SYSDATE</when><otherwise>NULL</otherwise></choose>)
+	</insert>
+
+	<!-- ==================== 회원 ==================== -->
+
+	<select id="selectForMember" resultType="Notification">
+		SELECT * FROM (
+			SELECT <include refid="columns"/>
+			  FROM TBL_NOTIFICATION N
+			 WHERE N.RECEIVER_TYPE = '01'
+			   AND N.MEMBER_ID = #{memberId}
+			 ORDER BY N.NOTIFICATION_ID DESC
+		) WHERE ROWNUM &lt;= #{limit}
+	</select>
+
+	<select id="countUnreadForMember" resultType="int">
+		SELECT COUNT(*)
+		  FROM TBL_NOTIFICATION
+		 WHERE RECEIVER_TYPE = '01'
+		   AND MEMBER_ID = #{memberId}
+		   AND IS_READ = 'N'
+	</select>
+
+	<update id="markReadForMember">
+		UPDATE TBL_NOTIFICATION
+		   SET IS_READ = 'Y'
+		 WHERE NOTIFICATION_ID = #{notificationId}
+		   AND RECEIVER_TYPE = '01'
+		   AND MEMBER_ID = #{memberId}
+	</update>
+
+	<update id="markAllReadForMember">
+		UPDATE TBL_NOTIFICATION
+		   SET IS_READ = 'Y'
+		 WHERE RECEIVER_TYPE = '01'
+		   AND MEMBER_ID = #{memberId}
+		   AND IS_READ = 'N'
+	</update>
+
+	<select id="selectMemberPhone" resultType="string">
+		SELECT PHONE FROM TBL_MEMBER WHERE MEMBER_ID = #{memberId} AND IS_ACTIVE = 'Y'
+	</select>
+
+	<!-- ==================== 관리자 알림 패널 ==================== -->
+
+	<select id="selectAdminPanel" resultType="Notification">
+		SELECT * FROM (
+			SELECT <include refid="columns"/>
+			  FROM TBL_NOTIFICATION N
+			 WHERE N.RECEIVER_TYPE = '02'
+			   AND N.CREATED_AT &gt;= TRUNC(SYSDATE) - #{days}
+			 ORDER BY N.NOTIFICATION_ID DESC
+		) WHERE ROWNUM &lt;= #{limit}
+	</select>
+
+	<select id="countAdminUnread" resultType="int">
+		SELECT COUNT(*)
+		  FROM TBL_NOTIFICATION
+		 WHERE RECEIVER_TYPE = '02'
+		   AND IS_READ = 'N'
+		   AND CREATED_AT &gt;= TRUNC(SYSDATE) - #{days}
+	</select>
+
+	<update id="markAdminRead">
+		UPDATE TBL_NOTIFICATION
+		   SET IS_READ = 'Y'
+		 WHERE NOTIFICATION_ID = #{notificationId}
+		   AND RECEIVER_TYPE = '02'
+	</update>
+
+	<update id="markAllAdminRead">
+		UPDATE TBL_NOTIFICATION
+		   SET IS_READ = 'Y'
+		 WHERE RECEIVER_TYPE = '02'
+		   AND IS_READ = 'N'
+	</update>
+
+	<select id="selectPushPhones" resultType="string">
+		SELECT PHONE FROM TBL_ADMIN WHERE IS_ACTIVE = 'Y' AND PUSH_ENABLED = 'Y' ORDER BY ADMIN_ID
+	</select>
+
+	<select id="selectPushEnabled" resultType="string">
+		SELECT PUSH_ENABLED FROM TBL_ADMIN WHERE ADMIN_ID = #{adminId}
+	</select>
+
+	<update id="updatePushEnabled">
+		UPDATE TBL_ADMIN SET PUSH_ENABLED = #{pushEnabled} WHERE ADMIN_ID = #{adminId}
+	</update>
+
+	<!-- ==================== 관리자 발송 내역 ==================== -->
+
+	<sql id="historyWhere">
+		 WHERE N.RECEIVER_TYPE = '01'
+		<if test="q.recentDays > 0">
+		   AND N.CREATED_AT &gt;= TRUNC(SYSDATE) - #{q.recentDays}
+		</if>
+		<if test="q.name != null">
+		   AND M.MEMBER_NAME LIKE '%' || #{q.name} || '%'
+		</if>
+		<if test="q.datePatterns != null">
+		   AND <foreach collection="q.datePatterns" item="p" open="(" separator=" OR " close=")">TO_CHAR(N.CREATED_AT, 'YYMMDD') LIKE #{p}</foreach>
+		</if>
+		<if test="q.channel != null">
+		   AND N.NTF_CHANNEL = #{q.channel}
+		</if>
+		<choose>
+			<when test="q.result == 'held'">AND N.SENT_AT IS NULL</when>
+			<when test="q.result == 'sms'">AND N.SENT_AT IS NOT NULL AND N.NTF_CHANNEL = '03'</when>
+			<when test="q.result == 'sent'">AND N.SENT_AT IS NOT NULL AND N.NTF_CHANNEL &lt;&gt; '03'</when>
+		</choose>
+	</sql>
+
+	<select id="selectHistory" resultType="Notification">
+		SELECT * FROM (
+			SELECT <include refid="columns"/>, M.MEMBER_NAME, M.PHONE AS MEMBER_PHONE
+			  FROM TBL_NOTIFICATION N
+			  LEFT JOIN TBL_MEMBER M ON M.MEMBER_ID = N.MEMBER_ID
+			<include refid="historyWhere"/>
+			<if test="cursor != null">
+			   AND N.NOTIFICATION_ID &lt; #{cursor}
+			</if>
+			 ORDER BY N.NOTIFICATION_ID DESC
+		) WHERE ROWNUM &lt;= #{limit}
+	</select>
+
+	<select id="countHistory" resultType="int">
+		SELECT COUNT(*)
+		  FROM TBL_NOTIFICATION N
+		  LEFT JOIN TBL_MEMBER M ON M.MEMBER_ID = N.MEMBER_ID
+		<include refid="historyWhere"/>
+	</select>
+
+	<select id="countSentToday" resultType="int">
+		SELECT COUNT(*) FROM TBL_NOTIFICATION
+		 WHERE RECEIVER_TYPE = '01' AND SENT_AT &gt;= TRUNC(SYSDATE)
+	</select>
+
+	<select id="countHeld" resultType="int">
+		SELECT COUNT(*) FROM TBL_NOTIFICATION
+		 WHERE RECEIVER_TYPE = '01' AND SENT_AT IS NULL
+	</select>
+
+	<select id="countSmsFallback" resultType="int">
+		SELECT COUNT(*) FROM TBL_NOTIFICATION
+		 WHERE RECEIVER_TYPE = '01' AND NTF_CHANNEL = '03' AND SENT_AT IS NOT NULL
+		   AND CREATED_AT &gt;= TRUNC(SYSDATE) - #{days}
+	</select>
+
+	<!-- ==================== 야간 보류 발송 ==================== -->
+
+	<select id="selectHeld" resultType="Notification">
+		SELECT <include refid="columns"/>
+		  FROM TBL_NOTIFICATION N
+		 WHERE N.RECEIVER_TYPE = '01'
+		   AND N.SENT_AT IS NULL
+		 ORDER BY N.NOTIFICATION_ID
+	</select>
+
+	<update id="markSent">
+		UPDATE TBL_NOTIFICATION
+		   SET SENT_AT = SYSDATE,
+		       NTF_CHANNEL = #{channel}
+		 WHERE NOTIFICATION_ID = #{notificationId}
+		   AND SENT_AT IS NULL
+	</update>
+
+	<update id="updateChannel">
+		UPDATE TBL_NOTIFICATION SET NTF_CHANNEL = #{channel} WHERE NOTIFICATION_ID = #{notificationId}
+	</update>
+
+	<!-- ==================== 설정 ==================== -->
+
+	<select id="selectSetting" resultType="NotificationSetting">
+		SELECT * FROM (
+			SELECT SETTING_ID, IS_ACTIVE, QUIET_ENABLED, QUIET_START, QUIET_END, SMS_FALLBACK, UPDATED_AT, ADMIN_ID
+			  FROM TBL_NOTIFICATION_SETTING
+			 ORDER BY SETTING_ID
+		) WHERE ROWNUM = 1
+	</select>
+
+	<insert id="insertSetting" parameterType="NotificationSetting">
+		<selectKey keyProperty="settingId" resultType="long" order="BEFORE">
+			SELECT SEQ_NOTIFICATION_SETTING.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_NOTIFICATION_SETTING (SETTING_ID, IS_ACTIVE, QUIET_ENABLED, QUIET_START, QUIET_END, SMS_FALLBACK, ADMIN_ID)
+		VALUES (#{settingId}, #{isActive}, #{quietEnabled}, #{quietStart,jdbcType=VARCHAR}, #{quietEnd,jdbcType=VARCHAR},
+		        #{smsFallback}, #{adminId,jdbcType=NUMERIC})
+	</insert>
+
+	<update id="updateSetting" parameterType="NotificationSetting">
+		UPDATE TBL_NOTIFICATION_SETTING
+		   SET IS_ACTIVE = #{isActive},
+		       QUIET_ENABLED = #{quietEnabled},
+		       QUIET_START = #{quietStart,jdbcType=VARCHAR},
+		       QUIET_END = #{quietEnd,jdbcType=VARCHAR},
+		       SMS_FALLBACK = #{smsFallback},
+		       UPDATED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId,jdbcType=NUMERIC}
+		 WHERE SETTING_ID = #{settingId}
+	</update>
+
+	<!-- ==================== D-3 (예약 · 견적 요청 읽기 전용) ==================== -->
+
+	<select id="selectMoveReminders" resultType="com.codemove.notification.MoveReminder">
+		SELECT R.RESERVATION_ID, M.MEMBER_ID, R.MOVE_DATE, R.MOVE_TIME
+		  FROM TBL_RESERVATION R
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = R.REQUEST_ID
+		  JOIN TBL_MEMBER B ON B.MEMBER_ID = M.MEMBER_ID
+		 WHERE R.STATUS = '01'
+		   AND R.MOVE_DATE &gt;= TRUNC(SYSDATE) + #{days}
+		   AND R.MOVE_DATE &lt; TRUNC(SYSDATE) + #{days} + 1
+		   AND B.IS_ACTIVE = 'Y'
+		   AND NOT EXISTS (
+		       SELECT 1 FROM TBL_NOTIFICATION N
+		        WHERE N.RECEIVER_TYPE = '01'
+		          AND N.MEMBER_ID = M.MEMBER_ID
+		          AND N.NTF_DETAIL = '07'
+		          AND N.LINK_URL = '/reservations/' || R.RESERVATION_ID)
+		 ORDER BY R.RESERVATION_ID
+	</select>
+
+</mapper>

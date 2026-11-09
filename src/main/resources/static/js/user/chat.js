@@ -1,8 +1,13 @@
 /*
- * 채팅 (G-G01~G07) — 퀵메뉴 답변·메시지 전송·파일 첨부 시뮬레이션 (백엔드 없음)
- *  [data-ask="문구"]  클릭 시 해당 문구로 질문
+ * 채팅 (G-G01~G07)
+ *  실제 화면(/chat, #chatContent[data-live]): 서버(ChatController)와 메시지를 주고받고, 상담사 답장은 3초마다 다시 불러온다
+ *  미리 보기(/dev/user/chat/index): 퀵메뉴 답변·메시지 전송·파일 첨부 시뮬레이션 (백엔드 없음)
+ *  [data-ask="문구"]  클릭 시 해당 문구로 질문 (data-topic 이 있으면 그 주제로)
+ *  [data-agent]       상담사 연결 요청
  */
 (function () {
+  const content = document.getElementById('chatContent');
+  if (content && content.dataset.live === 'true') { liveChat(); return; }
   const thread = document.getElementById('chatThread');
   const restart = document.getElementById('chatRestart');
   const editor = document.getElementById('chatEditor');
@@ -182,3 +187,206 @@
 
   // 화면 상태(?state=...) 미리보기는 캡처와 같이 맨 위에서 시작한다 (대화 진행 시에는 scrollEnd)
 })();
+
+/* ---------- 실제 채팅: 서버와 주고받기 ---------- */
+function liveChat() {
+  const content = document.getElementById('chatContent');
+  const thread = document.getElementById('chatThread');
+  const restart = document.getElementById('chatRestart');
+  const editor = document.getElementById('chatEditor');
+  const send = document.getElementById('chatSend');
+  const fileInput = document.getElementById('chatFile');
+  const chip = document.getElementById('chatAttachment');
+  const chipName = document.getElementById('chatAttachmentName');
+  if (!thread || !editor) return;
+
+  const AVATAR = '/images/user/mover-assistant-3d.svg';
+  const CLIP = '/images/user/paperclip.svg';
+  const POLL_MS = 3000;
+  const hours = content.dataset.hours || '평일 09:00–18:00';
+  const shown = new Set();
+  let lastId = 0;
+  let file = null;
+  let busy = false;
+
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+  const avatar = () => {
+    const box = el('div', 'chat-mini-avatar');
+    const img = el('img');
+    img.alt = '';
+    img.src = AVATAR;
+    box.appendChild(img);
+    return box;
+  };
+  const now = () => {
+    const d = new Date();
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  };
+  const scrollEnd = (smooth) => {
+    const s = CodeMove.scroller();
+    s.scrollTo({ top: s.scrollHeight, behavior: smooth === false ? 'auto' : 'smooth' });
+  };
+
+  // m: {id, role: user|bot, text, time, attachment: {name, url, image}, actions: [{label, href|prompt|agent|topic}]}
+  function addMessage(m) {
+    if (m.id) {
+      if (shown.has(m.id)) return;
+      shown.add(m.id);
+      lastId = Math.max(lastId, m.id);
+    }
+    if (restart) restart.hidden = false;
+    const wrap = el('div', 'chat-message-wrap ' + m.role);
+    if (m.role === 'bot') wrap.appendChild(avatar());
+    const box = el('div', 'chat-message-content');
+    box.appendChild(el('div', 'message ' + m.role, m.text));
+    if (m.attachment) {
+      const f = el('div', 'chat-file-message');
+      const img = el('img');
+      img.alt = '';
+      img.src = CLIP;
+      f.append(img, el('span', null, m.attachment.name));
+      if (m.attachment.url) {
+        f.setAttribute('role', 'button');
+        f.tabIndex = 0;
+        f.dataset.href = m.attachment.url;
+      }
+      box.appendChild(f);
+    }
+    if (m.actions && m.actions.length) {
+      const q = el('div', 'chat-quick-replies');
+      m.actions.forEach((a) => {
+        const b = el(a.href ? 'a' : 'div', 'action', a.label);
+        if (a.href) b.href = a.href;
+        else {
+          b.setAttribute('role', 'button');
+          b.tabIndex = 0;
+          if (a.agent) b.dataset.agent = '';
+          else { b.dataset.ask = a.prompt || a.label; if (a.topic) b.dataset.topic = a.topic; }
+        }
+        q.appendChild(b);
+      });
+      box.appendChild(q);
+    }
+    box.appendChild(el('small', 'chat-message-time', m.time || now()));
+    wrap.appendChild(box);
+    thread.appendChild(wrap);
+  }
+
+  function typing() {
+    const t = el('div', 'chat-message-wrap bot');
+    t.appendChild(avatar());
+    const dots = el('div', 'chat-typing');
+    dots.setAttribute('aria-label', '답변 작성 중');
+    dots.append(el('i'), el('i'), el('i'));
+    t.appendChild(dots);
+    thread.appendChild(t);
+    scrollEnd();
+    return t;
+  }
+
+  async function request(url, body) {
+    try {
+      const res = await fetch(url, { method: 'POST', body });
+      const data = await res.json().catch(() => ({}));
+      return res.ok ? data : { message: data.message || '잠시 후 다시 시도해 주세요.' };
+    } catch (e) {
+      return { message: '잠시 후 다시 시도해 주세요.' };
+    }
+  }
+
+  // 보내기 → 응답의 새 메시지(내 메시지 + 챗봇 답변)를 그린다. 실패하면 안내 문구를 챗봇 말풍선으로 (저장 안 함)
+  async function post(url, body) {
+    if (busy) return;
+    busy = true;
+    const dots = typing();
+    const data = await request(url, body);
+    dots.remove();
+    busy = false;
+    if (data.messages) data.messages.forEach(addMessage);
+    else addMessage({ role: 'bot', text: data.message });
+    scrollEnd();
+  }
+
+  function updateSend() {
+    send.classList.toggle('is-disabled', !editor.innerText.trim() && !file);
+  }
+  function setFile(f) {
+    file = f;
+    if (chip) {
+      chip.hidden = !f;
+      chipName.textContent = f ? f.name : '';
+    }
+    if (!f && fileInput) fileInput.value = '';
+    updateSend();
+  }
+
+  function ask(value, topicId) {
+    const text = (value || '').trim();
+    if (!text && !file) return;
+    editor.innerText = '';
+    if (file) {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('text', text);
+      setFile(null);
+      post('/chat/files', body);
+      return;
+    }
+    updateSend();
+    const body = new URLSearchParams({ text });
+    if (topicId) body.append('topicId', topicId);
+    post('/chat/messages', body);
+  }
+
+  // 고정 [상담사 연결]: 운영시간 안내 + [상담사 연결 요청] 버튼 (화면에서만 보여 주고 저장하지 않음)
+  function agentInfo() {
+    addMessage({ role: 'user', text: '상담사 연결' });
+    addMessage({ role: 'bot', text: '상담사에게 직접 문의할 수 있어요.\n상담 운영시간은 ' + hours + '이며, 운영시간 외 요청은 다음 영업일에 확인합니다.',
+      actions: [{ label: '상담사 연결 요청', agent: true }] });
+    scrollEnd();
+  }
+
+  document.addEventListener('click', (e) => {
+    const fileLink = e.target.closest('.chat-file-message[data-href]');
+    if (fileLink) { window.open(fileLink.dataset.href, '_blank'); return; }
+    if (e.target.closest('[data-agent-info]')) { agentInfo(); return; }
+    if (e.target.closest('[data-agent]')) { post('/chat/agent', new URLSearchParams()); return; }
+    const asker = e.target.closest('[data-ask]');
+    if (asker) { ask(asker.dataset.ask, asker.dataset.topic); return; }
+    if (e.target.closest('#chatSend')) { ask(editor.innerText); return; }
+    if (e.target.closest('#chatAttachmentRemove')) setFile(null);
+  });
+  editor.addEventListener('input', () => {
+    if (!editor.innerText.trim()) editor.innerHTML = '';
+    updateSend();
+  });
+  editor.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      ask(editor.innerText);
+    }
+  });
+  if (fileInput) {
+    fileInput.addEventListener('change', () => setFile(fileInput.files && fileInput.files[0] ? fileInput.files[0] : null));
+  }
+
+  // 처음: 가장 최근 상담 / 이후 3초마다 새 메시지(상담사 답장 · 지연 안내)
+  async function load(after) {
+    try {
+      const res = await fetch('/chat/messages?after=' + after);
+      if (!res.ok) return;
+      const data = await res.json();
+      const before = lastId;
+      (data.messages || []).forEach(addMessage);
+      if (lastId !== before) scrollEnd(after > 0);
+    } catch (e) { /* 다음 주기에 다시 */ }
+  }
+  load(0);
+  // 대화가 없으면(방 없음) 상담사도 먼저 보낼 수 없으므로 첫 메시지 뒤부터 확인
+  setInterval(() => { if (!document.hidden && !busy && lastId > 0) load(lastId); }, POLL_MS);
+}

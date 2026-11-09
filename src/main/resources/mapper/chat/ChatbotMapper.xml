@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.chat.ChatbotMapper">
+
+	<sql id="topicColumns">
+		TOPIC_ID, TITLE, INTRO, TOPIC_TYPE, IS_ACTIVE, UPDATED_AT, ADMIN_ID
+	</sql>
+
+	<select id="selectTopics" resultType="ChatbotTopic">
+		SELECT <include refid="topicColumns"/>
+		  FROM TBL_CHATBOT_TOPIC
+		 ORDER BY TOPIC_ID
+	</select>
+
+	<select id="selectTopic" resultType="ChatbotTopic">
+		SELECT <include refid="topicColumns"/>
+		  FROM TBL_CHATBOT_TOPIC
+		 WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</select>
+
+	<sql id="lorebookColumns">
+		LOREBOOK_ID, TOPIC_ID, KEYWORDS, CONTENT, SORT_ORDER, UPDATED_AT
+	</sql>
+
+	<select id="selectLorebooks" resultType="Lorebook">
+		SELECT <include refid="lorebookColumns"/>
+		  FROM TBL_LOREBOOK
+		 ORDER BY TOPIC_ID, SORT_ORDER, LOREBOOK_ID
+	</select>
+
+	<select id="selectLorebooksOfTopic" resultType="Lorebook">
+		SELECT <include refid="lorebookColumns"/>
+		  FROM TBL_LOREBOOK
+		 WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+		 ORDER BY SORT_ORDER, LOREBOOK_ID
+	</select>
+
+	<sql id="actionColumns">
+		ACTION_ID, TOPIC_ID, LABEL, ACTION_TYPE, ACTION_VALUE, SORT_ORDER
+	</sql>
+
+	<select id="selectActions" resultType="ChatbotAction">
+		SELECT <include refid="actionColumns"/>
+		  FROM TBL_CHATBOT_ACTION
+		 ORDER BY TOPIC_ID, SORT_ORDER, ACTION_ID
+	</select>
+
+	<select id="selectActionsOfTopic" resultType="ChatbotAction">
+		SELECT <include refid="actionColumns"/>
+		  FROM TBL_CHATBOT_ACTION
+		 WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+		 ORDER BY SORT_ORDER, ACTION_ID
+	</select>
+
+	<insert id="insertTopic" parameterType="ChatbotTopic">
+		<selectKey keyProperty="topicId" resultType="long" order="BEFORE">
+			SELECT SEQ_CHATBOT_TOPIC.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_CHATBOT_TOPIC (TOPIC_ID, TITLE, INTRO, TOPIC_TYPE, IS_ACTIVE, ADMIN_ID)
+		VALUES (#{topicId,jdbcType=NUMERIC}, #{title}, #{intro,jdbcType=VARCHAR}, #{topicType}, #{isActive}, #{adminId,jdbcType=NUMERIC})
+	</insert>
+
+	<update id="updateTopic" parameterType="ChatbotTopic">
+		UPDATE TBL_CHATBOT_TOPIC
+		   SET TITLE = #{title},
+		       INTRO = #{intro,jdbcType=VARCHAR},
+		       TOPIC_TYPE = #{topicType},
+		       IS_ACTIVE = #{isActive},
+		       UPDATED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId,jdbcType=NUMERIC}
+		 WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</update>
+
+	<update id="updateTopicActive">
+		UPDATE TBL_CHATBOT_TOPIC
+		   SET IS_ACTIVE = #{isActive},
+		       UPDATED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId,jdbcType=NUMERIC}
+		 WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</update>
+
+	<delete id="deleteTopic">
+		DELETE FROM TBL_CHATBOT_TOPIC WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</delete>
+
+	<insert id="insertLorebook" parameterType="Lorebook">
+		<selectKey keyProperty="lorebookId" resultType="long" order="BEFORE">
+			SELECT SEQ_LOREBOOK.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_LOREBOOK (LOREBOOK_ID, TOPIC_ID, KEYWORDS, CONTENT, SORT_ORDER)
+		VALUES (#{lorebookId}, #{topicId,jdbcType=NUMERIC}, #{keywords}, #{content,jdbcType=VARCHAR}, #{sortOrder})
+	</insert>
+
+	<delete id="deleteLorebooksOfTopic">
+		DELETE FROM TBL_LOREBOOK WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</delete>
+
+	<insert id="insertAction" parameterType="ChatbotAction">
+		<selectKey keyProperty="actionId" resultType="long" order="BEFORE">
+			SELECT SEQ_CHATBOT_ACTION.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_CHATBOT_ACTION (ACTION_ID, TOPIC_ID, LABEL, ACTION_TYPE, ACTION_VALUE, SORT_ORDER)
+		VALUES (#{actionId}, #{topicId,jdbcType=NUMERIC}, #{label}, #{actionType}, #{actionValue,jdbcType=VARCHAR}, #{sortOrder})
+	</insert>
+
+	<delete id="deleteActionsOfTopic">
+		DELETE FROM TBL_CHATBOT_ACTION WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</delete>
+
+	<update id="clearMessageTopic">
+		UPDATE TBL_CHAT_MESSAGE SET TOPIC_ID = NULL WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</update>
+
+	<!-- ==================== 퀵메뉴 ==================== -->
+
+	<select id="selectQuickMenus" resultType="QuickMenu">
+		SELECT Q.MENU_ID, Q.TOPIC_ID, Q.MENU_NAME, Q.SORT_ORDER, Q.IS_ACTIVE, Q.ADMIN_ID,
+		       T.IS_ACTIVE AS TOPIC_ACTIVE
+		  FROM TBL_QUICK_MENU Q
+		  JOIN TBL_CHATBOT_TOPIC T ON T.TOPIC_ID = Q.TOPIC_ID
+		 ORDER BY Q.SORT_ORDER, Q.MENU_ID
+	</select>
+
+	<insert id="insertQuickMenu" parameterType="QuickMenu">
+		<selectKey keyProperty="menuId" resultType="long" order="BEFORE">
+			SELECT SEQ_QUICK_MENU.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_QUICK_MENU (MENU_ID, TOPIC_ID, MENU_NAME, SORT_ORDER, IS_ACTIVE, ADMIN_ID)
+		VALUES (#{menuId}, #{topicId,jdbcType=NUMERIC}, #{menuName}, #{sortOrder}, #{isActive}, #{adminId,jdbcType=NUMERIC})
+	</insert>
+
+	<update id="updateQuickMenu" parameterType="QuickMenu">
+		UPDATE TBL_QUICK_MENU
+		   SET TOPIC_ID = #{topicId,jdbcType=NUMERIC},
+		       MENU_NAME = #{menuName},
+		       SORT_ORDER = #{sortOrder},
+		       IS_ACTIVE = #{isActive},
+		       ADMIN_ID = #{adminId,jdbcType=NUMERIC}
+		 WHERE MENU_ID = #{menuId}
+	</update>
+
+	<delete id="deleteQuickMenu">
+		DELETE FROM TBL_QUICK_MENU WHERE MENU_ID = #{menuId}
+	</delete>
+
+	<delete id="deleteQuickMenusOfTopic">
+		DELETE FROM TBL_QUICK_MENU WHERE TOPIC_ID = #{topicId,jdbcType=NUMERIC}
+	</delete>
+
+</mapper>

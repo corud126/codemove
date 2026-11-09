@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.quote.QuoteMapper">
+
+	<sql id="columns">
+		QUOTE_ID, QUOTE_NO, REQUEST_ID, MEMBER_ID, ADMIN_ID, SOURCE_TYPE, STATUS, COMPANY_NAME, CONTACT_NAME, CONTACT_PHONE,
+		ESTIMATE_DATE, FROM_ADDRESS, TO_ADDRESS, WORK_DATE, WORK_TIME, TRANSPORT_DATE, WORK_TYPE,
+		FROM_LADDER_USE, TO_LADDER_USE, FROM_ELEVATOR_USE, TO_ELEVATOR_USE, FROM_STAIRS_USE, TO_STAIRS_USE,
+		VOLUME_TON, NOTE, MOVING_COST, FROM_LADDER_FLOOR, FROM_LADDER_COST, TO_LADDER_FLOOR, TO_LADDER_COST,
+		TOTAL_AMOUNT, DEPOSIT_AMOUNT, BALANCE_AMOUNT, DOCUMENT_PATH, APPROVED_AT, EXPIRES_AT, UPDATED_AT
+	</sql>
+
+	<insert id="insertQuote" parameterType="Quote">
+		<selectKey keyProperty="quoteId" resultType="long" order="BEFORE">
+			SELECT SEQ_QUOTE.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_QUOTE (
+			QUOTE_ID, QUOTE_NO, REQUEST_ID, MEMBER_ID, SOURCE_TYPE, STATUS, CONTACT_NAME, CONTACT_PHONE, ESTIMATE_DATE,
+			FROM_ADDRESS, TO_ADDRESS, WORK_DATE, WORK_TYPE, VOLUME_TON,
+			MOVING_COST, TOTAL_AMOUNT, DEPOSIT_AMOUNT, BALANCE_AMOUNT
+		) VALUES (
+			#{quoteId}, 'QT-' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(#{quoteId}, 10000), 4, '0'), #{requestId}, #{memberId}, #{sourceType}, #{status}, #{contactName}, #{contactPhone}, TRUNC(SYSDATE),
+			#{fromAddress}, #{toAddress}, #{workDate}, #{workType}, #{volumeTon},
+			#{movingCost}, #{totalAmount}, #{depositAmount}, #{balanceAmount}
+		)
+	</insert>
+
+	<insert id="insertQuoteItem" parameterType="QuoteItem">
+		<selectKey keyProperty="qtItemId" resultType="long" order="BEFORE">
+			SELECT SEQ_QUOTE_ITEM.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_QUOTE_ITEM (QT_ITEM_ID, QUOTE_ID, CATEGORY, ITEM_NAME, QUANTITY, UNIT, SORT_ORDER)
+		VALUES (#{qtItemId}, #{quoteId}, #{category}, #{itemName}, #{quantity}, NVL(#{unit}, '개'), #{sortOrder})
+	</insert>
+
+	<select id="selectByRequestId" resultType="Quote">
+		SELECT <include refid="columns"/>
+		  FROM TBL_QUOTE
+		 WHERE REQUEST_ID = #{requestId}
+	</select>
+
+	<select id="selectById" resultType="Quote">
+		SELECT <include refid="columns"/>
+		  FROM TBL_QUOTE
+		 WHERE QUOTE_ID = #{quoteId}
+	</select>
+
+	<select id="selectAll" resultType="Quote">
+		SELECT <include refid="columns"/>
+		  FROM TBL_QUOTE
+		 ORDER BY ESTIMATE_DATE DESC, QUOTE_ID DESC
+	</select>
+
+	<select id="selectItems" resultType="QuoteItem">
+		SELECT QT_ITEM_ID, QUOTE_ID, CATEGORY, ITEM_NAME, QUANTITY, UNIT, SORT_ORDER
+		  FROM TBL_QUOTE_ITEM
+		 WHERE QUOTE_ID = #{quoteId}
+		 ORDER BY SORT_ORDER, QT_ITEM_ID
+	</select>
+
+	<select id="selectOptions" resultType="QuoteOption">
+		SELECT QT_OPTION_ID, QUOTE_ID, OPTION_CODE, CHOICE1_YN, CHOICE2_YN, OPTION_COST
+		  FROM TBL_QUOTE_OPTION
+		 WHERE QUOTE_ID = #{quoteId}
+		 ORDER BY OPTION_CODE
+	</select>
+
+	<update id="updateSheet" parameterType="Quote">
+		UPDATE TBL_QUOTE
+		   SET COMPANY_NAME = #{companyName},
+		       CONTACT_NAME = #{contactName},
+		       CONTACT_PHONE = #{contactPhone},
+		       ESTIMATE_DATE = #{estimateDate},
+		       FROM_ADDRESS = #{fromAddress},
+		       TO_ADDRESS = #{toAddress},
+		       WORK_DATE = #{workDate},
+		       WORK_TIME = #{workTime},
+		       TRANSPORT_DATE = #{transportDate},
+		       WORK_TYPE = #{workType},
+		       FROM_LADDER_USE = #{fromLadderUse},
+		       TO_LADDER_USE = #{toLadderUse},
+		       FROM_ELEVATOR_USE = #{fromElevatorUse},
+		       TO_ELEVATOR_USE = #{toElevatorUse},
+		       FROM_STAIRS_USE = #{fromStairsUse},
+		       TO_STAIRS_USE = #{toStairsUse},
+		       VOLUME_TON = #{volumeTon},
+		       NOTE = #{note},
+		       MOVING_COST = #{movingCost},
+		       FROM_LADDER_FLOOR = #{fromLadderFloor},
+		       FROM_LADDER_COST = #{fromLadderCost},
+		       TO_LADDER_FLOOR = #{toLadderFloor},
+		       TO_LADDER_COST = #{toLadderCost},
+		       TOTAL_AMOUNT = #{totalAmount},
+		       DEPOSIT_AMOUNT = #{depositAmount},
+		       BALANCE_AMOUNT = #{balanceAmount},
+		       EXPIRES_AT = #{expiresAt},
+		       UPDATED_AT = SYSDATE
+		 WHERE QUOTE_ID = #{quoteId}
+		   AND STATUS != '03'
+	</update>
+
+	<delete id="deleteItems">
+		DELETE FROM TBL_QUOTE_ITEM WHERE QUOTE_ID = #{quoteId}
+	</delete>
+
+	<delete id="deleteOptions">
+		DELETE FROM TBL_QUOTE_OPTION WHERE QUOTE_ID = #{quoteId}
+	</delete>
+
+	<insert id="insertOption" parameterType="QuoteOption">
+		<selectKey keyProperty="qtOptionId" resultType="long" order="BEFORE">
+			SELECT SEQ_QUOTE_OPTION.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_QUOTE_OPTION (QT_OPTION_ID, QUOTE_ID, OPTION_CODE, CHOICE1_YN, CHOICE2_YN, OPTION_COST)
+		VALUES (#{qtOptionId}, #{quoteId}, #{optionCode}, #{choice1Yn}, #{choice2Yn}, #{optionCost})
+	</insert>
+
+	<update id="approve" parameterType="Quote">
+		UPDATE TBL_QUOTE
+		   SET STATUS = '02',
+		       APPROVED_AT = SYSDATE,
+		       EXPIRES_AT = #{expiresAt},
+		       UPDATED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId}
+		 WHERE QUOTE_ID = #{quoteId}
+		   AND STATUS IN ('01', '04')
+	</update>
+
+	<update id="expireOverdue">
+		UPDATE TBL_QUOTE
+		   SET STATUS = '04'
+		 WHERE STATUS = '02'
+		   AND EXPIRES_AT &lt; SYSDATE
+	</update>
+
+	<select id="selectByMember" resultType="Quote">
+		SELECT <include refid="columns"/>
+		  FROM TBL_QUOTE
+		 WHERE MEMBER_ID = #{memberId}
+		 ORDER BY QUOTE_ID DESC
+	</select>
+
+	<update id="confirm">
+		UPDATE TBL_QUOTE
+		   SET STATUS = '03'
+		 WHERE QUOTE_ID = #{quoteId}
+		   AND STATUS = '02'
+		   AND EXPIRES_AT &gt; SYSDATE
+		   AND UPDATED_AT = #{updatedAt}
+	</update>
+
+	<delete id="deleteQuote">
+		DELETE FROM TBL_QUOTE WHERE QUOTE_ID = #{quoteId}
+	</delete>
+
+	<insert id="insertRegistered" parameterType="Quote">
+		<selectKey keyProperty="quoteId" resultType="long" order="BEFORE">
+			SELECT SEQ_QUOTE.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_QUOTE (
+			QUOTE_ID, QUOTE_NO, MEMBER_ID, ADMIN_ID, SOURCE_TYPE, STATUS, COMPANY_NAME, CONTACT_NAME, CONTACT_PHONE, ESTIMATE_DATE,
+			FROM_ADDRESS, TO_ADDRESS, WORK_DATE, WORK_TIME, TRANSPORT_DATE, WORK_TYPE,
+			FROM_LADDER_USE, TO_LADDER_USE, FROM_ELEVATOR_USE, TO_ELEVATOR_USE, FROM_STAIRS_USE, TO_STAIRS_USE,
+			VOLUME_TON, NOTE, MOVING_COST, FROM_LADDER_FLOOR, FROM_LADDER_COST, TO_LADDER_FLOOR, TO_LADDER_COST,
+			TOTAL_AMOUNT, DEPOSIT_AMOUNT, BALANCE_AMOUNT, DOCUMENT_PATH, APPROVED_AT, UPDATED_AT
+		) VALUES (
+			#{quoteId}, 'QT-' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(#{quoteId}, 10000), 4, '0'), #{memberId}, #{adminId},
+			#{sourceType}, #{status}, NVL(#{companyName}, '명품익스프레스'), #{contactName}, #{contactPhone}, #{estimateDate},
+			#{fromAddress}, #{toAddress}, #{workDate}, #{workTime}, #{transportDate}, #{workType},
+			NVL(#{fromLadderUse}, 'N'), NVL(#{toLadderUse}, 'N'), NVL(#{fromElevatorUse}, 'N'), NVL(#{toElevatorUse}, 'N'),
+			NVL(#{fromStairsUse}, 'N'), NVL(#{toStairsUse}, 'N'),
+			#{volumeTon}, #{note}, #{movingCost}, #{fromLadderFloor}, NVL(#{fromLadderCost}, 0), #{toLadderFloor}, NVL(#{toLadderCost}, 0),
+			#{totalAmount}, #{depositAmount}, #{balanceAmount}, #{documentPath},
+			CASE WHEN #{status} IN ('02', '03') THEN SYSDATE END, SYSDATE
+		)
+	</insert>
+
+	<select id="selectActiveMembers" resultType="Member">
+		SELECT MEMBER_ID, MEMBER_NAME, PHONE, JOINED_AT
+		  FROM TBL_MEMBER
+		 WHERE IS_ACTIVE = 'Y'
+		 ORDER BY JOINED_AT DESC, MEMBER_ID DESC
+	</select>
+
+</mapper>

@@ -1,8 +1,10 @@
 /*
- * SCR-A-011 예약 관리 (templates/admin/reservation/list.html) — 더미 데이터
+ * SCR-A-011 예약 관리 (templates/admin/reservation/list.html)
  *  분류 필터(전체 · 예약 완료 · 예약 취소 — 이사 완료는 예약 완료에 포함) · 검색(이름·휴대폰·예약 번호·예약일)
  *  페이지(8건, 예약일 내림차순) · 상세 팝업(상태·금액·결제·취소 정보) · [결제 완료] → 결제 상태·결제일 변경(A→B) · 분류별 현황
  *  [일정 변경] 예약일 입력 + 예약 시간은 고정 시간대(오전 8:00 · 10:00 / 오후 1:00 · 3:00 · 5:00) 중 선택
+ * 서버 연동(data-live="true"): [결제 완료] · [예약 취소] · [일정 변경] 을 AdminReservationController 로 보내고, 성공하면 화면 값을 바꾼다.
+ * 미리보기(/dev, 모델 없음)에서는 서버를 부르지 않고 더미 데이터로 모의 동작
  */
 (function () {
   const root = document.getElementById('reservationList');
@@ -11,7 +13,37 @@
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const layer = window.CodeMoveAdmin || { open: (el) => { el.hidden = false; }, close: (el) => { el.hidden = true; } };
   const PER_PAGE = 8;
-  const TODAY = '26.09.28'; // 더미 기준일 ([결제 완료] 시 계약금 결제일)
+  const live = root.dataset.live === 'true';
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  // 오늘(YY.MM.DD). 미리보기는 더미 기준일 ([결제 완료] 시 계약금 결제일)
+  const TODAY = live ? `${String(now.getFullYear()).slice(2)}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}` : '26.09.28';
+
+  /* 서버 요청 (JSON). 응답에 ok(성공 여부)를 붙여 돌려준다 */
+  async function post(url, data) {
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+      return Object.assign(await res.json().catch(() => ({})), { ok: res.ok });
+    } catch (_) {
+      return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+    }
+  }
+  // 실패 안내 — 견적 관리(estimate.js)와 같은 회색 알약, 하단 탭 위
+  function snack(message) {
+    let el = $('#reservationSnack');
+    if (!el) {
+      el = document.createElement('p');
+      el.id = 'reservationSnack';
+      el.setAttribute('role', 'status');
+      el.style.cssText = 'position:absolute;left:50%;bottom:calc(var(--nav) + 20px);z-index:120;display:flex;align-items:center;height:31px;padding:0 14px;'
+        + 'border-radius:999px;background:#70746d;color:#f4f4f2;font-size:14px;white-space:nowrap;pointer-events:none;transform:translateX(-50%);transition:opacity .4s';
+      ($('#adminFrame') || document.body).appendChild(el);
+    }
+    el.textContent = message;
+    el.style.opacity = '1';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
+  }
   const STATUS_CHIP = { '예약 완료': 'chip-done', '이사 완료': 'chip-done', '예약 취소': 'chip-cancel' };
   const PAY_CHIP = { '결제 대기': 'chip-review', '결제 완료': 'chip-done', '결제 취소': 'chip-cancel' };
 
@@ -33,8 +65,9 @@
   const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
   const no = (r) => String(r.dataset.row).padStart(4, '0');
   // 예약 번호는 생성 시점의 이사일 기준 — 일정 변경 후에도 그대로 (처음 계산한 값을 보관)
-  const reservationNo = (r) => (r.dataset.rsvNo ||= `ME-20${digits(r.dataset.movingDate)}-${no(r)}`);
-  const estimateNo = (r) => `QT-20${digits(r.dataset.applied)}-${no(r)}`;       // 견적일 기준 (더미: 신청일)
+  const reservationNo = (r) => (r.dataset.rsvNo ||= `RSV-20${digits(r.dataset.movingDate)}-${no(r)}`);
+  // 실데이터는 서버가 준 번호(data-quote-no · data-rsv-no), 더미는 견적일 기준 (더미: 신청일)
+  const estimateNo = (r) => r.dataset.quoteNo || `QT-20${digits(r.dataset.applied)}-${no(r)}`;
 
   // 날짜 검색어 → 목록 날짜(YY.MM.DD)와 비교할 함수. 날짜 형태가 아니면 null
   // 입력 중에도 결과가 따라오도록 마지막 숫자는 앞부분만 맞으면 통과시킨다.
@@ -69,12 +102,12 @@
   }
 
 
-  // 검색: 'ME-' → 예약 번호 / 010 으로 시작하는 7자리 이상 → 휴대폰 번호 / 날짜 형태 → 예약일(MOVE_DATE) / 그 외 → 이름
+  // 검색: 'RSV-' → 예약 번호 / 010 으로 시작하는 7자리 이상 → 휴대폰 번호 / 날짜 형태 → 예약일(MOVE_DATE) / 그 외 → 이름
   const isPhone = (q) => /^[\d\s-]+$/.test(q) && digits(q).startsWith('010') && digits(q).length >= 7;
   function matches(r) {
     const q = query.trim();
     if (!q) return true;
-    if (/^me-?/i.test(q)) return reservationNo(r).toLowerCase().includes(q.toLowerCase());
+    if (/^rsv-?/i.test(q)) return reservationNo(r).toLowerCase().includes(q.toLowerCase());
     if (isPhone(q)) return digits(r.dataset.phone).includes(digits(q));
     const byDate = dateMatcher(q);
     return byDate ? byDate(r.dataset.movingDate) : r.dataset.name.includes(q);
@@ -129,7 +162,9 @@
     selected = row;
     const d = row.dataset;
     const total = Number(d.total);
-    const deposit = Math.round(total * 0.1);
+    // 실데이터는 견적서 계약금·잔금, 더미는 총액의 10%
+    const deposit = d.deposit ? Number(d.deposit) : Math.round(total * 0.1);
+    const balance = d.balance ? Number(d.balance) : total - deposit;
     const set = (key, value) => { $(`[data-d="${key}"]`, detail).textContent = value; };
     setChip($('[data-d="status"]', detail), STATUS_CHIP, d.status); // 상세에서만 이사 완료 구분
     set('applied', d.applied);
@@ -145,7 +180,7 @@
     set('memo', d.memo === '-' ? '-' : d.memo);
     set('total', won(total));
     set('deposit', won(deposit));
-    set('balance', won(total - deposit));
+    set('balance', won(balance));
     const cancelled = d.status === '예약 취소';
     $('[data-cancel-box]', detail).hidden = !cancelled;
     if (cancelled) { set('cancelledAt', d.cancelledAt); set('cancelledBy', d.cancelledBy); }
@@ -162,11 +197,28 @@
     const row = e.target.closest('[data-row]');
     if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetail(row); }
   });
-  $('#paymentComplete').addEventListener('click', () => {
+  // 중복 클릭 막기: 서버 응답 전에는 다시 보내지 않는다
+  let busy = false;
+  async function send(url, data) {
+    if (!live) return { ok: true };
+    if (busy) return { ok: false };
+    busy = true;
+    const result = await post(url, data);
+    busy = false;
+    if (!result.ok && result.message) snack(result.message);
+    else if (!result.ok) snack('잠시 후 다시 시도해 주세요.');
+    return result;
+  }
+  const actionUrl = (row, action) => `/admin/reservations/${row.dataset.row}/${action}`;
+
+  $('#paymentComplete').addEventListener('click', async () => {
     if (!selected) return;
-    selected.dataset.payment = '결제 완료';
-    selected.dataset.paidAt = TODAY;
-    renderPayment(selected);
+    const row = selected;
+    const result = await send(actionUrl(row, 'paid'));
+    if (!result.ok) return;
+    row.dataset.payment = '결제 완료';
+    row.dataset.paidAt = result.paidAt || TODAY;
+    if (selected === row) renderPayment(row);
   });
 
   filterBox.addEventListener('click', (e) => {
@@ -206,7 +258,7 @@
     const m = /^(\d{2})\.(\d{2})\.(\d{2})$/.exec(v);
     if (!m) return false;
     const dt = new Date(2000 + Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    return dt.getMonth() === Number(m[2]) - 1 && dt.getDate() === Number(m[3]) && v >= TODAY; // 오늘 이후만
+    return dt.getMonth() === Number(m[2]) - 1 && dt.getDate() === Number(m[3]) && v > TODAY; // 내일부터 (서버 예약 가능일과 같게)
   };
 
   // 예약 시간: 고정 시간대(08:00 · 10:00 · 13:00 · 15:00 · 17:00) 중 하나를 고름
@@ -236,14 +288,17 @@
     layer.open(reschedule);
   }
   $('#rescheduleOpen').addEventListener('click', openReschedule);
-  $('#rescheduleForm').addEventListener('submit', (e) => {
+  $('#rescheduleForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (saveBtn.disabled || !selected) return;
+    const date = dateInput.value;
+    const result = await send(actionUrl(selected, 'schedule'), { date, time: pickedTime }); // 휴무·마감이면 서버가 막고 안내
+    if (!result.ok) return;
     reservationNo(selected); // 번호 고정
-    selected.dataset.movingDate = dateInput.value;
+    selected.dataset.movingDate = date;
     selected.dataset.movingTime = pickedTime;
-    $('[data-date-cell]', selected).textContent = dateInput.value;
-    $('[data-d="movingDate"]', detail).textContent = dateInput.value;
+    $('[data-date-cell]', selected).textContent = date;
+    $('[data-d="movingDate"]', detail).textContent = date;
     $('[data-d="movingTime"]', detail).textContent = pickedTime;
     layer.close(reschedule);
     render(); // 예약일 정렬 유지
@@ -252,11 +307,13 @@
 
   const cancelConfirm = $('#reservationCancelConfirm');
   $('#reservationCancelOpen').addEventListener('click', () => layer.open(cancelConfirm));
-  $('#reservationCancelOk').addEventListener('click', () => {
+  $('#reservationCancelOk').addEventListener('click', async () => {
     if (!selected) return;
+    const result = await send(actionUrl(selected, 'cancel'));
+    if (!result.ok) { layer.close(cancelConfirm); return; }
     const d = selected.dataset;
     d.status = '예약 취소';
-    d.cancelledAt = TODAY;
+    d.cancelledAt = result.cancelledAt || TODAY;
     d.cancelledBy = '관리자';                              // CANCELLED_BY 02
     if (d.payment === '결제 대기') d.payment = '결제 취소'; // PAY_STATUS 03
     setChip($('[data-list-chip]', selected), STATUS_CHIP, '예약 취소');
@@ -274,15 +331,17 @@
   if (preset) $(`[data-filter="${preset}"]`, filterBox)?.click();
   render();
   if (s === 'search' || s === 'empty') setSearch(true);
-  if (s === 'detail' || s === 'paid') {
-    const row = rows().find((r) => r.dataset.row === '6');
-    if (s === 'paid') { row.dataset.payment = '결제 완료'; row.dataset.paidAt = TODAY; }
-    openDetail(row);
+  // 더미는 정해진 행, 실데이터는 그 상태의 첫 행 (없으면 열지 않음)
+  const pick = (id, rsvStatus) => (live ? rows().find((r) => r.dataset.status === rsvStatus) : rows().find((r) => r.dataset.row === id));
+  const booked = pick('6', '예약 완료');
+  if ((s === 'detail' || s === 'paid') && booked) {
+    if (s === 'paid' && !live) { booked.dataset.payment = '결제 완료'; booked.dataset.paidAt = TODAY; }
+    openDetail(booked);
   }
-  if (s === 'cancel-detail') openDetail(rows().find((r) => r.dataset.row === '7'));
-  if (s === 'done-detail') openDetail(rows().find((r) => r.dataset.row === '21'));
-  if (s === 'reschedule' || s === 'cancel-confirm') {
-    openDetail(rows().find((r) => r.dataset.row === '6'));
+  if (s === 'cancel-detail' && pick('7', '예약 취소')) openDetail(pick('7', '예약 취소'));
+  if (s === 'done-detail' && pick('21', '이사 완료')) openDetail(pick('21', '이사 완료'));
+  if ((s === 'reschedule' || s === 'cancel-confirm') && booked) {
+    openDetail(booked);
     if (s === 'reschedule') openReschedule(); else layer.open(cancelConfirm);
   }
 })();

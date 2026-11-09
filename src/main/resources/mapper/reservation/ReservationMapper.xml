@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.reservation.ReservationMapper">
+
+	<sql id="columns">
+		RESERVATION_ID, RESERVATION_NO, REQUEST_ID, STATUS, PAY_STATUS, MOVE_DATE, MOVE_TIME, MOVE_MEMO,
+		APPLIED_AT, DEPOSIT_PAID_AT, CANCELLED_AT, CANCELLED_BY
+	</sql>
+
+	<insert id="insertReservation" parameterType="Reservation">
+		<selectKey keyProperty="reservationId" resultType="long" order="BEFORE">
+			SELECT SEQ_RESERVATION.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_RESERVATION (RESERVATION_ID, RESERVATION_NO, REQUEST_ID, STATUS, PAY_STATUS, MOVE_DATE, MOVE_TIME)
+		VALUES (#{reservationId}, 'RSV-' || TO_CHAR(#{moveDate}, 'YYYYMMDD') || '-' || LPAD(MOD(#{reservationId}, 10000), 4, '0'),
+		        #{requestId}, '01', '01', #{moveDate}, #{moveTime})
+	</insert>
+
+	<select id="selectByRequestId" resultType="Reservation">
+		SELECT <include refid="columns"/>
+		  FROM TBL_RESERVATION
+		 WHERE REQUEST_ID = #{requestId}
+	</select>
+
+	<select id="selectById" resultType="Reservation">
+		SELECT <include refid="columns"/>
+		  FROM TBL_RESERVATION
+		 WHERE RESERVATION_ID = #{reservationId}
+	</select>
+
+
+	<select id="selectByMember" resultType="Reservation">
+		SELECT R.RESERVATION_ID, R.RESERVATION_NO, R.REQUEST_ID, R.STATUS, R.PAY_STATUS, R.MOVE_DATE, R.MOVE_TIME, R.MOVE_MEMO,
+		       R.APPLIED_AT, R.DEPOSIT_PAID_AT, R.CANCELLED_AT, R.CANCELLED_BY
+		  FROM TBL_RESERVATION R
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = R.REQUEST_ID
+		 WHERE M.MEMBER_ID = #{memberId}
+		 ORDER BY R.MOVE_DATE, R.RESERVATION_ID
+	</select>
+
+	<select id="selectForMember" resultType="Reservation">
+		SELECT R.RESERVATION_ID, R.RESERVATION_NO, R.REQUEST_ID, R.STATUS, R.PAY_STATUS, R.MOVE_DATE, R.MOVE_TIME, R.MOVE_MEMO,
+		       R.APPLIED_AT, R.DEPOSIT_PAID_AT, R.CANCELLED_AT, R.CANCELLED_BY
+		  FROM TBL_RESERVATION R
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = R.REQUEST_ID
+		 WHERE R.RESERVATION_ID = #{reservationId}
+		   AND M.MEMBER_ID = #{memberId}
+	</select>
+
+	<update id="updateMemo">
+		UPDATE TBL_RESERVATION
+		   SET MOVE_MEMO = #{memo}
+		 WHERE RESERVATION_ID = #{reservationId}
+		   AND STATUS = '01'
+	</update>
+
+	<update id="cancel">
+		UPDATE TBL_RESERVATION
+		   SET STATUS = '03',
+		       CANCELLED_AT = SYSDATE,
+		       CANCELLED_BY = #{cancelledBy},
+		       PAY_STATUS = CASE WHEN PAY_STATUS = '01' THEN '03' ELSE PAY_STATUS END
+		 WHERE RESERVATION_ID = #{reservationId}
+		   AND STATUS = '01'
+	</update>
+
+	<update id="completeOverdue">
+		UPDATE TBL_RESERVATION
+		   SET STATUS = '02'
+		 WHERE STATUS = '01'
+		   AND MOVE_DATE &lt; TRUNC(SYSDATE)
+	</update>
+
+	<select id="hasReview" resultType="boolean">
+		SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM TBL_REVIEW WHERE RESERVATION_ID = #{reservationId}
+	</select>
+
+	<!-- ===== 관리자 예약 관리 · 사용자 예약내역 공용 행 (예약 + 견적 요청 + 회원 + 견적서) ===== -->
+	<sql id="rowSelect">
+		SELECT RS.RESERVATION_ID, RS.RESERVATION_NO, RS.STATUS, RS.PAY_STATUS, RS.MOVE_DATE, RS.MOVE_TIME, RS.MOVE_MEMO,
+		       RS.APPLIED_AT, RS.DEPOSIT_PAID_AT, RS.CANCELLED_AT, RS.CANCELLED_BY,
+		       MB.MEMBER_NAME, MB.PHONE,
+		       Q.QUOTE_NO, M.HOUSE_TYPE, M.PACK_TYPE, Q.WORK_TYPE, Q.FROM_ADDRESS, Q.TO_ADDRESS,
+		       Q.TOTAL_AMOUNT, Q.DEPOSIT_AMOUNT, Q.BALANCE_AMOUNT
+		  FROM TBL_RESERVATION RS
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = RS.REQUEST_ID
+		  JOIN TBL_MEMBER MB ON MB.MEMBER_ID = M.MEMBER_ID
+		  LEFT JOIN TBL_QUOTE Q ON Q.REQUEST_ID = RS.REQUEST_ID
+	</sql>
+
+	<select id="selectAdminRows" resultType="com.codemove.reservation.ReservationRow">
+		<include refid="rowSelect"/>
+		 ORDER BY RS.MOVE_DATE DESC, RS.RESERVATION_ID DESC
+	</select>
+
+	<update id="completePayment">
+		UPDATE TBL_RESERVATION
+		   SET PAY_STATUS = '02',
+		       DEPOSIT_PAID_AT = SYSDATE
+		 WHERE RESERVATION_ID = #{reservationId}
+		   AND PAY_STATUS = '01'
+		   AND STATUS IN ('01', '02')
+	</update>
+
+	<update id="updateSchedule">
+		UPDATE TBL_RESERVATION
+		   SET MOVE_DATE = #{moveDate},
+		       MOVE_TIME = #{moveTime}
+		 WHERE RESERVATION_ID = #{reservationId}
+		   AND STATUS = '01'
+	</update>
+
+	<select id="selectHistoryByMember" resultType="com.codemove.reservation.ReservationRow">
+		<include refid="rowSelect"/>
+		 WHERE M.MEMBER_ID = #{memberId}
+		 ORDER BY RS.MOVE_DATE DESC, RS.RESERVATION_ID DESC
+	</select>
+
+	<select id="selectQuoteHistory" resultType="com.codemove.reservation.QuoteHistoryRow">
+		SELECT Q.QUOTE_ID, Q.STATUS, Q.ESTIMATE_DATE, Q.FROM_ADDRESS, Q.TO_ADDRESS, Q.WORK_DATE, Q.TOTAL_AMOUNT, Q.EXPIRES_AT,
+		       Q.WORK_TYPE, M.HOUSE_TYPE, M.PACK_TYPE
+		  FROM TBL_QUOTE Q
+		  LEFT JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = Q.REQUEST_ID
+		 WHERE Q.MEMBER_ID = #{memberId}
+		 ORDER BY Q.QUOTE_ID DESC
+	</select>
+
+	<select id="selectMemberId" resultType="long">
+		SELECT M.MEMBER_ID
+		  FROM TBL_RESERVATION R
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = R.REQUEST_ID
+		 WHERE R.RESERVATION_ID = #{reservationId}
+	</select>
+
+</mapper>

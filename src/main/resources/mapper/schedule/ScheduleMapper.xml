@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.schedule.ScheduleMapper">
+
+	<sql id="settingColumns">
+		SETTING_ID, DAILY_CAPACITY, CLOSED_WEEKDAYS, HOLIDAY_CLOSED, UPDATED_AT, ADMIN_ID
+	</sql>
+
+	<!-- 1행 테이블이지만 혹시 여러 행이면 가장 먼저 만든 행 -->
+	<select id="selectSetting" resultType="ReservationSetting">
+		SELECT * FROM (
+			SELECT <include refid="settingColumns"/>
+			  FROM TBL_RESERVATION_SETTING
+			 ORDER BY SETTING_ID
+		) WHERE ROWNUM = 1
+	</select>
+
+	<select id="selectSettingForUpdate" resultType="ReservationSetting">
+		SELECT <include refid="settingColumns"/>
+		  FROM TBL_RESERVATION_SETTING
+		 WHERE SETTING_ID = (SELECT MIN(SETTING_ID) FROM TBL_RESERVATION_SETTING)
+		   FOR UPDATE
+	</select>
+
+	<insert id="insertSetting" parameterType="ReservationSetting">
+		<selectKey keyProperty="settingId" resultType="long" order="BEFORE">
+			SELECT SEQ_RESERVATION_SETTING.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_RESERVATION_SETTING (SETTING_ID, DAILY_CAPACITY, CLOSED_WEEKDAYS, HOLIDAY_CLOSED, UPDATED_AT, ADMIN_ID)
+		VALUES (#{settingId}, #{dailyCapacity}, #{closedWeekdays,jdbcType=VARCHAR}, #{holidayClosed}, SYSDATE, #{adminId,jdbcType=NUMERIC})
+	</insert>
+
+	<update id="updateSetting" parameterType="ReservationSetting">
+		UPDATE TBL_RESERVATION_SETTING
+		   SET DAILY_CAPACITY = #{dailyCapacity},
+		       CLOSED_WEEKDAYS = #{closedWeekdays,jdbcType=VARCHAR},
+		       HOLIDAY_CLOSED = #{holidayClosed},
+		       UPDATED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId,jdbcType=NUMERIC}
+		 WHERE SETTING_ID = #{settingId}
+	</update>
+
+	<select id="selectClosedDays" resultType="ClosedDay">
+		SELECT TRUNC(CLOSED_DATE) AS CLOSED_DATE, UPDATED_AT, ADMIN_ID
+		  FROM TBL_CLOSED_DAY
+		 WHERE CLOSED_DATE &gt;= #{from}
+		   AND CLOSED_DATE &lt; #{to}
+		 ORDER BY CLOSED_DATE
+	</select>
+
+	<select id="selectAllClosedDays" resultType="ClosedDay">
+		SELECT TRUNC(CLOSED_DATE) AS CLOSED_DATE, UPDATED_AT, ADMIN_ID
+		  FROM TBL_CLOSED_DAY
+		 ORDER BY CLOSED_DATE
+	</select>
+
+	<select id="countClosedDay" resultType="int">
+		SELECT COUNT(*) FROM TBL_CLOSED_DAY WHERE TRUNC(CLOSED_DATE) = #{date}
+	</select>
+
+	<insert id="insertClosedDay" parameterType="ClosedDay">
+		INSERT INTO TBL_CLOSED_DAY (CLOSED_DATE, UPDATED_AT, ADMIN_ID)
+		VALUES (#{closedDate}, SYSDATE, #{adminId,jdbcType=NUMERIC})
+	</insert>
+
+	<delete id="deleteClosedDay">
+		DELETE FROM TBL_CLOSED_DAY WHERE TRUNC(CLOSED_DATE) = #{date}
+	</delete>
+
+	<select id="countConfirmedByDay" resultType="com.codemove.schedule.DayCount">
+		SELECT TRUNC(MOVE_DATE) AS MOVE_DAY, COUNT(*) AS CNT
+		  FROM TBL_RESERVATION
+		 WHERE STATUS = '01'
+		   AND MOVE_DATE &gt;= #{from}
+		   AND MOVE_DATE &lt; #{to}
+		 GROUP BY TRUNC(MOVE_DATE)
+	</select>
+
+	<!-- 주소: 견적서에 적힌 주소가 있으면 그것, 없으면 견적 요청 주소 + 상세 -->
+	<select id="selectCalendarReservations" resultType="com.codemove.schedule.CalendarReservation">
+		SELECT R.RESERVATION_ID, R.RESERVATION_NO, R.STATUS, R.PAY_STATUS,
+		       TRUNC(R.MOVE_DATE) AS MOVE_DATE, R.MOVE_TIME,
+		       M.MEMBER_NAME, M.PHONE, MR.HOUSE_TYPE,
+		       NVL(Q.FROM_ADDRESS, TRIM(MR.FROM_ADDRESS || ' ' || MR.FROM_DETAIL)) AS FROM_ADDRESS,
+		       NVL(Q.TO_ADDRESS, TRIM(MR.TO_ADDRESS || ' ' || MR.TO_DETAIL)) AS TO_ADDRESS
+		  FROM TBL_RESERVATION R
+		  JOIN TBL_MOVE_REQUEST MR ON MR.REQUEST_ID = R.REQUEST_ID
+		  JOIN TBL_MEMBER M ON M.MEMBER_ID = MR.MEMBER_ID
+		  LEFT JOIN TBL_QUOTE Q ON Q.REQUEST_ID = R.REQUEST_ID
+		 WHERE R.STATUS IN ('01', '02')
+		   AND R.MOVE_DATE &gt;= #{from}
+		   AND R.MOVE_DATE &lt; #{to}
+		 ORDER BY R.MOVE_DATE, R.MOVE_TIME NULLS LAST, R.RESERVATION_ID
+	</select>
+
+</mapper>

@@ -54,7 +54,9 @@
           <button type="button" aria-label="최근 알림" data-open="#notificationPanel"
                   class="relative grid h-11 w-11 place-items-center rounded-full text-[#292929] transition hover:bg-[#f2f5f2]">
             <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-bell'"/></svg>
-            <span class="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#f5831a]"></span>
+            <!--/* 안 읽은 관리자 알림이 있을 때만 (adminNotificationPanel.unread, 미리보기는 예시 값) — 읽음 처리 시 overlays.js 가 갱신 */-->
+            <span id="notificationDot" class="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#f5831a]"
+                  th:hidden="${(adminNotificationPanel ?: T(com.codemove.notification.NotificationViews$AdminPanel).SAMPLE).unread() == 0}"></span>
           </button>
         </div>
       </header>

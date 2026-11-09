@@ -1,8 +1,8 @@
 /*
- * 더보기 화면 그룹 (G-H01~H14) — 백엔드 없이 동작만 시뮬레이션
- *  내 정보 수정: 휴대폰 번호 입력 → 인증번호 발송(3분 타이머) → 6자리 입력 → 변경
- *  견적내역·예약내역: [data-filter-toggle] / [data-filter] 로 목록 필터
- *  후기 작성: 별점, 사진 첨부(최대 5장), 등록 → 후기 목록(?state=done)
+ * 더보기 화면 그룹 (G-H01~H14) (서버 연동: 견적내역·예약내역·후기, 미리보기 /dev 는 시뮬레이션)
+ *  후기 작성: 별점, 사진 첨부(최대 5장), 등록 → POST /more/reviews (multipart) → 후기 목록(?state=done). 미리보기(/dev)는 서버 없이 시뮬레이션
+ *  견적내역·예약내역 (목록은 서버 값): [data-filter-toggle] / [data-filter] 로 목록 필터, 견적 도착 카드 남은 시간 [data-countdown]
+ *  내 정보 수정: 휴대폰 번호 입력 → 인증번호 발송(3분 타이머) → 6자리 입력 → 변경 (POST /more/profile/phone/send · /more/profile/phone, 미리보기는 시뮬레이션)
  *  알림: 탭(전체·내 이사), 행 클릭 시 읽음, 모두 읽음
  */
 (function () {
@@ -63,9 +63,29 @@
     if (e.target.closest('[data-close]')) setToggleOpen(false);
   });
 
+  /* ---------- 견적내역: 견적 도착 남은 시간 (24시간 이상 N일 N시간, 미만 HH:MM:SS — move.js 와 같은 규칙) ---------- */
+  const pad = (n) => String(n).padStart(2, '0');
+  $$('[data-countdown]').forEach((el) => {
+    let left = Number(el.dataset.countdown);
+    if (!el.dataset.countdown || !Number.isFinite(left)) return;
+    const suffix = el.dataset.suffix || '';
+    const target = el.querySelector('[data-countdown-text]') || el;
+    const draw = () => {
+      const text = left >= 86400
+        ? `${Math.floor(left / 86400)}일 ${Math.floor((left % 86400) / 3600)}시간`
+        : `${pad(Math.floor(left / 3600))}:${pad(Math.floor((left % 3600) / 60))}:${pad(left % 60)}`;
+      target.textContent = `${text}${suffix}`;
+      left = Math.max(0, left - 1);
+    };
+    draw();
+    setInterval(draw, 1000);
+  });
+
   /* ---------- 알림: 탭(전체·내 이사), 읽음 처리, 모두 읽음 ---------- */
   const notiFeed = $('#notificationFeed');
   if (notiFeed) {
+    // 읽음 저장: 행 = POST /notifications/{id}/read, 모두 읽음 = POST /notifications/read-all (미리보기 행은 data-id 없음 → 화면만)
+    const post = (url) => fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
     const markRead = (row) => {
       row.classList.remove('unread');
       const dot = row.querySelector(':scope > i');
@@ -88,11 +108,18 @@
     document.addEventListener('click', (e) => {
       const tab = e.target.closest('[data-noti-tab]');
       if (tab) { showTab(tab.dataset.notiTab); return; }
-      if (e.target.closest('#readAll')) { $$('.notification-row.unread', notiFeed).forEach(markRead); return; }
+      if (e.target.closest('#readAll')) {
+        const unread = $$('.notification-row.unread', notiFeed);
+        unread.forEach(markRead);
+        if (unread.some((r) => r.dataset.id)) post('/notifications/read-all');
+        return;
+      }
       const row = e.target.closest('.notification-row');
       if (row) {
+        const wasUnread = row.classList.contains('unread');
         markRead(row);
-        if (row.dataset.href) location.href = row.dataset.href;
+        const saved = wasUnread && row.dataset.id ? post(`/notifications/${row.dataset.id}/read`) : Promise.resolve();
+        if (row.dataset.href) saved.finally(() => { location.href = row.dataset.href; });
       }
     });
     const initial = new URLSearchParams(location.search).get('tab');
@@ -146,11 +173,13 @@
       code.value = '';
       codeGroup.hidden = true;
       sendBtn.textContent = '인증하기';
+      showError('');
       update();
     };
 
     nextPhone.addEventListener('input', () => {
       nextPhone.value = formatPhone(nextPhone.value);
+      showError('');
       codeGroup.hidden = true;
       sendBtn.textContent = '인증하기';
       code.value = '';
@@ -162,19 +191,57 @@
       code.value = code.value.replace(/\D/g, '').slice(0, 6);
       update();
     });
-    sendBtn.addEventListener('click', () => {
-      if (!phoneReady()) return;
+    // 서버 연동 (로그인 화면): 발송 · 확인 주소가 있을 때. 미리보기(/dev)는 시뮬레이션
+    const sendUrl = phoneSheet.dataset.sendUrl;
+    const changeUrl = phoneSheet.dataset.changeUrl;
+    const errorEl = $('#phoneError');
+    const showError = (message) => {
+      if (!errorEl) return;
+      errorEl.textContent = message || '';
+      errorEl.hidden = !message;
+    };
+    async function post(url, data) {
+      try {
+        const res = await fetch(url, { method: 'POST', body: new URLSearchParams(data) });
+        return Object.assign({ ok: res.ok }, await res.json().catch(() => ({})));
+      } catch (_) {
+        return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+      }
+    }
+    let busy = false;
+
+    sendBtn.addEventListener('click', async () => {
+      if (!phoneReady() || busy) return;
+      let from = 180;
+      if (sendUrl) {
+        busy = true;
+        const res = await post(sendUrl, { phone: nextPhone.value });
+        busy = false;
+        if (!res.ok) { showError(res.message); return; }
+        from = res.seconds || 180;
+      }
+      showError('');
       codeGroup.hidden = false;
       sendBtn.textContent = '재인증';
       hintPhone.textContent = nextPhone.value;
       code.value = '';
-      startTimer(180);
+      startTimer(from);
       update();
       code.focus();
     });
-    confirm.addEventListener('click', () => {
-      if (confirm.classList.contains('is-disabled')) return;
-      $('#currentPhone').textContent = nextPhone.value;
+    confirm.addEventListener('click', async () => {
+      if (confirm.classList.contains('is-disabled') || busy) return;
+      let phone = nextPhone.value;
+      if (changeUrl) {
+        busy = true;
+        const res = await post(changeUrl, { phone: nextPhone.value, code: code.value });
+        busy = false;
+        if (res.redirect) { location.href = res.redirect; return; }
+        if (!res.ok) { showError(res.message); return; }
+        phone = res.phone;
+      }
+      // 알림 단계에서 추가: 번호 변경 완료 안내
+      $('#currentPhone').textContent = phone;
       phoneSheet.hidden = true;
       reset();
     });
@@ -221,9 +288,10 @@
       count.textContent = n + '/' + MAX;
       addBtn.hidden = n >= MAX;
     };
-    const addPreview = (src, name) => {
+    const addPreview = (src, name, file) => {
       const box = document.createElement('div');
       box.className = 'review-photo-preview';
+      box._file = file; // 등록 때 보낼 원본 파일
       const img = document.createElement('img');
       img.src = src;
       img.alt = name;
@@ -252,7 +320,7 @@
       Array.from(input.files || []).slice(0, remaining).forEach((file) => {
         const reader = new FileReader();
         reader.onload = () => {
-          if (typeof reader.result === 'string' && photos().length < MAX) addPreview(reader.result, file.name);
+          if (typeof reader.result === 'string' && photos().length < MAX) addPreview(reader.result, file.name, file);
         };
         reader.readAsDataURL(file);
       });
@@ -260,9 +328,43 @@
     });
     editor.addEventListener('input', renderCount);
 
-    reviewForm.addEventListener('submit', (e) => {
+    // 등록 실패 안내 (다른 화면의 저장 토스트와 같은 모양)
+    const toast = (message) => {
+      let el = $('.save-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'save-toast';
+        el.setAttribute('role', 'status');
+        document.body.appendChild(el);
+      }
+      el.textContent = message;
+      el.hidden = false;
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => { el.hidden = true; }, 2200);
+    };
+
+    reviewForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (submit.disabled) return;
+      if (reviewForm.dataset.live === 'true') {
+        const data = new FormData();
+        data.append('reservation', reviewForm.elements.reservation.value);
+        data.append('rating', String(rating));
+        data.append('content', editor.value.trim());
+        photos().forEach((p) => { if (p._file) data.append('photos', p._file); });
+        submit.disabled = true;
+        let result;
+        try {
+          const res = await fetch(reviewForm.action, { method: 'POST', body: data });
+          result = Object.assign({ ok: res.ok }, await res.json().catch(() => ({})));
+        } catch (_) {
+          result = { ok: false };
+        }
+        if (result.ok && result.redirect) { location.href = result.redirect; return; }
+        toast(result.message || '잠시 후 다시 시도해 주세요.');
+        updateSubmit();
+        return;
+      }
       const draft = {
         rating,
         text: editor.value.trim(),
@@ -299,5 +401,9 @@
     // .my-review-photos 는 display:grid !important 라 hidden 이 먹지 않으므로 비어 있으면 제거
     const photoBox = $('[data-review-photos]', submitted);
     if (photoBox && !photoBox.children.length) photoBox.remove();
+  } else {
+    // 실제 등록 후(?state=done): 방금 쓴 후기는 서버 목록 맨 위에 있으므로 토스트만 잠시 보여준다
+    const toast = $('#reviewToast');
+    if (toast) setTimeout(() => { toast.hidden = true; }, 2500);
   }
 })();

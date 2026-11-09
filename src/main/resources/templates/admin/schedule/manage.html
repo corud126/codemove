@@ -6,7 +6,7 @@
     연동: 공휴일 · 손 없는 날 — 외부 API(공공데이터 특일 정보 · 음력)에서 불러온 값, 월별 확인만 (DB 저장 없음, Q17)
   감사용 UPDATED_AT · ADMIN_ID 는 표시하지 않음 · 자동 알림 없음(Q23) · 저장 후 토스트
   state: (기본) 휴무일 · weekly(매주 월 + 공휴일 휴무) · past · day-add · day-edit · day-warning · holidays · saved
-  더미 데이터·동작: js/admin/schedule.js (오늘 = 26.09.27 가정) */-->
+  데이터: AdminScheduleController 가 열면 data-base 로 JSON(/admin/schedule/settings · month, 저장은 POST)을 주고받음 · /dev 미리보기는 js/admin/schedule.js 더미(오늘 = 26.09.27 가정) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='일정 관리', active='', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
@@ -14,8 +14,8 @@
   <div id="scheduleManage" class="px-4 pb-28 pt-5"
        th:with="ic=@{/images/admin/icons-v2.svg}, st=${param.state != null ? param.state[0] : ''},
                 boxCls='block w-full rounded-[12px] bg-[#f5f6f4] px-3.5 text-[16px] text-[#1a1a1a] outline-none transition-colors placeholder:text-[#a9aea9] focus:bg-white focus:ring-2 focus:ring-inset focus:ring-[#346538]',
-                labelCls='mb-2 block text-[15px] font-semibold text-[#292929]'"
-       th:attr="data-state=${st}">
+                labelCls='mb-2 block text-[15px] font-semibold text-[#292929]', base=@{/admin/schedule}"
+       th:attr="data-state=${st}, data-base=${live != null ? base : ''}, data-today=${today ?: ''}">
     <!--/* 1행: 페이지 제목만 */-->
     <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">일정 관리</h2>
 

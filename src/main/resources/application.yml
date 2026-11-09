@@ -19,7 +19,8 @@ mybatis:
   type-aliases-package: com.codemove.domain
   configuration:
     map-underscore-to-camel-case: true
-    jdbc-type-for-null: NULL
+    # 따옴표 필수: YAML 은 NULL 을 빈 값으로 읽어 설정이 빠진다
+    jdbc-type-for-null: "NULL"
 
 server:
   port: 8080
@@ -27,6 +28,58 @@ server:
     session:
       # URL 에 ;jsessionid= 가 붙지 않도록 쿠키로만 세션 유지
       tracking-modes: cookie
+
+# 간편 로그인 앱 키는 application-local.yml 에 작성 (비어 있으면 해당 로그인 버튼은 로그인 방법 선택으로 돌아감)
+codemove:
+  oauth:
+    providers:
+      kakao:
+        client-id:
+        client-secret:
+      naver:
+        client-id:
+        client-secret:
+  # 도로명주소 검색 API 승인키 (application-local.yml 에 작성, 비어 있으면 예시 주소로 검색)
+  juso:
+    confm-key:
+  # 공공데이터포털 특일 정보 키 (application-local.yml 에 작성, 비어 있으면 내장 공휴일 목록 2026~2027)
+  holiday:
+    service-key:
+  # 채팅: 응답 지연 안내(분) · 대화 없으면 자동 종료(분) · 첨부 저장 폴더 · 첨부 최대 크기(MB)
+  chat:
+    delay-minutes: 10
+    idle-end-minutes: 30
+    upload-dir: uploads/chat
+    max-file-mb: 10
+  # 알림: 기본 조회 기간(일) · 관리자 내역 한 번에 불러올 개수 · 사용자 목록·관리자 패널 최대 개수 · 이사 임박 알림(D-n)
+  #        이사 임박 알림 시각(cron) · 방해 금지 시간에 보류한 알림 발송 주기(cron)
+  notification:
+    recent-days: 30
+    page-size: 20
+    user-list-size: 100
+    panel-size: 100
+    reminder-days: 3
+    reminder-cron: "0 0 9 * * *"
+    flush-cron: "0 */10 * * * *"
+  # 후기 사진 저장 폴더 · 사진 1장 최대 크기(MB)
+  review:
+    upload-dir: uploads/reviews
+    max-photo-mb: 10
+  # 견적 요청: 톤 환산은 ERD 임시 규칙, 단가(pricing)는 업체 기준이 정해질 때까지 임시값
+  quote:
+    upload-dir: uploads
+    cbm-per-ton: 6
+    ton-step: 0.5
+    min-ton: 1
+    deposit-rate: 0.1
+    review-confidence: 70
+    pricing:
+      base-fee: 150000
+      per-ton: 100000
+      partial-pack-rate: 1.2
+      range-min-rate: 0.95
+      range-max-rate: 1.15
+      round-unit: 10000
 
 ---
 # 로컬 개발: 템플릿·정적 파일을 src에서 직접 읽어 수정 즉시 반영 (재시작 불필요)

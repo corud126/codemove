@@ -1,29 +1,22 @@
 <!DOCTYPE html>
 <!--/* SCR-A-023 회원 관리 — 디자인 기준: docs/ui/관리자디자인기준.md · 컬럼 기준: docs/erd/admin-screen-mapping.md (TBL_MEMBER, TBL_SOCIAL)
   상태: (기본) | ?state=search (검색 열림) | ?state=empty (검색 결과 없음) | ?state=detail (A 회원 상세: 간편로그인 2개)
-        ?state=inactive (비활성 회원) | ?state=withdrawn (탈퇴 회원 상세)
   ERD 반영 (Q11·Q13): 고객만 조회 → 분류 필터·배지·권한 변경(C)·등록(B) 제거, 아이디 → 휴대폰 번호. 삭제 기능 없음 (사용자 결정 11/03)
-  행 데이터: id|이름|휴대폰|가입일|본인인증(Y/N)|활성(Y/N)|약관 동의일|탈퇴일(-)|간편로그인(코드:연결일;… 또는 -) — 코드 01 카카오 · 02 네이버 · 03 애플
-  검색(이름·초성·휴대폰 번호·가입일) · 필터(활성/비활성) · 페이지(8명) · 상세는 member.js */-->
+  활성 회원(IS_ACTIVE='Y')만 표시: 비활성 = 탈퇴(이름·번호 파기)뿐이라 상태 필터·상태 표시·탈퇴일 제거 (11/03)
+  행 데이터: id|이름|휴대폰|가입일|본인인증(Y/N)|약관 동의일|간편로그인(코드:연결일;… 또는 -) — 코드 01 카카오 · 02 네이버 · 03 애플
+  검색(이름·초성·휴대폰 번호·가입일) · 페이지(8명) · 상세는 member.js */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='회원 관리', active='', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
   <div id="memberList" class="px-4 pb-28 pt-5"
-       th:with="state=${param.state != null ? param.state[0] : ''},
-                activeFilter=${state == 'inactive' or state == 'withdrawn' ? 'N' : 'Y'}"
+       th:with="state=${param.state != null ? param.state[0] : ''}"
        th:attr="data-state=${state}">
     <!--/* 1행: 페이지 제목만 */-->
     <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">회원 관리</h2>
 
-    <!--/* 2행: 상태 필터(활성·비활성) · 검색 (등록 없음) */-->
+    <!--/* 2행: 검색 (등록·상태 필터 없음) */-->
     <div class="mt-5 flex items-center gap-1">
-      <div id="activeFilter" class="inline-flex gap-0.5 rounded-full bg-[#eef0ee] p-1" role="tablist" aria-label="회원 상태 필터">
-        <button type="button" th:each="f : ${ {'Y|활성', 'N|비활성'} }" th:with="t=${#strings.arraySplit(f, '|')}" role="tab"
-                th:attr="data-active-filter=${t[0]}, aria-selected=${t[0] == activeFilter}"
-                class="h-8 rounded-full px-3.5 text-[14px] font-semibold text-[#888] aria-selected:bg-white aria-selected:text-[#346538] aria-selected:shadow-[0_1px_4px_rgba(26,26,26,.1)]"
-                th:text="${t[1]}">활성</button>
-      </div>
       <button type="button" id="memberSearchToggle" aria-label="회원 검색" aria-expanded="false"
               class="ml-auto grid h-10 w-10 place-items-center rounded-full text-[#292929] hover:bg-[#eef0ee] aria-expanded:bg-[#eef0ee]">
         <svg class="icon" width="22" height="22"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
@@ -43,42 +36,38 @@
 
     <!--/* 회원 목록 (한 줄 리스트) · 행 클릭 → 상세 */-->
     <section class="mt-4 overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">
-      <div class="grid grid-cols-[64px_1fr_1.6fr_0.9fr] items-center gap-2 border-b border-[#eef0ee] bg-[#f7f8f6] px-4 py-2.5 text-[12px] font-semibold text-[#888]">
-        <span>상태</span><span>이름</span><span>휴대폰 번호</span><span>가입일</span>
+      <div class="grid grid-cols-[1fr_1.6fr_0.9fr] items-center gap-2 border-b border-[#eef0ee] bg-[#f7f8f6] px-4 py-2.5 text-[12px] font-semibold text-[#888]">
+        <span>이름</span><span>휴대폰 번호</span><span>가입일</span>
       </div>
       <div id="memberRows">
         <div th:each="m : ${ {
-              '1|홍길동|010-1234-5678|23.02.14|Y|Y|23.02.14|-|01:23.02.14;02:24.05.03',
-              '3|박철수|010-7788-2200|23.06.02|Y|Y|23.06.02|-|-',
-              '4|최지우|010-3377-9021|24.01.17|Y|Y|24.01.17|-|02:24.01.17',
-              '5|이서준|010-5892-1144|23.09.10|Y|Y|23.09.10|-|01:23.09.10',
-              '25|서도윤|010-6612-4083|24.07.15|Y|N|24.07.15|26.08.30|-',
-              '6|정하윤|010-9834-1420|24.02.22|Y|Y|24.02.22|-|03:24.02.22',
-              '7|강민준|010-4471-3302|24.04.03|Y|Y|24.04.03|-|-',
-              '8|윤서아|010-8842-3199|24.08.19|Y|Y|24.08.19|-|01:24.08.19;02:25.02.11;03:25.07.30',
-              '9|송지호|010-1166-4201|26.09.21|Y|Y|26.09.21|-|01:26.09.21',
-              '10|한유진|010-6673-9920|26.09.22|N|Y|26.09.22|-|-',
-              '11|오도현|010-2207-6134|26.09.24|Y|Y|26.09.24|-|02:26.09.24',
-              '12|문지안|010-7318-4490|26.09.26|Y|Y|26.09.26|-|01:26.09.26',
-              '13|임지수|010-9901-7722|22.05.01|Y|Y|22.05.01|-|-',
-              '14|김도윤|010-3142-6678|24.09.12|Y|Y|24.09.12|-|01:24.09.12',
-              '15|이지민|010-5521-9034|24.11.03|Y|Y|24.11.03|-|03:24.11.03',
-              '16|박서연|010-7713-2088|25.01.18|Y|Y|25.01.18|-|01:25.01.18;03:25.04.02',
-              '17|최현우|010-4055-7291|25.03.24|Y|Y|25.03.24|-|-',
-              '18|정수빈|010-6320-1847|25.06.11|Y|Y|25.06.11|-|02:25.06.11',
-              '19|강준호|010-9081-3362|26.09.20|Y|Y|26.09.20|-|01:26.09.20',
-              '20|윤채원|010-2466-8103|26.09.21|Y|Y|26.09.21|-|-',
-              '21|송민재|010-8642-5179|26.09.23|Y|Y|26.09.23|-|01:26.09.23',
-              '22|한예린|010-1937-6405|26.09.25|Y|Y|26.09.25|-|02:26.09.25',
-              '23|오승민|010-7254-3916|26.09.27|Y|Y|26.09.27|-|-',
-              '24|김가은|010-3008-1275|25.02.07|Y|N|25.02.07|-|01:25.02.07',
-              '26|노하은|010-2290-5561|25.10.02|Y|N|25.10.02|26.09.12|02:25.10.02'} }"
+              '1|홍길동|010-1234-5678|23.02.14|Y|23.02.14|01:23.02.14;02:24.05.03',
+              '3|박철수|010-7788-2200|23.06.02|Y|23.06.02|-',
+              '4|최지우|010-3377-9021|24.01.17|Y|24.01.17|02:24.01.17',
+              '5|이서준|010-5892-1144|23.09.10|Y|23.09.10|01:23.09.10',
+              '6|정하윤|010-9834-1420|24.02.22|Y|24.02.22|03:24.02.22',
+              '7|강민준|010-4471-3302|24.04.03|Y|24.04.03|-',
+              '8|윤서아|010-8842-3199|24.08.19|Y|24.08.19|01:24.08.19;02:25.02.11;03:25.07.30',
+              '9|송지호|010-1166-4201|26.09.21|Y|26.09.21|01:26.09.21',
+              '10|한유진|010-6673-9920|26.09.22|N|26.09.22|-',
+              '11|오도현|010-2207-6134|26.09.24|Y|26.09.24|02:26.09.24',
+              '12|문지안|010-7318-4490|26.09.26|Y|26.09.26|01:26.09.26',
+              '13|임지수|010-9901-7722|22.05.01|Y|22.05.01|-',
+              '14|김도윤|010-3142-6678|24.09.12|Y|24.09.12|01:24.09.12',
+              '15|이지민|010-5521-9034|24.11.03|Y|24.11.03|03:24.11.03',
+              '16|박서연|010-7713-2088|25.01.18|Y|25.01.18|01:25.01.18;03:25.04.02',
+              '17|최현우|010-4055-7291|25.03.24|Y|25.03.24|-',
+              '18|정수빈|010-6320-1847|25.06.11|Y|25.06.11|02:25.06.11',
+              '19|강준호|010-9081-3362|26.09.20|Y|26.09.20|01:26.09.20',
+              '20|윤채원|010-2466-8103|26.09.21|Y|26.09.21|-',
+              '21|송민재|010-8642-5179|26.09.23|Y|26.09.23|01:26.09.23',
+              '22|한예린|010-1937-6405|26.09.25|Y|26.09.25|02:26.09.25',
+              '23|오승민|010-7254-3916|26.09.27|Y|26.09.27|-'} }"
              th:with="t=${#strings.arraySplit(m, '|')}"
-             th:attr="data-row=${t[0]}, data-name=${t[1]}, data-phone=${t[2]}, data-joined=${t[3]}, data-verified=${t[4]}, data-active=${t[5]},
-                      data-terms=${t[6]}, data-withdrawn=${t[7]}, data-socials=${t[8]}"
-             th:hidden="${activeFilter != '전체' and t[5] != activeFilter}" role="button" tabindex="0"
-             class="grid cursor-pointer grid-cols-[64px_1fr_1.6fr_0.9fr] items-center gap-2 border-b border-[#eef0ee] min-h-[52px] px-4 py-1.5 transition last:border-none hover:bg-[#f7f8f6]">
-          <span><span class="chip" th:classappend="${t[5] == 'Y'} ? 'chip-done' : 'chip-expired'" th:text="${t[5] == 'Y'} ? '활성' : '비활성'">활성</span></span>
+             th:attr="data-row=${t[0]}, data-name=${t[1]}, data-phone=${t[2]}, data-joined=${t[3]}, data-verified=${t[4]},
+                      data-terms=${t[5]}, data-socials=${t[6]}"
+             role="button" tabindex="0"
+             class="grid cursor-pointer grid-cols-[1fr_1.6fr_0.9fr] items-center gap-2 border-b border-[#eef0ee] min-h-[52px] px-4 py-1.5 transition last:border-none hover:bg-[#f7f8f6]">
           <span class="truncate text-[15px] font-semibold text-[#292929]" th:text="${t[1]}">홍길동</span>
           <span class="text-[14px] tabular-nums text-[#555]" th:text="${t[2]}">010-1234-5678</span>
           <span class="text-[13px] tabular-nums text-[#888]" th:text="${t[3]}">23.02.14</span>
@@ -106,7 +95,6 @@
           <p data-f="name" class="text-[17px] font-bold text-[#1a1a1a]">홍길동</p>
           <div class="mt-1 flex gap-1.5">
             <span data-f="verifiedChip" class="chip chip-done">본인인증 완료</span>
-            <span data-f="activeChip" class="chip chip-cancel" hidden>비활성</span>
           </div>
         </div>
       </div>
@@ -115,11 +103,8 @@
         <div class="flex justify-between py-2.5"><dt class="text-[#888]">이름</dt><dd data-f="name" class="font-medium text-[#292929]">홍길동</dd></div>
         <div class="flex justify-between py-2.5"><dt class="text-[#888]">연락처</dt><dd data-f="phone" class="font-medium tabular-nums text-[#292929]">010-1234-5678</dd></div>
         <div class="flex justify-between py-2.5"><dt class="text-[#888]">본인인증</dt><dd data-f="verified" class="font-medium text-[#292929]">완료</dd></div>
-        <div class="flex justify-between py-2.5"><dt class="text-[#888]">상태</dt><dd data-f="active" class="font-medium text-[#292929]">활성</dd></div>
         <div class="flex justify-between py-2.5"><dt class="text-[#888]">가입일</dt><dd data-f="joined" class="font-medium tabular-nums text-[#292929]">2023.02.14</dd></div>
-        <div class="flex justify-between py-2.5"><dt class="text-[#888]">약관 동의일</dt><dd data-f="terms" class="font-medium tabular-nums text-[#292929]">2023.02.14</dd></div>
-        <div class="flex justify-between py-2.5" data-f-row="withdrawn" hidden><dt class="text-[#888]">탈퇴일</dt><dd data-f="withdrawn" class="font-medium tabular-nums text-[#d8663d]">-</dd></div>
-      </dl>
+        <div class="flex justify-between py-2.5"><dt class="text-[#888]">약관 동의일</dt><dd data-f="terms" class="font-medium tabular-nums text-[#292929]">2023.02.14</dd></div>      </dl>
 
       <!--/* 로그인 방식 (TBL_SOCIAL: 연결된 방식 전부 + 연결일) */-->
       <section class="mt-3 rounded-[14px] p-4 ring-1 ring-[#e5e7eb]">

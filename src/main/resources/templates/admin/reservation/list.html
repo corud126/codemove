@@ -3,15 +3,18 @@
   상태: (기본) | ?state=detail (A 예약 상세, 결제 대기) | ?state=paid (B 결제 완료) | ?state=cancel-filter (C 예약 취소 필터)
         ?state=search (검색 열림) | ?state=empty (검색 결과 없음) | ?state=cancel-detail (취소 건 상세: 취소일·취소 주체) | ?state=done-detail (이사 완료 건 상세)
         ?state=reschedule (일정 변경 창) | ?state=cancel-confirm (예약 취소 확인) — 예약 완료 건만 [일정 변경]·[예약 취소] (이사 완료는 자동, Q7)
-  ERD 반영: 예약 상태 RSV_STATUS(예약 완료·이사 완료·예약 취소), 결제 상태 PAY_STATUS, 번호 형식 QT-/ME-YYYYMMDD-NNNN
-  행 데이터: id|예약 상태|이름|휴대폰|신청일|이사 유형|포장 방식|이사일|이사 시간|출발지|도착지|결제 상태|총액|이사 메모(-)|계약금 결제일(-)|취소일(-)|취소 주체(-)
+  ERD 반영: 예약 상태 RSV_STATUS(예약 완료·이사 완료·예약 취소), 결제 상태 PAY_STATUS, 번호 형식 QT-YYYYMMDD-NNNN(견적일) · RSV-YYYYMMDD-NNNN(이사일)
+  행 데이터: model rows (AdminReservationController, TBL_RESERVATION + 회원·견적 요청·견적서). 없으면(미리보기 /dev) 아래 더미 30건
+    id|예약 상태|이름|휴대폰|신청일|이사 유형|포장 방식|이사일|이사 시간|출발지|도착지|결제 상태|총액|이사 메모(-)|계약금 결제일(-)|취소일(-)|취소 주체(-)
+    (실데이터만) |계약금|잔금|견적 번호|예약 번호 — 더미는 계약금 10%·번호를 JS 가 만든다
+  동작(실데이터): POST /admin/reservations/{id}/paid · /cancel · /schedule {date, time}
   목록: 분류 칩은 예약 완료(이사 완료 포함)·예약 취소 두 가지, 결제 상태는 상세에서만
-  분류 필터 · 검색(이름·휴대폰·예약 번호·예약일) · 페이지(8건) · 상세 팝업 · [결제 완료]는 reservation.js (더미 30건, 기준일 26.09.28) */-->
+  분류 필터 · 검색(이름·휴대폰·예약 번호·예약일) · 페이지(8건) · 상세 팝업 · [결제 완료]는 reservation.js (더미 기준일 26.09.28) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='예약 관리', active='', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
-  <div id="reservationList" class="px-4 pb-28 pt-5" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}">
+  <div id="reservationList" class="px-4 pb-28 pt-5" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}, data-live=${rows != null}">
     <!--/* 1행: 페이지 제목만 */-->
     <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">예약 관리</h2>
 
@@ -47,7 +50,7 @@
         <span>분류</span><span>이름</span><span>휴대폰 번호</span><span>예약일</span>
       </div>
       <div id="reservationRows">
-        <div th:each="r : ${ {
+        <div th:each="r : ${rows ?: {
               '1|예약 취소|홍길동|010-1234-5678|26.09.27|기업이사|포장|26.10.21|08:00|서울 강남구 테헤란로 521|서울 서초구 남부순환로 2584|결제 취소|2400000|-|-|26.09.27|회원',
               '6|예약 완료|정하윤|010-9834-1420|26.09.27|가정이사|반포장|26.10.26|13:00|서울 서초구 남부순환로 2584|부산 연제구 중앙대로 1001|결제 대기|1320000|엘리베이터 사용 가능, 피아노 1대 있음|-|-|-',
               '2|예약 완료|김명품|010-2244-8811|26.09.26|가정이사|포장|26.10.22|08:00|서울 중구 세종대로 110|경기 수원시 팔달구 효원로 241|결제 대기|1320000|-|-|-|-',
@@ -77,11 +80,13 @@
               '27|예약 완료|최지우|010-3377-9021|26.08.22|가정이사|포장|26.10.07|17:00|서울 강남구 테헤란로 521|경기 수원시 팔달구 효원로 241|결제 대기|1320000|-|-|-|-',
               '28|예약 완료|이서준|010-5892-1144|26.08.21|원룸이사|일반|26.10.08|08:00|서울 중구 세종대로 110|경기 성남시 분당구 판교역로 166|결제 대기|650000|-|-|-|-',
               '29|예약 완료|정하윤|010-9834-1420|26.08.20|기업이사|포장|26.10.09|08:00|서울 송파구 올림픽로 300|경기 고양시 덕양구 고양시청로 10|결제 대기|2400000|-|-|-|-',
-              '30|예약 완료|강민준|010-4471-3302|26.08.19|가정이사|반포장|26.10.10|10:00|서울 용산구 한강대로 405|대전 서구 둔산로 100|결제 완료|1320000|-|26.08.20|-|-'} }"
+              '30|예약 완료|강민준|010-4471-3302|26.08.19|가정이사|반포장|26.10.10|10:00|서울 용산구 한강대로 405|대전 서구 둔산로 100|결제 완료|1320000|-|26.08.20|-|-'}}"
              th:with="t=${#strings.arraySplit(r, '|')}"
              th:attr="data-row=${t[0]}, data-status=${t[1]}, data-name=${t[2]}, data-phone=${t[3]}, data-applied=${t[4]}, data-service=${t[5]}, data-pack=${t[6]},
                       data-moving-date=${t[7]}, data-moving-time=${t[8]}, data-origin=${t[9]}, data-destination=${t[10]}, data-payment=${t[11]},
-                      data-total=${t[12]}, data-memo=${t[13]}, data-paid-at=${t[14]}, data-cancelled-at=${t[15]}, data-cancelled-by=${t[16]}"
+                      data-total=${t[12]}, data-memo=${t[13]}, data-paid-at=${t[14]}, data-cancelled-at=${t[15]}, data-cancelled-by=${t[16]},
+                      data-deposit=${#arrays.length(t) > 20 ? t[17] : null}, data-balance=${#arrays.length(t) > 20 ? t[18] : null},
+                      data-quote-no=${#arrays.length(t) > 20 ? t[19] : null}, data-rsv-no=${#arrays.length(t) > 20 ? t[20] : null}"
              th:hidden="${rStat.count > 8}" role="button" tabindex="0"
              class="grid cursor-pointer grid-cols-[76px_1fr_1.6fr_0.9fr] items-center gap-2 border-b border-[#eef0ee] px-4 py-3 transition last:border-none hover:bg-[#f7f8f6]">
           <!--/* 목록 칩은 예약 완료 / 예약 취소 두 가지 (이사 완료도 예약 완료로 표시, 상세에서만 구분) */-->
@@ -133,7 +138,7 @@
         <dl class="mt-2.5 grid grid-cols-[76px_1fr] gap-x-2 gap-y-2 text-[14px]">
           <dt class="text-[#888]">회원 정보</dt><dd class="font-medium text-[#292929]" data-d="member">정하윤 · 010-9834-1420</dd>
           <dt class="text-[#888]">견적 번호</dt><dd class="font-medium tabular-nums text-[#292929]" data-d="estimateNo">QT-20260927-0006</dd>
-          <dt class="text-[#888]">예약 번호</dt><dd class="font-medium tabular-nums text-[#292929]" data-d="reservationNo">ME-20261026-0006</dd>
+          <dt class="text-[#888]">예약 번호</dt><dd class="font-medium tabular-nums text-[#292929]" data-d="reservationNo">RSV-20261026-0006</dd>
         </dl>
       </section>
 

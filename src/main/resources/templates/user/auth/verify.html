@@ -2,6 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U 회원가입 인증번호 입력 (G-A11~A12)
   state: (기본) 미입력 | filled (6자리 입력 완료)
+  model: name · phone (회원가입 입력값), seconds (인증번호 남은 시간)
+  '인증 완료' → POST /signup/verify (auth.js) → 가입 + 로그인 후 /signup/welcome
 */-->
 <head th:replace="~{fragments/user-layout :: head(title='인증번호 입력', links=~{::link})}">
   <link rel="stylesheet" th:href="@{/css/user/auth.css}">
@@ -14,8 +16,8 @@
       <a th:replace="~{fragments/user-layout :: back(href=@{/signup})}"></a>
     </div>
     <div class="form-content verify-page">
-      <div class="signup-copy"><span data-user-name>김무브</span>님,<br>인증번호를 입력해 주세요</div>
-      <div class="verify-help">인증번호 문자 메시지가 <b>010</b>으로 발송되었습니다.</div>
+      <div class="signup-copy"><span th:text="${name ?: '김무브'}">김무브</span>님,<br>인증번호를 입력해 주세요</div>
+      <div class="verify-help">인증번호 문자 메시지가 <b th:text="${phone ?: '010'}">010</b>으로 발송되었습니다.</div>
       <div class="otp-row" data-otp>
         <input class="otp-box" type="text" inputmode="numeric" maxlength="1" aria-label="인증번호 1번째 자리" autocomplete="one-time-code"
                th:value="${filled} ? '1' : ''" th:classappend="${filled} ? 'otp-filled'">
@@ -31,9 +33,10 @@
                th:value="${filled} ? '6' : ''" th:classappend="${filled} ? 'otp-filled'">
       </div>
       <div class="otp-meta">
-        <span class="otp-timer" data-timer th:attr="data-seconds=${filled} ? 178 : 180" th:text="${filled} ? '02:58' : '03:00'">03:00</span>
+        <span class="otp-timer" data-timer th:attr="data-seconds=${filled} ? 178 : (${seconds} ?: 180)" th:text="${filled} ? '02:58' : '03:00'">03:00</span>
         <div class="action otp-resend" role="button" tabindex="0" data-otp-resend>재발송</div>
       </div>
+      <p class="auth-error" data-auth-error hidden></p>
       <a class="action form-submit verify-submit" th:href="@{/signup/welcome}" data-verify-submit
          th:classappend="${filled} ? 'primary' : 'next-button is-disabled'" th:attr="aria-disabled=${!filled}">인증 완료</a>
     </div>

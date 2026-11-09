@@ -16,22 +16,29 @@
   - 신규(사용자 확인 후 ddl.sql 반영): TBL_SAVED_REPLY 자주 쓰는 답변
       REPLY_ID NUMBER(19) PK · TITLE VARCHAR2(30 CHAR) NOT NULL · CONTENT VARCHAR2(500 CHAR) NOT NULL (순서 기능 없음 · 등록순)
       · ADMIN_ID NUMBER(19) FK NULL(마지막 수정 관리자) · UPDATED_AT DATE NOT NULL / 시퀀스 SEQ_SAVED_REPLY
-      관리 화면: /admin/chats/replies */-->
+      관리 화면: /admin/chats/replies
+  실제 화면: AdminChatController 의 chat(ChatService.AdminRoom: room · items · quote · reservation) · savedReplies.
+            chat.js 가 3초마다 /admin/chats/{id}/messages(조각 messages)로 대화를 바꾸고, 전송 · 첨부 · 종료는 fetch.
+            미리 보기(/dev/admin/chat/detail)는 아래 더미 + chat.js 의 ROOMS */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='채팅방', active='chat', fixed=true, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
   <!--/* 채팅방은 메신저처럼 하단 탭 없이 화면 전체를 쓴다 (뒤로 가기로 상담함). --nav 를 안전 영역만큼으로 줄여 입력창·시트가 맨 아래에 붙는다 */-->
   <!--/* 채팅방은 하단 탭을 숨김 — admin.css 의 [data-hide-nav] */-->
-  <div class="flex h-full min-h-0 flex-col bg-[#f4f5f2]" data-chat-detail data-hide-nav>
+  <div class="flex h-full min-h-0 flex-col bg-[#f4f5f2]" data-chat-detail data-hide-nav
+       th:with="room=${chat != null ? chat.room : null}, custName=${room != null ? (#strings.isEmpty(room.memberName) ? '고객' : room.memberName) : '홍길동'}"
+       th:attr="data-live=${chat != null}, data-member=${room != null ? room.memberId : null}, data-status=${room != null ? room.status : null}">
     <header class="flex h-14 shrink-0 items-center gap-1 border-b border-[#eef0ee] bg-white px-2">
       <a th:href="@{/admin/chats}" aria-label="채팅 목록으로 돌아가기"
          class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#292929] hover:bg-[#f0f1ef]">
         <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronLeft'"/></svg>
       </a>
       <button type="button" data-open="#infoSheet" class="flex min-w-0 items-baseline gap-2 rounded-lg px-1 py-1 text-left hover:bg-[#f7f8f6]" aria-label="고객 정보 보기">
-        <h2 class="truncate text-[17px] font-bold text-[#1a1a1a]" data-room-name>홍길동</h2>
-        <span class="shrink-0 text-[13px] font-semibold text-[#d9701a]" data-room-status>대기 중</span>
+        <h2 class="truncate text-[17px] font-bold text-[#1a1a1a]" data-room-name th:text="${custName}">홍길동</h2>
+        <span class="shrink-0 text-[13px] font-semibold text-[#d9701a]" data-room-status
+              th:text="${room != null ? @codeService.name('CHAT_STATUS', room.status) : '대기 중'}"
+              th:class="'shrink-0 text-[13px] font-semibold ' + ${room == null or room.status == '02' ? 'text-[#d9701a]' : (room.status == '03' ? 'text-[#346538]' : 'text-[#888]')}">대기 중</span>
       </button>
       <button type="button" data-open="#menuSheet" aria-label="더보기"
               class="ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#292929] hover:bg-[#f0f1ef]">
@@ -40,10 +47,74 @@
     </header>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-5" data-messages-area>
-      <div class="mb-5 text-center">
+      <div class="mb-5 text-center" th:if="${chat == null}">
         <span class="rounded-full bg-[#e9ebe7] px-3 py-1 text-[12px] font-medium text-[#888]">오늘</span>
       </div>
-      <div class="flex flex-col gap-[17px]" data-messages>
+      <div class="flex flex-col gap-[17px]" data-messages th:fragment="messages"
+           th:attr="data-status=${chat != null ? chat.room.status : null}">
+        <!--/* 실제 대화 (ChatService.timeline): 날짜 줄 · 대기 시작/종료 줄 · 고객(묶음 첫 줄만 프로필) · AI(주제 + 버튼 기록) · 관리자(안 읽음 '1') */-->
+        <th:block th:if="${chat != null}"><th:block th:each="it : ${chat.items}"
+                  th:with="m=${it.message}, cust=${#strings.isEmpty(chat.room.memberName) ? '고객' : chat.room.memberName}">
+          <div th:if="${it.kind == 'day' or it.kind == 'system'}" class="text-center" th:attr="data-role=${it.kind}">
+            <span class="rounded-full bg-[#e9ebe7] px-3 py-1 text-[12px] font-medium text-[#888]" th:text="${it.text}">오늘</span>
+          </div>
+          <!--/* 고객 */-->
+          <div th:if="${it.kind == 'customer'}" data-role="customer"
+               th:class="(${it.groupStart} ? 'flex max-w-[90%] gap-2' : '-mt-2.5 flex max-w-[90%] items-end gap-1.5 pl-11') + (${it.waiting} ? ' touch-pan-y select-none transition-transform' : '')"
+               th:attr="data-waiting=${it.waiting ? '' : null}, data-swipe=${it.waiting ? '' : null}">
+            <span th:if="${it.groupStart}" class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e3ece4] text-[15px] font-bold text-[#346538]" aria-hidden="true" th:text="${#strings.substring(cust, 0, 1)}">홍</span>
+            <div th:class="${it.groupStart} ? 'min-w-0' : 'contents'">
+              <p th:if="${it.groupStart}" class="mb-1 text-[12px] font-medium text-[#777]" th:text="${cust}">홍길동</p>
+              <div th:class="${it.groupStart} ? 'flex items-end gap-1.5' : 'contents'">
+                <div class="flex min-w-0 flex-col items-start gap-1.5">
+                  <div th:if="${m.content != null}" class="whitespace-pre-line rounded-[4px_18px_18px_18px] bg-white px-[15px] py-[13px] text-[15px] leading-[1.6] text-[#444] shadow-[0_1px_3px_rgba(0,0,0,.03)]" data-text th:text="${m.content}">메시지</div>
+                  <a th:if="${m.image}" th:href="@{/admin/chats/files/{id}(id=${m.messageId})}" target="_blank" rel="noopener" aria-label="고객이 보낸 사진 크게 보기"
+                     class="block overflow-hidden rounded-[4px_18px_18px_18px] bg-[#e9ebe7] shadow-[0_1px_3px_rgba(0,0,0,.03)]">
+                    <img th:src="@{/admin/chats/files/{id}(id=${m.messageId})}" th:alt="${m.attachmentName}" th:attr="data-text=${m.content == null ? '' : null}" class="block aspect-[4/3] w-[210px] object-cover" loading="lazy">
+                  </a>
+                  <a th:if="${m.file and !m.image}" th:href="@{/admin/chats/files/{id}(id=${m.messageId})}" th:attr="data-text=${m.content == null ? '' : null}"
+                     class="flex items-center gap-2 rounded-[4px_18px_18px_18px] bg-white px-[15px] py-[13px] text-[15px] leading-[1.6] text-[#444] shadow-[0_1px_3px_rgba(0,0,0,.03)]">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 text-[#888]"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span class="min-w-0 break-all" th:text="${m.attachmentName}">파일</span>
+                  </a>
+                </div>
+                <time class="shrink-0 text-[12px] tabular-nums text-[#aaa]" th:text="${it.time}">14:02</time>
+              </div>
+            </div>
+          </div>
+          <!--/* AI */-->
+          <div th:if="${it.kind == 'ai'}" class="ml-auto flex max-w-[86%] flex-col items-end gap-1.5" data-role="ai">
+            <span class="text-[12px] font-semibold text-[#555]">AI<span th:if="${m.topicTitle != null}" class="font-medium text-[#888]" th:text="| · ${m.topicTitle}|"> · 주제</span></span>
+            <div class="flex items-end gap-1.5">
+              <time class="shrink-0 text-[12px] tabular-nums text-[#aaa]" th:text="${it.time}">14:02</time>
+              <div class="whitespace-pre-line rounded-[18px_4px_18px_18px] bg-[#e9ece7] px-[15px] py-[13px] text-[15px] leading-[1.6] text-[#333]" data-text th:text="${m.content}">답변</div>
+            </div>
+            <span th:each="a : ${it.actions}" class="inline-flex h-8 items-center rounded-full px-3 text-[12px] font-medium text-[#888] ring-1 ring-inset ring-[#dcdfdc]" th:text="${a.label}">버튼</span>
+          </div>
+          <!--/* 관리자 */-->
+          <div th:if="${it.kind == 'admin'}" class="ml-auto flex max-w-[86%] flex-col items-end gap-1.5" data-role="admin">
+            <span class="text-[12px] font-semibold text-[#555]">관리자 <span class="font-medium text-[#888]" th:text="|· ${m.adminName ?: '상담사'}|">· 김상담</span></span>
+            <div class="flex items-end gap-1.5">
+              <span class="flex shrink-0 flex-col items-end text-[12px] leading-tight tabular-nums">
+                <span th:if="${m.isRead == 'N'}" class="font-semibold text-[#888]" data-unread-mark aria-label="안 읽음">1</span>
+                <time class="text-[#aaa]" th:text="${it.time}">14:06</time>
+              </span>
+              <div class="flex min-w-0 flex-col items-end gap-1.5">
+                <div th:if="${m.content != null}" class="whitespace-pre-line rounded-[18px_4px_18px_18px] bg-[#346538] px-[15px] py-[13px] text-[15px] leading-[1.6] text-white" data-text th:text="${m.content}">답장</div>
+                <a th:if="${m.image}" th:href="@{/admin/chats/files/{id}(id=${m.messageId})}" target="_blank" rel="noopener" aria-label="보낸 사진 크게 보기"
+                   class="block overflow-hidden rounded-[18px_4px_18px_18px] bg-[#e9ebe7]">
+                  <img th:src="@{/admin/chats/files/{id}(id=${m.messageId})}" th:alt="${m.attachmentName}" class="block aspect-[4/3] w-[210px] object-cover" loading="lazy">
+                </a>
+                <a th:if="${m.file and !m.image}" th:href="@{/admin/chats/files/{id}(id=${m.messageId})}"
+                   class="flex items-center gap-2 rounded-[18px_4px_18px_18px] bg-[#346538] px-[15px] py-[13px] text-[15px] leading-[1.6] text-white">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  <span class="min-w-0 break-all" th:text="${m.attachmentName}">파일</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </th:block></th:block>
+        <th:block th:if="${chat == null}">
         <!--/* 고객 — 메신저처럼 연달아 보낸 묶음의 첫 말풍선에만 프로필 원 + 이름, 이어지는 말풍선은 같은 줄에 맞춰 들여 씀 */-->
         <div class="flex max-w-[90%] gap-2" data-role="customer">
           <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e3ece4] text-[15px] font-bold text-[#346538]" data-cust-initial aria-hidden="true">홍</span>
@@ -89,6 +160,7 @@
           <div class="rounded-[4px_18px_18px_18px] bg-white px-[15px] py-[13px] text-[15px] leading-[1.6] text-[#444] shadow-[0_1px_3px_rgba(0,0,0,.03)]" data-text data-room-message>혹시 사다리차 추가 비용이 발생하나요?</div>
           <time class="shrink-0 text-[12px] tabular-nums text-[#aaa]">14:05</time>
         </div>
+        </th:block>
       </div>
     </div>
 
@@ -147,7 +219,9 @@
   </div>
 
   <!--/* 고객 정보 */-->
-  <div id="infoSheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40">
+  <div id="infoSheet" data-layer hidden class="absolute inset-0 z-40 flex items-end bg-[#1a1a1a]/40"
+       th:with="room=${chat != null ? chat.room : null}, q=${chat != null ? chat.quote : null}, v=${chat != null ? chat.reservation : null},
+                infoName=${room == null ? '홍길동' : (#strings.isEmpty(room.memberName) ? '고객' : room.memberName)}">
     <div role="dialog" aria-modal="true" aria-labelledby="infoTitle"
          class="max-h-[85%] w-full overflow-y-auto rounded-t-[24px] bg-white px-5 pb-[calc(20px+var(--safe-bottom))] pt-2 [animation:slideUp_.2s_ease-out]">
       <div class="mx-auto h-1 w-9 rounded-full bg-[#dcdfdc]"></div>
@@ -159,17 +233,37 @@
       </div>
       <!--/* 이름 · 휴대폰 · 전화 */-->
       <div class="mt-4 flex items-center gap-3">
-        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eef4f0] text-[17px] font-bold text-[#346538]" data-info-initial>홍</span>
+        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eef4f0] text-[17px] font-bold text-[#346538]" data-info-initial th:text="${#strings.substring(infoName, 0, 1)}">홍</span>
         <div class="min-w-0 flex-1">
-          <p class="text-[17px] font-bold text-[#1a1a1a]" data-info-name>홍길동</p>
-          <p class="text-[14px] tabular-nums text-[#555]" data-info-phone>010-2481-3375</p>
+          <p class="text-[17px] font-bold text-[#1a1a1a]" data-info-name th:text="${infoName}">홍길동</p>
+          <p class="text-[14px] tabular-nums text-[#555]" data-info-phone th:text="${room != null ? room.phone : '010-2481-3375'}">010-2481-3375</p>
         </div>
-        <a href="tel:01024813375" data-info-tel aria-label="전화 걸기" class="tone-green grid h-11 w-11 shrink-0 place-items-center rounded-full">
+        <a href="tel:01024813375" data-info-tel aria-label="전화 걸기" class="tone-green grid h-11 w-11 shrink-0 place-items-center rounded-full"
+           th:href="${room != null ? 'tel:' + #strings.replace(room.phone, '-', '') : 'tel:01024813375'}">
           <svg class="icon" width="21" height="21"><use th:href="@{/images/admin/icons-v2.svg} + '#i-phone'"/></svg>
         </a>
       </div>
-      <!--/* 진행 중인 견적 · 예약 */-->
-      <div class="mt-5 overflow-hidden rounded-[16px] ring-1 ring-inset ring-[#eef0ee]" data-info-links>
+      <!--/* 진행 중인 견적 · 예약 (실제 화면: 최근 견적 · 예약, 없으면 숨김) */-->
+      <div th:if="${chat != null and (q != null or v != null)}" class="mt-5 overflow-hidden rounded-[16px] ring-1 ring-inset ring-[#eef0ee]" data-info-links>
+        <a th:if="${q != null}" th:href="@{/admin/estimates/{id}(id=${q.quoteId}, tab='info')}" class="flex items-center gap-3 border-b border-[#eef0ee] px-4 py-3 last:border-none hover:bg-[#f7f8f6]">
+          <span th:class="'chip shrink-0 ' + ${q.status == '01' ? 'chip-review' : (q.status == '02' ? 'chip-progress' : (q.status == '03' ? 'chip-done' : 'chip-expired'))}"
+                th:text="${@codeService.name('QUOTE_STATUS', q.status)}">견적 승인</span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[15px] font-semibold text-[#292929]">견적</span>
+            <span class="block text-[13px] tabular-nums text-[#888]" th:text="${q.quoteNo}">QT-20261028-0412</span>
+          </span>
+          <svg class="icon shrink-0 text-[#b0b4b1]" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+        </a>
+        <a th:if="${v != null}" th:href="@{/admin/reservations}" class="flex items-center gap-3 px-4 py-3 hover:bg-[#f7f8f6]">
+          <span th:class="'chip shrink-0 ' + ${v.status == '03' ? 'chip-cancel' : 'chip-done'}" th:text="${@codeService.name('RSV_STATUS', v.status)}">예약 완료</span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[15px] font-semibold text-[#292929]">예약 <span class="font-medium text-[#555]" th:text="|· ${#temporals.format(v.moveDate, 'MM.dd')}${v.moveTime != null ? ' ' + v.moveTime : ''}|">· 11.15 오전 9시</span></span>
+            <span class="block text-[13px] tabular-nums text-[#888]" th:text="${v.reservationNo}">RSV-20261030-0031</span>
+          </span>
+          <svg class="icon shrink-0 text-[#b0b4b1]" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
+        </a>
+      </div>
+      <div th:if="${chat == null}" class="mt-5 overflow-hidden rounded-[16px] ring-1 ring-inset ring-[#eef0ee]" data-info-links>
         <a th:href="@{/admin/estimates/1(tab='info')}" class="flex items-center gap-3 border-b border-[#eef0ee] px-4 py-3 hover:bg-[#f7f8f6]">
           <span class="chip chip-progress shrink-0">견적 승인</span>
           <span class="min-w-0 flex-1">
@@ -182,17 +276,17 @@
           <span class="chip chip-done shrink-0">예약 완료</span>
           <span class="min-w-0 flex-1">
             <span class="block text-[15px] font-semibold text-[#292929]">예약 <span class="font-medium text-[#555]">· 11.15 오전 9시</span></span>
-            <span class="block text-[13px] tabular-nums text-[#888]">ME-20261030-0031</span>
+            <span class="block text-[13px] tabular-nums text-[#888]">RSV-20261030-0031</span>
           </span>
           <svg class="icon shrink-0 text-[#b0b4b1]" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
         </a>
       </div>
       <!--/* 상담 시각 · 담당자 */-->
       <dl class="mt-5 grid grid-cols-[72px_1fr] gap-y-2.5 text-[14px] tabular-nums">
-        <dt class="text-[#888]">상담 시작</dt><dd class="text-[#292929]" data-info-started>14:02</dd>
-        <dt class="text-[#888]" data-info-waiting-row>대기 시작</dt><dd class="text-[#292929]" data-info-waiting-row data-info-waiting>14:03</dd>
-        <dt class="text-[#888]" data-info-ended-row hidden>종료</dt><dd class="text-[#292929]" data-info-ended-row data-info-ended hidden>—</dd>
-        <dt class="text-[#888]">담당자</dt><dd class="text-[#292929]" data-info-admin>미배정</dd>
+        <dt class="text-[#888]">상담 시작</dt><dd class="text-[#292929]" data-info-started th:text="${room != null ? @chatTimes.dayTime(room.startedAt) : '14:02'}">14:02</dd>
+        <dt class="text-[#888]" data-info-waiting-row th:hidden="${room != null and room.waitingAt == null}">대기 시작</dt><dd class="text-[#292929]" data-info-waiting-row data-info-waiting th:hidden="${room != null and room.waitingAt == null}" th:text="${room != null ? @chatTimes.dayTime(room.waitingAt) : '14:03'}">14:03</dd>
+        <dt class="text-[#888]" data-info-ended-row th:hidden="${room == null or room.endedAt == null}">종료</dt><dd class="text-[#292929]" data-info-ended-row data-info-ended th:hidden="${room == null or room.endedAt == null}" th:text="${room != null and room.endedAt != null ? @chatTimes.dayTime(room.endedAt) : '—'}">—</dd>
+        <dt class="text-[#888]">담당자</dt><dd class="text-[#292929]" data-info-admin th:text="${room == null ? '미배정' : (room.adminName ?: (room.status == '01' ? '—' : '미배정'))}">미배정</dd>
       </dl>
     </div>
   </div>
@@ -215,7 +309,12 @@
       </div>
       <div class="-mx-2 mt-2 min-h-0 flex-1 overflow-y-auto" data-replies>
         <!--/* TBL_SAVED_REPLY: TITLE | CONTENT (등록순) — 자주 쓰는 답변(chat-replies) 더미와 같은 내용 */-->
-        <button type="button" th:each="r : ${ {'방문 견적 안내|방문 견적은 담당자가 현장을 확인한 뒤 확정 금액을 안내해 드립니다. 원하시는 방문 날짜와 시간을 알려주세요.', '계약금 입금 안내|견적 확인 후 계약금을 입금해 주시면 이사 일정이 확정됩니다. 입금 계좌는 예약 상세에서 확인하실 수 있습니다.', '사다리차 비용 안내|사다리차 비용은 층수와 작업 환경에 따라 달라집니다. 현장 확인 후 정확한 금액을 안내해 드리겠습니다.', '이사 당일 준비물|귀중품과 중요 서류는 직접 챙겨 주시고, 냉장고는 전날 미리 비워 두시면 좋습니다.', '상담 종료 인사|문의해 주셔서 감사합니다. 더 궁금한 점이 있으시면 언제든 채팅으로 남겨 주세요.'} }"
+        <button type="button" th:each="r : ${savedReplies}" th:attr="data-reply-content=${r.content}"
+                class="block w-full rounded-[14px] px-3 py-3 text-left hover:bg-[#f7f8f6]">
+          <span class="block text-[15px] font-semibold text-[#292929]" data-reply-title th:text="${r.title}">방문 견적 안내</span>
+          <span class="mt-0.5 block truncate text-[14px] text-[#888]" th:text="${r.content}">내용</span>
+        </button>
+        <button type="button" th:if="${savedReplies == null}" th:each="r : ${ {'방문 견적 안내|방문 견적은 담당자가 현장을 확인한 뒤 확정 금액을 안내해 드립니다. 원하시는 방문 날짜와 시간을 알려주세요.', '계약금 입금 안내|견적 확인 후 계약금을 입금해 주시면 이사 일정이 확정됩니다. 입금 계좌는 예약 상세에서 확인하실 수 있습니다.', '사다리차 비용 안내|사다리차 비용은 층수와 작업 환경에 따라 달라집니다. 현장 확인 후 정확한 금액을 안내해 드리겠습니다.', '이사 당일 준비물|귀중품과 중요 서류는 직접 챙겨 주시고, 냉장고는 전날 미리 비워 두시면 좋습니다.', '상담 종료 인사|문의해 주셔서 감사합니다. 더 궁금한 점이 있으시면 언제든 채팅으로 남겨 주세요.'} }"
                 th:with="t=${#strings.arraySplit(r, '|')}" th:attr="data-reply-content=${t[1]}"
                 class="block w-full rounded-[14px] px-3 py-3 text-left hover:bg-[#f7f8f6]">
           <span class="block text-[15px] font-semibold text-[#292929]" data-reply-title th:text="${t[0]}">방문 견적 안내</span>
@@ -248,7 +347,7 @@
             <svg class="icon" width="24" height="24"><use th:href="@{/images/admin/icons-v2.svg} + '#i-' + ${t[0]}"/></svg>
           </span>
           <span class="text-[15px] font-semibold text-[#292929]" th:text="${t[1]}">사진</span>
-          <input type="file" hidden th:attr="accept=${t[2]}">
+          <input type="file" hidden data-attach-input th:attr="accept=${t[2]}">
         </label>
       </div>
     </div>

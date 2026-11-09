@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.request.MoveRequestMapper">
+
+	<insert id="insertRequest" parameterType="MoveRequest">
+		<selectKey keyProperty="requestId" resultType="long" order="BEFORE">
+			SELECT SEQ_MOVE_REQUEST.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_MOVE_REQUEST (
+			REQUEST_ID, MEMBER_ID, HOUSE_TYPE, PACK_TYPE, MOVE_DATE, PREFER_TIME,
+			FROM_ADDRESS, FROM_DETAIL, TO_ADDRESS, TO_DETAIL,
+			AI_CBM, AI_EST_AMOUNT, AI_EST_MIN, AI_EST_MAX, AI_ANALYSIS_SEC, AI_CONFIDENCE
+		) VALUES (
+			#{requestId}, #{memberId}, #{houseType}, #{packType}, #{moveDate}, #{preferTime},
+			#{fromAddress}, #{fromDetail}, #{toAddress}, #{toDetail},
+			#{aiCbm}, #{aiEstAmount}, #{aiEstMin}, #{aiEstMax}, #{aiAnalysisSec}, #{aiConfidence}
+		)
+	</insert>
+
+	<insert id="insertVideo" parameterType="ReVideo">
+		<selectKey keyProperty="videoId" resultType="long" order="BEFORE">
+			SELECT SEQ_RE_VIDEO.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_RE_VIDEO (VIDEO_ID, REQUEST_ID, FILE_NAME, FILE_PATH)
+		VALUES (#{videoId}, #{requestId}, #{fileName}, #{filePath})
+	</insert>
+
+	<insert id="insertItem" parameterType="RequestItem">
+		<selectKey keyProperty="reItemId" resultType="long" order="BEFORE">
+			SELECT SEQ_REQUEST_ITEM.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_REQUEST_ITEM (
+			RE_ITEM_ID, REQUEST_ID, CATEGORY, ITEM_NAME, ITEM_SIZE, QUANTITY, VOLUME, CONFIDENCE, NEEDS_REVIEW, SOURCE
+		) VALUES (
+			#{reItemId}, #{requestId}, #{category}, #{itemName}, #{itemSize}, #{quantity}, #{volume}, #{confidence}, #{needsReview}, #{source}
+		)
+	</insert>
+
+	<select id="selectById" resultType="MoveRequest">
+		SELECT REQUEST_ID, MEMBER_ID, HOUSE_TYPE, PACK_TYPE, MOVE_DATE, PREFER_TIME,
+		       FROM_ADDRESS, FROM_DETAIL, TO_ADDRESS, TO_DETAIL,
+		       AI_CBM, AI_EST_AMOUNT, AI_EST_MIN, AI_EST_MAX, AI_ANALYSIS_SEC, AI_CONFIDENCE, REQUESTED_AT
+		  FROM TBL_MOVE_REQUEST
+		 WHERE REQUEST_ID = #{requestId}
+	</select>
+
+	<select id="selectItems" resultType="RequestItem">
+		SELECT RE_ITEM_ID, REQUEST_ID, CATEGORY, ITEM_NAME, ITEM_SIZE, QUANTITY, VOLUME, CONFIDENCE, NEEDS_REVIEW, SOURCE
+		  FROM TBL_REQUEST_ITEM
+		 WHERE REQUEST_ID = #{requestId}
+		 ORDER BY RE_ITEM_ID
+	</select>
+
+	<select id="selectVideo" resultType="ReVideo">
+		SELECT VIDEO_ID, REQUEST_ID, FILE_NAME, FILE_PATH, UPLOADED_AT
+		  FROM TBL_RE_VIDEO
+		 WHERE REQUEST_ID = #{requestId}
+		   AND ROWNUM = 1
+	</select>
+
+</mapper>

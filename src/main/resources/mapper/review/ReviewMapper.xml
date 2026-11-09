@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.review.ReviewMapper">
+
+	<!-- 예약 · 견적 요청 · 회원 · 견적서(있으면) 공통 컬럼 -->
+	<sql id="moveColumns">
+		RS.RESERVATION_ID, RS.RESERVATION_NO, RS.STATUS AS RESERVATION_STATUS, M.MEMBER_ID, MB.MEMBER_NAME,
+		M.HOUSE_TYPE, NVL(Q.WORK_TYPE, M.PACK_TYPE) AS PACK_TYPE,
+		NVL(Q.FROM_ADDRESS, M.FROM_ADDRESS) AS FROM_ADDRESS, NVL(Q.TO_ADDRESS, M.TO_ADDRESS) AS TO_ADDRESS, RS.MOVE_DATE
+	</sql>
+
+	<sql id="moveJoins">
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = RS.REQUEST_ID
+		  JOIN TBL_MEMBER MB ON MB.MEMBER_ID = M.MEMBER_ID
+		  LEFT JOIN TBL_QUOTE Q ON Q.REQUEST_ID = RS.REQUEST_ID
+	</sql>
+
+	<sql id="rowSelect">
+		SELECT R.REVIEW_ID, R.RATING, R.CONTENT, R.CREATED_AT, R.REPLY_CONTENT, R.REPLIED_AT,
+		       <include refid="moveColumns"/>
+		  FROM TBL_REVIEW R
+		  JOIN TBL_RESERVATION RS ON RS.RESERVATION_ID = R.RESERVATION_ID
+		<include refid="moveJoins"/>
+	</sql>
+
+	<insert id="insertReview" parameterType="Review">
+		<selectKey keyProperty="reviewId" resultType="long" order="BEFORE">
+			SELECT SEQ_REVIEW.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_REVIEW (REVIEW_ID, RESERVATION_ID, RATING, CONTENT)
+		VALUES (#{reviewId}, #{reservationId}, #{rating}, #{content})
+	</insert>
+
+	<insert id="insertPhoto" parameterType="ReviewPhoto">
+		<selectKey keyProperty="photoId" resultType="long" order="BEFORE">
+			SELECT SEQ_REVIEW_PHOTO.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_REVIEW_PHOTO (PHOTO_ID, REVIEW_ID, FILE_PATH, SORT_ORDER)
+		VALUES (#{photoId}, #{reviewId}, #{filePath}, #{sortOrder})
+	</insert>
+
+	<select id="selectById" resultType="Review">
+		SELECT REVIEW_ID, RESERVATION_ID, RATING, CONTENT, CREATED_AT, REPLY_CONTENT, REPLIED_AT, ADMIN_ID
+		  FROM TBL_REVIEW
+		 WHERE REVIEW_ID = #{reviewId}
+	</select>
+
+	<select id="existsByReservation" resultType="boolean">
+		SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM TBL_REVIEW WHERE RESERVATION_ID = #{reservationId}
+	</select>
+
+	<select id="selectRows" resultType="com.codemove.review.ReviewRow">
+		<include refid="rowSelect"/>
+		<where>
+			<if test="memberId != null">M.MEMBER_ID = #{memberId}</if>
+		</where>
+		 ORDER BY R.CREATED_AT DESC, R.REVIEW_ID DESC
+	</select>
+
+	<select id="selectLatest" resultType="com.codemove.review.ReviewRow">
+		SELECT *
+		  FROM (SELECT R.REVIEW_ID, R.RATING, R.CONTENT, R.CREATED_AT, R.REPLY_CONTENT, R.REPLIED_AT,
+		               <include refid="moveColumns"/>,
+		               (SELECT COUNT(*)
+		                  FROM TBL_RESERVATION X
+		                  JOIN TBL_MOVE_REQUEST XM ON XM.REQUEST_ID = X.REQUEST_ID
+		                 WHERE XM.MEMBER_ID = M.MEMBER_ID
+		                   AND X.STATUS = '02'
+		                   AND X.MOVE_DATE &lt;= RS.MOVE_DATE) AS USE_COUNT
+		          FROM TBL_REVIEW R
+		          JOIN TBL_RESERVATION RS ON RS.RESERVATION_ID = R.RESERVATION_ID
+		        <include refid="moveJoins"/>
+		         ORDER BY R.CREATED_AT DESC, R.REVIEW_ID DESC)
+		 WHERE ROWNUM &lt;= #{limit}
+	</select>
+
+	<select id="selectPhotos" resultType="ReviewPhoto">
+		SELECT P.PHOTO_ID, P.REVIEW_ID, P.FILE_PATH, P.SORT_ORDER
+		  FROM TBL_REVIEW_PHOTO P
+		<if test="memberId != null">
+		  JOIN TBL_REVIEW R ON R.REVIEW_ID = P.REVIEW_ID
+		  JOIN TBL_RESERVATION RS ON RS.RESERVATION_ID = R.RESERVATION_ID
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = RS.REQUEST_ID
+		 WHERE M.MEMBER_ID = #{memberId}
+		</if>
+		 ORDER BY P.REVIEW_ID, P.SORT_ORDER
+	</select>
+
+	<select id="selectPhoto" resultType="ReviewPhoto">
+		SELECT P.PHOTO_ID, P.REVIEW_ID, P.FILE_PATH, P.SORT_ORDER
+		  FROM TBL_REVIEW_PHOTO P
+		<if test="memberId != null">
+		  JOIN TBL_REVIEW R ON R.REVIEW_ID = P.REVIEW_ID
+		  JOIN TBL_RESERVATION RS ON RS.RESERVATION_ID = R.RESERVATION_ID
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = RS.REQUEST_ID
+		</if>
+		 WHERE P.PHOTO_ID = #{photoId}
+		<if test="memberId != null">
+		   AND M.MEMBER_ID = #{memberId}
+		</if>
+	</select>
+
+	<select id="selectReservation" resultType="com.codemove.review.ReviewRow">
+		SELECT <include refid="moveColumns"/>,
+		       (SELECT MAX(REVIEW_ID) FROM TBL_REVIEW WHERE RESERVATION_ID = RS.RESERVATION_ID) AS REVIEW_ID
+		  FROM TBL_RESERVATION RS
+		<include refid="moveJoins"/>
+		 WHERE RS.RESERVATION_ID = #{reservationId}
+		   AND M.MEMBER_ID = #{memberId}
+	</select>
+
+	<select id="selectReviewable" resultType="com.codemove.review.ReviewRow">
+		SELECT <include refid="moveColumns"/>
+		  FROM TBL_RESERVATION RS
+		<include refid="moveJoins"/>
+		 WHERE M.MEMBER_ID = #{memberId}
+		   AND RS.STATUS = '02'
+		   AND NOT EXISTS (SELECT 1 FROM TBL_REVIEW V WHERE V.RESERVATION_ID = RS.RESERVATION_ID)
+		 ORDER BY RS.MOVE_DATE DESC, RS.RESERVATION_ID DESC
+	</select>
+
+	<!-- 답변 등록 · 수정: 답변일은 마지막으로 쓴 시각 -->
+	<update id="updateReply">
+		UPDATE TBL_REVIEW
+		   SET REPLY_CONTENT = #{content},
+		       REPLIED_AT = SYSDATE,
+		       ADMIN_ID = #{adminId}
+		 WHERE REVIEW_ID = #{reviewId}
+	</update>
+
+	<!-- 답변 삭제 → 답변 대기 -->
+	<update id="deleteReply">
+		UPDATE TBL_REVIEW
+		   SET REPLY_CONTENT = NULL,
+		       REPLIED_AT = NULL,
+		       ADMIN_ID = NULL
+		 WHERE REVIEW_ID = #{reviewId}
+	</update>
+
+</mapper>

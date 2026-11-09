@@ -13,7 +13,9 @@
   const listRoot = $('[data-chat-list]');
   if (listRoot) {
     const box = $('[data-rooms]', listRoot);
-    const rooms = $$('[data-name]', box);
+    let rooms = $$('[data-name]', box);
+    const live = listRoot.dataset.live === 'true';
+    let found = null;   // 실제 화면 검색: 서버가 찾은 MEMBER_ID (대화 내용 포함)
     const TABS = { waiting: '02', active: '03', ended: '04', bot: '01' };
     const SORTS = { latest: '최신 순', unread: '안 읽은 순' };
     let tab = TABS[params.get('tab')] ? params.get('tab') : 'waiting';
@@ -28,10 +30,24 @@
     const bar = $('[data-search]', listRoot);
     const input = $('[data-search-input]', listRoot);
     const searchBtn = $('[data-search-open]', listRoot);
-    const setSearch = (v) => { bar.hidden = !v; searchBtn.setAttribute('aria-expanded', String(v)); if (!v) { input.value = ''; query = ''; } render(); };
+    const setSearch = (v) => { bar.hidden = !v; searchBtn.setAttribute('aria-expanded', String(v)); if (!v) { input.value = ''; query = ''; found = null; } render(); };
     searchBtn.addEventListener('click', () => { setSearch(bar.hidden); if (!bar.hidden) input.focus(); });
     $('[data-search-close]', listRoot).addEventListener('click', () => setSearch(false));
-    input.addEventListener('input', () => { query = input.value; render(); });
+    let searchTimer = null;
+    input.addEventListener('input', () => {
+      query = input.value;
+      render();
+      if (!live) return;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(async () => {
+        const q = query.trim();
+        if (!q) { found = null; render(); return; }
+        try {
+          const res = await fetch(`/admin/chats/search?q=${encodeURIComponent(q)}`);
+          if (res.ok && q === query.trim()) { found = new Set((await res.json()).memberIds.map(String)); render(); }
+        } catch (e) { /* 이름 · 번호 검색은 그대로 */ }
+      }, 250);
+    });
 
     function render() {
       const q = query.trim().toLowerCase();
@@ -40,7 +56,8 @@
       const visible = rooms.filter((r) => {
         if (searching) {
           return `${r.dataset.name} ${r.dataset.msg}`.toLowerCase().includes(q)
-            || (digits.length >= 3 && r.dataset.phone.replace(/\D/g, '').includes(digits));
+            || (digits.length >= 3 && r.dataset.phone.replace(/\D/g, '').includes(digits))
+            || (found !== null && found.has(r.dataset.member));
         }
         return r.dataset.status === TABS[tab];
       }).sort((a, b) => {
@@ -64,6 +81,26 @@
       $$('[data-sort]', listRoot).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.sort === sort)));
       $('[data-empty]', listRoot).hidden = visible.length > 0;
       $('[data-empty-text]', listRoot).textContent = searching ? '일치하는 채팅이 없습니다' : '채팅이 없습니다';
+      // 탭 건수: 대기 · 상담 중
+      const counts = $$('[data-tab-count]', listRoot);
+      if (counts[0]) counts[0].textContent = rooms.filter((r) => r.dataset.status === '02').length;
+      if (counts[1]) counts[1].textContent = rooms.filter((r) => r.dataset.status === '03').length;
+    }
+
+    // 실제 화면: 5초마다 목록 조각을 다시 받아 행을 바꾼다 (새 문의 · 안 읽은 수 · 대기 시간)
+    if (live) {
+      setInterval(async () => {
+        if (document.hidden) return;
+        try {
+          const res = await fetch('/admin/chats/rooms');
+          if (!res.ok || res.redirected) return;
+          const fresh = new DOMParser().parseFromString(await res.text(), 'text/html').querySelector('[data-rooms]');
+          if (!fresh) return;
+          box.replaceChildren(...fresh.children);
+          rooms = $$('[data-name]', box);
+          render();
+        } catch (e) { /* 다음 주기에 다시 */ }
+      }, 5000);
     }
 
     $$('[data-tab]', listRoot).forEach((b) => b.addEventListener('click', () => {
@@ -79,7 +116,9 @@
 
   /* ---------- 채팅방 (SCR-A-007) ---------- */
   const detailRoot = $('[data-chat-detail]');
-  if (detailRoot) {
+  // 미리 보기(/dev/admin/chat/detail): 더미 ROOMS 로 동작 / 실제 화면은 아래 liveDetail
+  if (detailRoot && detailRoot.dataset.live === 'true') liveDetail(detailRoot);
+  else if (detailRoot) {
     const ME = '김상담'; // 로그인한 관리자
     // MEMBER_ID → [이름, PHONE, 마지막 고객 메시지, STATUS, STARTED_AT, WAITING_AT, ENDED_AT, 담당 ADMIN_NAME, 진행 중인 견적·예약 있음]
     const ROOMS = {
@@ -269,5 +308,173 @@
       $('[data-unread-mark]', m).remove(); // 고객이 읽음
       endRoom();
     }
+  }
+
+  /* ---------- 채팅방 실제 화면: 서버 조각으로 대화를 바꾸고, 전송 · 첨부 · 종료는 fetch ---------- */
+  function liveDetail(root) {
+    const base = `/admin/chats/${root.dataset.member}`;
+    const STATUS = { '01': ['챗봇 응대', 'text-[#888]'], '02': ['대기 중', 'text-[#d9701a]'], '03': ['상담 중', 'text-[#346538]'], '04': ['종료', 'text-[#888]'] };
+    const POLL_MS = 3000;
+    const area = $('[data-messages-area]', root);
+    const form = $('[data-send-form]', root);
+    const input = $('[data-send-input]', root);
+    const sendBtn = $('[data-send-button]', root);
+    let list = $('[data-messages]', root);
+    let status = root.dataset.status;
+    let sending = false;
+
+    const scrollEnd = () => area.scrollTo({ top: area.scrollHeight });
+    const nearBottom = () => area.scrollHeight - area.scrollTop - area.clientHeight < 80;
+
+    function applyStatus(code) {
+      const st = $('[data-room-status]', root);
+      if (STATUS[code]) {
+        st.textContent = STATUS[code][0];
+        st.className = `shrink-0 text-[13px] font-semibold ${STATUS[code][1]}`;
+      }
+      const ended = code === '04';
+      form.hidden = ended;
+      $('[data-ended-bar]', root).hidden = !ended;
+      $('[data-end-open]').hidden = ended;
+    }
+
+    async function post(url, body) {
+      try {
+        const res = await fetch(url, { method: 'POST', body });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) alert(data.message || '잠시 후 다시 시도해 주세요.');
+        return res.ok;
+      } catch (e) {
+        alert('잠시 후 다시 시도해 주세요.');
+        return false;
+      }
+    }
+
+    // 상태가 바뀌면(대기 → 상담 중 · 종료) 고객 정보 시트(담당자 · 종료 시각)도 다시 그린다
+    async function refreshInfo() {
+      try {
+        const res = await fetch(base);
+        if (!res.ok) return;
+        const fresh = new DOMParser().parseFromString(await res.text(), 'text/html').querySelector('#infoSheet');
+        if (fresh) $('#infoSheet').innerHTML = fresh.innerHTML;
+      } catch (e) { /* 다음에 다시 */ }
+    }
+
+    async function refresh(toBottom) {
+      try {
+        const res = await fetch(`${base}/messages`);
+        if (res.redirected) { location.href = '/admin/chats'; return; }
+        if (!res.ok) return;
+        const fresh = new DOMParser().parseFromString(await res.text(), 'text/html').querySelector('[data-messages]');
+        if (!fresh) return;
+        if (fresh.innerHTML !== list.innerHTML) {
+          const stick = toBottom || nearBottom();
+          list.innerHTML = fresh.innerHTML;
+          bindSwipe();
+          if (stick) scrollEnd();
+        }
+        if (fresh.dataset.status && fresh.dataset.status !== status) {
+          status = fresh.dataset.status;
+          applyStatus(status);
+          refreshInfo();
+        }
+      } catch (e) { /* 다음 주기에 다시 */ }
+    }
+
+    // ⋯ 시트 안 버튼(다른 시트 열기)은 ⋯ 시트를 닫는다
+    $$('#menuSheet [data-open]').forEach((b) => b.addEventListener('click', () => { $('#menuSheet').hidden = true; }));
+
+    // 답변 기다리는 고객 메시지를 왼쪽으로 밀면 답장 대상 (인용은 화면 표시용 — DB 에 저장하지 않음)
+    const reply = $('[data-reply]', root);
+    function setReply(text) {
+      reply.hidden = !text;
+      $('[data-reply-text]', root).textContent = text;
+      if (text) input.focus();
+    }
+    function bindSwipe() {
+      $$('[data-swipe]', list).forEach((m) => {
+        let startX = null;
+        m.addEventListener('pointerdown', (e) => { startX = e.clientX; });
+        m.addEventListener('pointermove', (e) => {
+          if (startX === null) return;
+          m.style.transform = `translateX(${Math.min(0, Math.max(-60, e.clientX - startX))}px)`;
+        });
+        const end = (e) => {
+          const t = $('[data-text]', m);
+          if (startX !== null && startX - e.clientX > 45 && t) setReply(t.textContent || t.alt || '');
+          startX = null;
+          m.style.transform = '';
+        };
+        m.addEventListener('pointerup', end);
+        m.addEventListener('pointercancel', end);
+        m.addEventListener('pointerleave', (e) => { if (startX !== null) end(e); });
+      });
+    }
+    $('[data-reply-cancel]', root).addEventListener('click', () => setReply(''));
+
+    // 보내기 (글자를 쓰면 자주 쓰는 답변 아이콘 자리에 보내기 버튼)
+    const syncSend = () => {
+      const has = Boolean(input.value.trim());
+      sendBtn.disabled = !has;
+      sendBtn.hidden = !has;
+      $('[data-replies-button]', root).hidden = has;
+    };
+    input.addEventListener('input', syncSend);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text || sending) return;
+      sending = true;
+      const ok = await post(`${base}/messages`, new URLSearchParams({ text }));
+      sending = false;
+      if (!ok) return;
+      input.value = '';
+      syncSend();
+      setReply('');
+      refresh(true);
+    });
+
+    // 첨부: 사진 · 파일 고르면 바로 보낸다
+    $$('[data-attach-input]').forEach((fi) => fi.addEventListener('change', async () => {
+      const file = fi.files && fi.files[0];
+      if (!file) return;
+      $('#attachSheet').hidden = true;
+      const body = new FormData();
+      body.append('file', file);
+      const ok = await post(`${base}/files`, body);
+      fi.value = '';
+      if (ok) refresh(true);
+    }));
+
+    // 자주 쓰는 답변: 검색 · 누르면 입력칸에 넣기
+    const replySearch = $('[data-replies-search]');
+    const replyItems = $$('[data-reply-content]');
+    replySearch.addEventListener('input', () => {
+      const q = replySearch.value.trim().toLowerCase();
+      let shown = 0;
+      replyItems.forEach((b) => {
+        const hit = !q || `${$('[data-reply-title]', b).textContent} ${b.dataset.replyContent}`.toLowerCase().includes(q);
+        b.hidden = !hit;
+        if (hit) shown += 1;
+      });
+      $('[data-replies-empty]').hidden = shown > 0;
+    });
+    replyItems.forEach((b) => b.addEventListener('click', () => {
+      input.value = b.dataset.replyContent;
+      syncSend();
+      $('#repliesSheet').hidden = true;
+      input.focus();
+    }));
+
+    // 상담 종료
+    $('[data-end-ok]').addEventListener('click', async () => {
+      $('#endConfirm').hidden = true;
+      if (await post(`${base}/end`, new URLSearchParams())) { setReply(''); refresh(true); }
+    });
+
+    applyStatus(status);
+    bindSwipe();
+    scrollEnd();
+    setInterval(() => { if (!document.hidden && !sending) refresh(false); }, POLL_MS);
   }
 })();

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.codemove.common.code.CodeMapper">
+
+	<select id="selectActiveCodes" resultType="Code">
+		SELECT C.GROUP_CODE, C.CODE, C.CODE_NAME, C.USER_NAME, C.SORT_ORDER
+		  FROM TBL_CODE C
+		  JOIN TBL_CODE_GROUP G ON G.GROUP_CODE = C.GROUP_CODE
+		 WHERE C.IS_ACTIVE = 'Y'
+		   AND G.IS_ACTIVE = 'Y'
+		 ORDER BY C.GROUP_CODE, C.SORT_ORDER
+	</select>
+
+</mapper>
