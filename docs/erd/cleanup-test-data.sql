@@ -7,7 +7,12 @@
 -- 업로드 파일(영상 · 후기 사진)은 DB 에서만 지워지므로, 아래 첫 SELECT 로 경로를 확인해 파일도 함께 지운다.
 -- ============================================================
 
--- 0. 지울 파일 경로 확인 (영상 · 후기 사진)
+-- 0. 지울 파일 경로 확인 (영상 · 사진/PDF 등록 견적 원본 · 후기 사진)
+SELECT Q.DOCUMENT_PATH AS FILE_PATH
+  FROM TBL_QUOTE Q
+ WHERE Q.DOCUMENT_PATH IS NOT NULL
+   AND Q.MEMBER_ID IN (SELECT MEMBER_ID FROM TBL_MEMBER WHERE PHONE = '010-0000-0001')
+UNION ALL
 SELECT V.FILE_PATH
   FROM TBL_RE_VIDEO V
   JOIN TBL_MOVE_REQUEST R ON R.REQUEST_ID = V.REQUEST_ID
