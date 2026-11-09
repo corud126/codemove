@@ -1,9 +1,10 @@
 /*
- * 견적 관리 화면 그룹 (모의 동작, 백엔드 없음)
+ * 견적 관리 화면 그룹
  *  SCR-A-001 견적 관리   #estimateList     분류 필터 · 검색(이름·날짜) · 페이지(8건) · 삭제 확인 · 분류별 현황
  *  SCR-A-002 견적 확인   #estimateEdit     문서 확대(두 손가락·맞춤) · 수정→저장 확인 · 견적 승인 · 하단 버튼 · 견적 정보(승인일·만료 카운트다운)
- *  SCR-A-003/004 견적서 등록 #regFlow      첨부 → (사진) 읽는 중 → 확인·수정 → 등록 / (PDF) 확인 → 정보 입력 → 등록. 단계 이동은 ?state= 주소
+ *  SCR-A-003/004 견적서 등록 #regFlow      첨부 → (사진) 읽는 중 → 확인·수정 → 등록 / (PDF) 확인 → 정보 입력 → 등록. 단계 이동은 ?state= 주소 (아직 모의 동작)
  *  공통 문서 [data-viewer] + .estimate-sheet (templates/admin/estimate/sheet.html)
+ * 서버 연동: 목록 삭제 · 견적서 저장 · 승인 (AdminEstimateController). 미리보기(/dev, 모델 없음)에서는 서버를 부르지 않고 모의 동작
  */
 (function () {
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -18,6 +19,20 @@
   const money = (n) => n.toLocaleString('ko-KR');
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = (d) => `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  /* 서버 요청 (JSON). 응답에 ok(성공 여부)를 붙여 돌려준다 */
+  async function post(url, data) {
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+      return Object.assign({ ok: res.ok }, await res.json().catch(() => ({})));
+    } catch (_) {
+      return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+    }
+  }
+  /* 새로고침 뒤 띄울 안내 (overlays.js 가 adminToast 를 꺼내 보여줌) */
+  function toastAfterReload(opts) {
+    try { sessionStorage.setItem('adminToast', JSON.stringify(opts)); } catch (_) { /* 저장 불가 시 생략 */ }
+  }
 
   // 짧은 안내 (저장·다운로드 등) — 확대 안내와 같은 회색 알약. 하단 버튼이 있으면 그 바로 위, 없으면 하단 탭 위
   function snack(message) {
@@ -355,11 +370,20 @@
       const row = e.target.closest('[data-row]');
       if (row && e.key === 'Enter' && row.dataset.href) location.href = openHref(row);
     });
-    $('#deleteConfirmOk').addEventListener('click', () => {
+    $('#deleteConfirmOk').addEventListener('click', async () => {
       if (deleting) {
-        const name = deleting.dataset.name;
-        deleting.remove();
+        const row = deleting;
+        const name = row.dataset.name;
         deleting = null;
+        if (list.dataset.live === 'true') {
+          const result = await post(`${row.dataset.href}/delete`);
+          if (!result.ok) {
+            layer.close('#deleteConfirm');
+            snack(result.message || '삭제하지 못했어요.');
+            return;
+          }
+        }
+        row.remove();
         render();
         toast({ title: '견적 삭제 알림', message: `${name} 고객님의 견적 기록이 삭제되었습니다.`, href: '/admin/estimates' });
       }
@@ -444,13 +468,53 @@
     const cd = $('[data-countdown]', edit);
     if (cd && !$('[data-sum="expires"]', edit).hidden) countdown(cd);
 
-    $('#saveConfirmOk').addEventListener('click', () => {
+    // 문서 칸을 그대로 모아 서버로 (형식 해석·합계 계산은 서버: QuoteService.save)
+    function collectSheet() {
+      const v = (name) => ($(`[data-field="${name}"]`, viewer) || {}).value || '';
+      const pressed = (b) => !!b && b.getAttribute('aria-pressed') === 'true';
+      const picked = $('[data-radio="workMethod"] [data-choice][aria-pressed="true"]', viewer);
+      return {
+        companyName: v('companyName'), customer: v('customer'), phone: v('phone'), estimateDate: v('estimateDate'),
+        origin: v('origin'), moveDate: v('moveDate'), destination: v('destination'), transportDate: v('transportDate'),
+        items: $$('[data-item-row]', viewer).map((row) => $$('input', row).map((i) => i.value)),
+        options: $$('[data-option-row]', viewer).map((row) => {
+          const [a, b] = $$('[data-choice]', row);
+          return { on1: pressed(a), on2: pressed(b), cost: ($('input', row) || {}).value || '' };
+        }),
+        workMethod: picked ? picked.dataset.value : '',
+        transports: $$('[data-transport]', viewer).map((row) => {
+          const [a, b] = $$('[data-choice]', row);
+          return { from: pressed(a), to: pressed(b) };
+        }),
+        volume: v('volume'), note: v('note'), movingCost: v('movingCost'),
+        fromLadderFloor: v('fromLadderFloor'), departureLadder: v('departureLadder'),
+        toLadderFloor: v('toLadderFloor'), destinationLadder: v('destinationLadder'),
+      };
+    }
+    const url = edit.dataset.url; // 미리보기(/dev)에는 없음 → 모의 동작
+    const reloadDoc = () => { location.href = `${url}?tab=doc`; };
+
+    $('#saveConfirmOk').addEventListener('click', async () => {
       layer.close('#saveConfirm');
+      if (url) {
+        const result = await post(url, collectSheet());
+        if (!result.ok) { snack(result.message || '저장하지 못했어요.'); return; }
+        toastAfterReload({ title: '견적서 저장', message: '견적서가 저장되었습니다.', href: '/admin/estimates' });
+        reloadDoc();
+        return;
+      }
       applyEditing(false);
       snack('견적서가 저장되었습니다.');
     });
-    $('#approveConfirmOk').addEventListener('click', () => {
+    $('#approveConfirmOk').addEventListener('click', async () => {
       layer.close('#approveConfirm');
+      if (url) {
+        const result = await post(`${url}/approve`);
+        if (!result.ok) { snack(result.message || '승인하지 못했어요.'); return; }
+        toastAfterReload({ title: '견적 승인 알림', message: `${edit.dataset.name} 고객님의 견적이 '견적 승인'으로 변경되었습니다.`, href: '/admin/estimates' });
+        reloadDoc();
+        return;
+      }
       const badge = $('#approvalBadge');
       badge.className = 'chip chip-progress';
       badge.textContent = '견적 승인';

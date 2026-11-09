@@ -6,6 +6,8 @@
  *  data-doc-download          견적서 PDF 다운로드 (DB 연동 단계에서 실제 파일로 연결)
  *  data-accordion="#id"       결제 금액 펼침/접기 (토글 버튼 svg 에 .open)
  *  data-request-edit          요청사항 수정 ↔ 저장
+ *  data-quote-confirm         견적 확정 (POST, data-updated-at 을 함께 보내 그 사이 견적이 바뀌었는지 서버가 확인)
+ *  data-countdown="초"        남은 시간 표시 (24시간 이상 N일 N시간, 미만 HH:MM:SS) + data-suffix 문구
  */
 (function () {
   const DOC_WIDTH = 580, ZOOM_MIN = 100, ZOOM_MAX = 300;
@@ -154,10 +156,69 @@
       card.setAttribute('role', editing ? 'textbox' : '');
       edit.textContent = editing ? '저장' : '수정';
       if (editing) card.focus();
+      else if (edit.dataset.memoUrl) saveMemo(edit.dataset.memoUrl, card.textContent);
       else toast('요청사항을 저장했어요.');
     }
   });
 
   // 요청사항 편집 상태로 시작한 경우 (?edit=true)
   document.querySelectorAll('.reservation-request-card.editing').forEach((card) => { card.contentEditable = 'true'; });
+
+  /* 폼 값으로 POST. 응답 JSON 에 ok(성공 여부)를 붙여 돌려준다 */
+  async function post(url, data) {
+    try {
+      const res = await fetch(url, { method: 'POST', body: new URLSearchParams(data || {}) });
+      return Object.assign({ ok: res.ok }, await res.json().catch(() => ({})));
+    } catch (_) {
+      return { ok: false };
+    }
+  }
+
+  // ── 요청사항 저장 ──
+  async function saveMemo(url, memo) {
+    const result = await post(url, { memo: memo.trim() });
+    toast(result.ok ? '요청사항을 저장했어요.' : (result.message || '잠시 후 다시 시도해 주세요.'));
+  }
+
+  // ── 예약 취소 ──
+  document.querySelectorAll('[data-reservation-cancel]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const result = await post(btn.dataset.reservationCancel);
+      if (result.ok && result.redirect) { location.href = result.redirect; return; }
+      toast(result.message || '잠시 후 다시 시도해 주세요.');
+    });
+  });
+
+  // ── 견적 확정 → 예약 생성 ──
+  document.querySelectorAll('[data-quote-confirm]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (btn.dataset.busy) return;
+      btn.dataset.busy = '1';
+      const result = await post(btn.dataset.quoteConfirm, { updatedAt: btn.dataset.updatedAt || '' });
+      delete btn.dataset.busy;
+      if (result.ok && result.redirect) { location.href = result.redirect; return; }
+      toast(result.message || '잠시 후 다시 시도해 주세요.');
+      if (result.message && result.message.startsWith('견적이 변경')) setTimeout(() => location.reload(), 1500);
+    });
+  });
+
+  // ── 남은 시간 ──
+  const pad = (n) => String(n).padStart(2, '0');
+  document.querySelectorAll('[data-countdown]').forEach((el) => {
+    let left = Number(el.dataset.countdown);
+    if (!Number.isFinite(left)) return;
+    const suffix = el.dataset.suffix || '';
+    const draw = () => {
+      const text = left >= 86400
+        ? `${Math.floor(left / 86400)}일 ${Math.floor((left % 86400) / 3600)}시간`
+        : `${pad(Math.floor(left / 3600))}:${pad(Math.floor((left % 3600) / 60))}:${pad(left % 60)}`;
+      const target = el.querySelector('[data-countdown-text]') || el;
+      target.textContent = `${text}${suffix}`;
+      left = Math.max(0, left - 1);
+    };
+    draw();
+    setInterval(draw, 1000);
+  });
 })();

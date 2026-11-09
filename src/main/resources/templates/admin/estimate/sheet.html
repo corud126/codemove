@@ -87,10 +87,9 @@
   .is-editing .qs [data-choice] { cursor: pointer; }
 </style>
 
-<!--/* 문서 본문 — 기본값은 견적 1번(홍길동) 더미. 품목 행: 전자기기 품목|수량|가구|수량|생활용품|수량|기타|수량 ('-' = 빈칸) */-->
+<!--/* 문서 본문 — 값은 sheetView (com.codemove.quote.SheetView). 없으면(미리보기·등록 화면) 예시 SheetView.SAMPLE */-->
 <article th:fragment="sheet" class="qs estimate-sheet [container-type:inline-size]"
-         th:with="itemRows=${ {'냉장고|1대|침대|1개|박스|25개|-|-', '세탁기|1대|책상|2개|-|-|-|-', '-|-|의자|4개|-|-|-|-',
-                               '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-', '-|-|-|-|-|-|-|-'} }">
+         th:with="s=${sheetView ?: T(com.codemove.quote.SheetView).SAMPLE}">
   <div class="qs-in">
     <div class="qs-top">
       <div class="qs-brand"><strong>명품 익스프레스</strong><span>포장이사 전문업체 관허 2015-7호</span><span>(피해보상)보증보험 가입</span></div>
@@ -104,15 +103,15 @@
 
     <!--/* 업체명 · 담당자(고객) · TEL · 견적일 · 출발지 · 작업일 · 도착지 · 운송일 */-->
     <div class="qs-cust">
-      <b>업체명</b><span><input readonly data-field="companyName" aria-label="업체명" value="명품익스프레스"></span>
-      <b>담당자</b><span><input readonly data-field="customer" aria-label="담당자" value="홍길동" class="!w-auto max-w-[70%] [field-sizing:content]"><em class="shrink-0 not-italic">(님)</em></span>
-      <b>TEL</b><span><input readonly data-field="phone" aria-label="연락처" value="010-1234-5678"></span>
-      <b>견적일</b><span><input readonly data-field="estimateDate" aria-label="견적일" value="26.03.25"></span>
-      <b>출발지</b><span><input readonly data-field="origin" aria-label="출발지" value="서울 강남구 테헤란로 123, 101동 1203호"></span>
+      <b>업체명</b><span><input readonly data-field="companyName" aria-label="업체명" th:value="${s.companyName}"></span>
+      <b>담당자</b><span><input readonly data-field="customer" aria-label="담당자" th:value="${s.customer}" class="!w-auto max-w-[70%] [field-sizing:content]"><em class="shrink-0 not-italic">(님)</em></span>
+      <b>TEL</b><span><input readonly data-field="phone" aria-label="연락처" th:value="${s.phone}"></span>
+      <b>견적일</b><span><input readonly data-field="estimateDate" aria-label="견적일" th:value="${s.estimateDate}"></span>
+      <b>출발지</b><span><input readonly data-field="origin" aria-label="출발지" th:value="${s.origin}"></span>
       <!--/* 작업일 = WORK_DATE + WORK_TIME(고정 시간대 08:00·10:00·13:00·15:00·17:00 중 하나, 고객 희망 시간대를 보고 정함) */-->
-      <b>작업일</b><span><input readonly data-field="moveDate" aria-label="작업일" placeholder="미정" th:value="${noDate == true} ? '' : '26.04.12 08:00'"></span>
-      <b>도착지</b><span><input readonly data-field="destination" aria-label="도착지" value="경기 성남시 분당구 판교로 45, 2층"></span>
-      <b>운송일</b><span><input readonly data-field="transportDate" aria-label="운송일" value="26.04.12"></span>
+      <b>작업일</b><span><input readonly data-field="moveDate" aria-label="작업일" placeholder="미정" th:value="${noDate == true} ? '' : ${s.moveDate}"></span>
+      <b>도착지</b><span><input readonly data-field="destination" aria-label="도착지" th:value="${s.destination}"></span>
+      <b>운송일</b><span><input readonly data-field="transportDate" aria-label="운송일" th:value="${s.transportDate}"></span>
     </div>
 
     <!--/* 품목 / 수량 — 그룹 4개 고정 (ERD Q14), 수량 칸 = 수량 + 단위 */-->
@@ -120,17 +119,17 @@
       <div class="qs-groups"><b>전자기기</b><b>가구</b><b>생활용품</b><b>기타</b></div>
       <div class="qs-ihead"><th:block th:each="i : ${#numbers.sequence(1, 4)}"><b>품목</b><b>수량</b></th:block></div>
       <div data-item-rows>
-        <div th:each="row : ${itemRows}" th:with="t=${#strings.arraySplit(row, '|')}" class="qs-irow" data-item-row>
+        <div th:each="t : ${s.itemRows}" class="qs-irow" data-item-row>
           <th:block th:each="c : ${#numbers.sequence(0, 3)}">
-            <input readonly data-item-name aria-label="품목" th:value="${t[c * 2] == '-'} ? '' : ${t[c * 2]}">
-            <input readonly data-item-qty aria-label="수량" th:value="${t[c * 2 + 1] == '-'} ? '' : ${t[c * 2 + 1]}">
+            <input readonly data-item-name aria-label="품목" th:value="${t[c * 2]}">
+            <input readonly data-item-qty aria-label="수량" th:value="${t[c * 2 + 1]}">
           </th:block>
         </div>
       </div>
       <!--/* 수정 모드에서만: 품목 행 추가/삭제 (문서 아래 경계선 위에 겹쳐 배치 — 배치가 밀리지 않음) */-->
       <div class="qs-rowctl">
       <button type="button" aria-label="품목 행 삭제" data-item-row-change="-1">−</button>
-      <span data-item-row-count>8행</span>
+      <span data-item-row-count th:text="${#lists.size(s.itemRows)} + '행'">8행</span>
       <button type="button" aria-label="품목 행 추가" data-item-row-change="1">+</button>
       </div>
     </div>
@@ -139,35 +138,34 @@
     <div class="qs-work">
       <b class="qs-vlabel">작업 정보</b>
       <div class="qs-opts">
-        <div th:each="o, s : ${ {'피아노|일반|그랜드|N|N|0', '돌침대|분해|조립|N|N|0', '조립장|분해|조립|N|N|0', '벽걸이TV|탈착|설치|Y|Y|20,000',
-                                 '홈씨어터|분리|설치|N|N|0', '수작업|계단|승강기|N|N|0', '안마의자|분리|설치|N|N|0', '에어컨|탈착|설치|N|N|0'} }"
-             th:with="t=${#strings.arraySplit(o, '|')}" class="qs-opt" data-option-row>
-          <span th:text="${t[0]}">피아노</span>
+        <div th:each="o, st : ${s.options}" class="qs-opt" data-option-row>
+          <span th:text="${o.name}">피아노</span>
           <span class="flex items-center gap-[calc(var(--u)*6)]">
-            <button th:each="k : ${ {1, 2} }" type="button" data-choice class="qs-choice" th:attr="data-value=${t[k]}, aria-pressed=${t[k + 2] == 'Y'}">
-              <span th:text="${t[k]}">일반</span><span data-box th:text="${t[k + 2] == 'Y'} ? '■' : '□'">□</span>
+            <button th:each="k : ${ {1, 2} }" th:with="label=${k == 1} ? ${o.choice1} : ${o.choice2}, on=${k == 1} ? ${o.on1} : ${o.on2}"
+                    type="button" data-choice class="qs-choice" th:attr="data-value=${label}, aria-pressed=${on}">
+              <span th:text="${label}">일반</span><span data-box th:text="${on} ? '■' : '□'">□</span>
             </button>
           </span>
-          <span class="cost">₩<input readonly inputmode="numeric" th:attr="data-field='option' + ${s.index}, data-money=true, aria-label=|${t[0]} 옵션 비용|" th:value="${t[5]}"></span>
+          <span class="cost">₩<input readonly inputmode="numeric" th:attr="data-field='option' + ${st.index}, data-money=true, aria-label=|${o.name} 옵션 비용|" th:value="${o.cost}"></span>
         </div>
       </div>
       <div class="qs-details">
         <div><b>작업내용</b>
           <span class="v" data-radio="workMethod">
-            <button th:each="m : ${ {'포장', '반포장', '일반', '보관'} }" type="button" data-choice class="qs-choice" th:attr="data-value=${m}, aria-pressed=${m == '반포장'}">
-              <span th:text="${m}">포장</span><span data-box th:text="${m == '반포장'} ? '■' : '□'">□</span>
+            <button th:each="m : ${ {'포장', '반포장', '일반', '보관'} }" type="button" data-choice class="qs-choice" th:attr="data-value=${m}, aria-pressed=${m == s.workMethod}">
+              <span th:text="${m}">포장</span><span data-box th:text="${m == s.workMethod} ? '■' : '□'">□</span>
             </button>
           </span></div>
         <div><b>운반방법</b>
           <span class="v qs-transport">
-            <span th:each="m : ${ {'사다리차|Y|Y', '승강기|N|N', '계단작업|N|N'} }" th:with="t=${#strings.arraySplit(m, '|')}" data-transport>
-              <em th:text="${t[0]}">사다리차</em>
-              <button type="button" data-choice class="qs-choice" data-value="전" th:attr="aria-pressed=${t[1] == 'Y'}">전<span data-box th:text="${t[1] == 'Y'} ? '■' : '□'">■</span></button>/
-              <button type="button" data-choice class="qs-choice" data-value="후" th:attr="aria-pressed=${t[2] == 'Y'}">후<span data-box th:text="${t[2] == 'Y'} ? '■' : '□'">■</span></button>
+            <span th:each="t : ${s.transports}" data-transport>
+              <em th:text="${t.name}">사다리차</em>
+              <button type="button" data-choice class="qs-choice" data-value="전" th:attr="aria-pressed=${t.from}">전<span data-box th:text="${t.from} ? '■' : '□'">■</span></button>/
+              <button type="button" data-choice class="qs-choice" data-value="후" th:attr="aria-pressed=${t.to}">후<span data-box th:text="${t.to} ? '■' : '□'">■</span></button>
             </span>
           </span></div>
-        <div><b>이사물량</b><span class="v"><input readonly data-field="volume" aria-label="이사물량" value="3.5톤"></span></div>
-        <div><b>비고</b><span class="v"><input readonly data-field="note" aria-label="비고" maxlength="500" value="파손 주의 물품 별도 포장"></span></div>
+        <div><b>이사물량</b><span class="v"><input readonly data-field="volume" aria-label="이사물량" th:value="${s.volume}"></span></div>
+        <div><b>비고</b><span class="v"><input readonly data-field="note" aria-label="비고" maxlength="500" th:value="${s.note}"></span></div>
       </div>
     </div>
 
@@ -175,29 +173,29 @@
     <div class="qs-cost">
       <div class="qs-col">
         <b>A. 작업 비용</b>
-        <div th:each="m : ${ {'이사비용|movingCost|1,050,000|', '사다리비용|extraCost|270,000|', '옵션비용|optionCost|20,000|', '총 비용|total|1,340,000|total'} }" th:with="t=${#strings.arraySplit(m + ' ', '|')}"
-             th:classappend="${#strings.trim(t[3]) == 'total'} ? 'total'">
-          <span th:text="${t[0]}">이사비용</span><strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=${t[0]}" th:value="${t[2]}"></strong>
+        <div th:each="m : ${ {'이사비용|movingCost|', '사다리비용|extraCost|', '옵션비용|optionCost|', '총 비용|total|total'} }" th:with="t=${#strings.arraySplit(m + ' ', '|')}"
+             th:classappend="${#strings.trim(t[2]) == 'total'} ? 'total'">
+          <span th:text="${t[0]}">이사비용</span><strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=${t[0]}" th:value="${s[t[1]]}"></strong>
         </div>
       </div>
       <div class="qs-col">
         <b>B. 별도 비용</b>
-        <div th:each="m : ${ {'출발지|departureLadder|150,000|fromLadderFloor|3', '도착지|destinationLadder|120,000|toLadderFloor|8'} }" th:with="t=${#strings.arraySplit(m, '|')}">
-          <span><th:block th:text="${t[0]}">출발지</th:block>&nbsp;사다리(<input readonly inputmode="numeric" maxlength="3" th:attr="data-field=${t[3]}, aria-label=|${t[0]} 사다리 층수|" th:value="${t[4]}">)층</span>
-          <strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=|${t[0]} 사다리 비용|" th:value="${t[2]}"></strong>
+        <div th:each="m : ${ {'출발지|departureLadder|fromLadderFloor', '도착지|destinationLadder|toLadderFloor'} }" th:with="t=${#strings.arraySplit(m, '|')}">
+          <span><th:block th:text="${t[0]}">출발지</th:block>&nbsp;사다리(<input readonly inputmode="numeric" maxlength="3" th:attr="data-field=${t[2]}, aria-label=|${t[0]} 사다리 층수|" th:value="${s[t[2]]}">)층</span>
+          <strong>₩<input readonly inputmode="numeric" th:attr="data-field=${t[1]}, data-money=true, aria-label=|${t[0]} 사다리 비용|" th:value="${s[t[1]]}"></strong>
         </div>
         <div aria-hidden="true"><span></span><strong></strong></div><!--/* A칸과 줄 높이 맞춤 */-->
-        <div class="total"><span>사다리 소계</span><strong>₩<input readonly inputmode="numeric" data-field="ladderSubtotal" data-money="true" aria-label="사다리 소계" value="270,000"></strong></div>
+        <div class="total"><span>사다리 소계</span><strong>₩<input readonly inputmode="numeric" data-field="ladderSubtotal" data-money="true" aria-label="사다리 소계" th:value="${s.ladderSubtotal}"></strong></div>
       </div>
     </div>
     <div class="qs-pay">
-      <b>계약금 10%</b><span>₩<input readonly inputmode="numeric" data-field="deposit" data-money="true" aria-label="계약금" value="134,000"></span>
-      <b class="bal">잔금</b><span class="bal">₩<input readonly inputmode="numeric" data-field="balance" data-money="true" aria-label="잔금" value="1,206,000"></span>
+      <b>계약금 10%</b><span>₩<input readonly inputmode="numeric" data-field="deposit" data-money="true" aria-label="계약금" th:value="${s.deposit}"></span>
+      <b class="bal">잔금</b><span class="bal">₩<input readonly inputmode="numeric" data-field="balance" data-money="true" aria-label="잔금" th:value="${s.balance}"></span>
       <div class="note">※ 현장 상황 및 요청사항 변경 시 비용이 조정될 수 있습니다.</div>
     </div>
 
     <div class="qs-sign">
-      <b>견적 담당자</b><span>김선국　(서명) / H.P　010-9445-8224</span>
+      <b>견적 담당자</b><span th:text="${s.signer}">김선국　(서명) / H.P　010-9445-8224</span>
       <b>고객 확인</b><span>(서명)</span>
     </div>
   </div>

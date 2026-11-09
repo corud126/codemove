@@ -2,7 +2,8 @@
  * 이사 견적 6단계 (SCR-U-003~009)
  *  ?step=1~6&state=... 로 캡처 상태를 바로 연다 (templates/user/quote/index.html 상단 주석 참고).
  *  ?voice=on  쉬운 모드 음성 안내 켜짐 상태 (E-C21)
- *  화면 개발 단계: AI 분석·주소 검색·견적 금액은 더미 데이터로 흉내 낸다.
+ *  서버 연동: 영상 업로드 · AI 분석 · 주소 검색 · 휴무/마감 · 예상 금액 · 요청 제출 (QuoteController)
+ *  ?step= 캡처 미리보기는 서버 없이 더미 데이터로 동작한다 (PREVIEW).
  */
 (function () {
   const root = document.getElementById('quote');
@@ -10,11 +11,27 @@
 
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => Array.from(el.querySelectorAll(sel));
+  const params = new URLSearchParams(location.search);
+  const PREVIEW = params.has('step') || !root.dataset.today;
   const IMG = root.dataset.img || '/images/user/';
   const TOTAL = 6;
   const SIZE_FACTOR = { 소형: 0.75, 중형: 1, 대형: 1.25 };
   const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-  const TODAY = new Date(2026, 1, 16); // 더미 기준일 (캡처: 2026년 2월 16일 이후 선택 가능)
+  const TODAY = PREVIEW ? new Date(2026, 1, 16) // 캡처 기준일: 2026년 2월 16일 이후 선택 가능
+    : (([y, m, d]) => new Date(y, m - 1, d))(root.dataset.today.split('-').map(Number));
+  const won = (n) => Number(n).toLocaleString('ko-KR');
+
+  /* 서버 요청: 응답 JSON 에 ok(성공 여부)를 붙여 돌려준다 */
+  async function request(url, options) {
+    try {
+      const res = await fetch(url, options);
+      const body = await res.json().catch(() => ({}));
+      return Object.assign({ ok: res.ok }, body);
+    } catch (_) {
+      return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+    }
+  }
+  const postJson = (url, data) => request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   const NEXT_LABELS = {
     standard: ['다음', '다음', '다음', '다음', '다음', '견적 요청'],
     easy: ['영상 분석하기', '인식 품목 확인', '주소 입력하기', '날짜 선택하기', '견적 확인하기', '견적 요청하기'],
@@ -29,8 +46,8 @@
   ];
   const VOICE_GUIDE_DONE = '영상 분석이 끝났습니다. 찾은 짐 목록을 확인해주세요. 정보가 다르면 품목을 눌러 수정하고, 빠진 짐은 빠진 품목 추가하기를 누르세요.';
 
-  /* 품목 카탈로그: 이름 → [아이콘, 중형 1개 기준 CBM] */
-  const CATALOG = {
+  /* 품목 카탈로그: 이름 → [아이콘, 중형 1개 기준 CBM, 카테고리] — 서버 표(ItemCatalog)를 받고, 미리보기에서는 아래 기본값 */
+  const CATALOG = window.QUOTE_CATALOG || {
     냉장고: ['item-fridge', 1.8], 김치냉장고: ['item-fridge', 0.9], 침대: ['item-bed', 2.4], 소파: ['item-sofa', 2.1],
     이사박스: ['item-box', 4.6 / 13], 세탁기: ['item-washer', 1.2], 건조기: ['item-washer', 1.0],
     테이블: ['item-table', 0.7 / 0.75], '식탁·테이블': ['item-table', 0.7 / 0.75], 책상: ['item-table', 0.9],
@@ -39,6 +56,7 @@
   };
   const catalog = (name) => CATALOG[name] || ['item-box', 0.5];
 
+  /* 캡처 미리보기용 주소 (실제 검색은 GET /quote/address) */
   const MOCK_ADDRESSES = [
     { road: '서울 강남구 테헤란로 123', jibun: '지번 역삼동 123-45' },
     { road: '서울 강남구 테헤란로 152', jibun: '지번 역삼동 678-9' },
@@ -48,28 +66,30 @@
     { road: '경기 수원시 영통구 광교중앙로 145', jibun: '지번 이의동 1336' },
   ];
 
-  const newItem = (name, size, count, review) => {
+  /* aiIndex: AI 인식 결과 순번 (사용자가 추가한 품목은 null) — 제출 때 신뢰도·출처를 찾는 데 쓴다 */
+  const newItem = (name, size, count, review, aiIndex = null) => {
     const [icon, base] = catalog(name);
-    return { name, size, count, base, icon, review: !!review };
+    return { name, size, count, base, icon, review: !!review, aiIndex };
   };
 
   const state = {
     step: 1,
     video: '',
     analysis: 'analyzing',
-    items: [
-      newItem('냉장고', '중형', 1), newItem('침대', '중형', 1), newItem('소파', '중형', 1, true),
-      newItem('이사박스', '중형', 13), newItem('세탁기', '중형', 1), newItem('테이블', '소형', 1),
+    items: [ // 캡처 미리보기용 — 실제로는 AI 분석 결과로 바뀐다
+      newItem('냉장고', '중형', 1, false, 0), newItem('침대', '중형', 1, false, 1), newItem('소파', '중형', 1, true, 2),
+      newItem('이사박스', '중형', 13, false, 3), newItem('세탁기', '중형', 1, false, 4), newItem('테이블', '소형', 1, false, 5),
     ],
     house: '', pack: '',
     addr: { from: { sel: null, detail: '' }, to: { sel: null, detail: '' } },
-    view: { y: 2026, m: 2 },
+    view: { y: TODAY.getFullYear(), m: TODAY.getMonth() },
     date: null,
     time: '오전', // 희망 시간대: 오전 · 오후 · 상관없음
     dateUnknown: false,
     voice: false,
   };
   let analysisTimer = 0;
+  let submitting = false;
 
   const mode = () => (window.CodeMove && CodeMove.mode ? CodeMove.mode() : 'standard');
   const open = (sel) => { const el = $(sel); if (el) el.hidden = false; };
@@ -147,9 +167,34 @@
     btn.setAttribute('aria-checked', on);
   }
 
+  /* 서버로 보내는 입력값 (QuoteForm) */
+  function payload() {
+    const addr = (a) => ({ road: a.sel ? a.sel.road : '', detail: a.detail });
+    return {
+      items: state.items.map((it) => ({ name: it.name, size: it.size, count: it.count, aiIndex: it.aiIndex ?? null, review: !!it.review })),
+      house: state.house,
+      pack: state.pack,
+      from: addr(state.addr.from),
+      to: addr(state.addr.to),
+      date: state.dateUnknown || !state.date ? null : ymd(state.date.y, state.date.m, state.date.d),
+      time: state.time,
+    };
+  }
+
+  /* 예상 금액: 서버 계산 (날짜 미정이면 범위) */
+  let estimateSeq = 0;
+  async function loadEstimate(unknown) {
+    const seq = ++estimateSeq;
+    const result = await postJson('/quote/estimate', payload());
+    if (seq !== estimateSeq || !result.ok) return;
+    $('[data-q-price]', root).textContent = unknown ? `${won(result.min)} ~ ${won(result.max)}` : won(result.amount);
+    $('[data-q-sum-items]', root).textContent = `${result.count}개 · ${fmt(Number(result.cbm))} CBM`;
+  }
+
   function renderSummary() {
     const unknown = state.dateUnknown || !state.date;
-    $('[data-q-price]', root).textContent = unknown ? '400,000 ~ 480,000' : '410,000';
+    if (PREVIEW) $('[data-q-price]', root).textContent = unknown ? '400,000 ~ 480,000' : '410,000';
+    else { $('[data-q-price]', root).textContent = '-'; loadEstimate(unknown); }
     $('[data-q-sum-date]', root).hidden = unknown;
     $('[data-q-sum-date-pick]', root).hidden = !unknown;
     if (!unknown) {
@@ -177,23 +222,54 @@
     state.step = Math.min(TOTAL, Math.max(1, step));
     if (state.step === 2 && state.analysis !== 'done') {
       state.analysis = 'analyzing';
-      analysisTimer = setTimeout(() => { state.analysis = 'done'; render(); speak(); }, 1800);
+      if (PREVIEW) analysisTimer = setTimeout(() => { state.analysis = 'done'; render(); speak(); }, 1800);
+      else analyze();
     }
     render();
     CodeMove.scroller().scrollTo(0, 0);
-    try {
-      const url = new URL(location.href);
-      url.searchParams.set('step', state.step);
-      url.searchParams.delete('state');
-      history.replaceState(null, '', url);
-    } catch (_) { /* URL 갱신 불가 환경 무시 */ }
+    // 미리보기만 주소에 단계를 남긴다 (실제 요청은 새로고침하면 처음부터 — 영상·분석 결과가 서버 세션에 있음)
+    if (PREVIEW) {
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('step', state.step);
+        url.searchParams.delete('state');
+        history.replaceState(null, '', url);
+      } catch (_) { /* URL 갱신 불가 환경 무시 */ }
+    }
     speak();
   }
 
-  /* ── 1. 영상 업로드 ── */
-  $('[data-q-video]', root).addEventListener('change', (e) => {
+  /* AI 분석 (POST /quote/analyze). 분석 화면이 너무 짧게 스치지 않도록 최소 1.2초 보여준다 */
+  async function analyze() {
+    const [result] = await Promise.all([postJson('/quote/analyze', {}), new Promise((r) => { analysisTimer = setTimeout(r, 1200); })]);
+    if (state.step !== 2) return;
+    if (!result.ok) {
+      alert(result.message || '영상을 분석하지 못했어요. 다시 시도해 주세요.');
+      go(1);
+      return;
+    }
+    state.items = result.items.map((it) => newItem(it.name, it.size, it.count, it.review, it.aiIndex));
+    state.analysis = 'done';
+    render();
+    speak();
+  }
+
+  /* ── 1. 영상 업로드 (POST /quote/video) ── */
+  $('[data-q-video]', root).addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    if (!PREVIEW) {
+      const form = new FormData();
+      form.append('video', file);
+      $('[data-q-next]', root).disabled = true;
+      const result = await request('/quote/video', { method: 'POST', body: form });
+      if (!result.ok) {
+        alert(result.message || '영상을 올리지 못했어요. 다시 시도해 주세요.');
+        e.target.value = '';
+        renderChrome();
+        return;
+      }
+    }
     state.video = file.name;
     // 첨부 카드: 첫 장면 썸네일 · 용량 · 길이
     const card = $('[data-q-upload]', root);
@@ -333,11 +409,29 @@
   /* ── 4. 주소 ── */
   const addrBlocks = $$('[data-q-addr]', root);
 
-  function showResults(block, query) {
+  /* 주소 검색 (GET /quote/address). 2글자 미만이면 null (결과 창을 열지 않음) */
+  async function findAddresses(q) {
+    if (PREVIEW) return MOCK_ADDRESSES.filter((a) => a.road.includes(q) || a.jibun.includes(q));
+    if (q.length < 2) return null;
+    try {
+      const res = await fetch(`/quote/address?q=${encodeURIComponent(q)}`);
+      const list = res.ok ? await res.json() : [];
+      return list.map((a) => ({ road: a.road, jibun: `지번 ${a.jibun}` }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function showResults(block, query) {
     const box = $('[data-q-addr-results]', block);
     const q = query.trim();
+    const seq = (block.qSeq || 0) + 1;
+    block.qSeq = seq;
     if (!q) { box.hidden = true; dimOthers(); return; }
-    const found = MOCK_ADDRESSES.filter((a) => a.road.includes(q) || a.jibun.includes(q));
+    const found = await findAddresses(q);
+    if (block.qSeq !== seq) return; // 더 최근 검색어가 있음
+    if (!found) { box.hidden = true; dimOthers(); return; }
+    block.qResults = found;
     if (!found.length) {
       const empty = document.createElement('div');
       empty.className = 'q-addr-empty';
@@ -391,7 +485,7 @@
 
   function selectAddr(block, road, detail = '') {
     const data = state.addr[block.dataset.qAddr];
-    data.sel = MOCK_ADDRESSES.find((a) => a.road === road) || null;
+    data.sel = (block.qResults || []).concat(MOCK_ADDRESSES).find((a) => a.road === road) || null;
     data.detail = detail;
     $('[data-q-addr-results]', block).hidden = true;
     dimOthers();
@@ -401,7 +495,10 @@
 
   addrBlocks.forEach((block) => {
     const input = $('[data-q-addr-search] input', block);
-    input.addEventListener('input', () => showResults(block, input.value));
+    input.addEventListener('input', () => {
+      clearTimeout(block.qTimer);
+      block.qTimer = setTimeout(() => showResults(block, input.value), PREVIEW ? 0 : 250);
+    });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); showResults(block, input.value); } });
     $('[data-q-addr-go]', block).addEventListener('click', () => { showResults(block, input.value); input.focus(); });
     $('[data-q-addr-results]', block).addEventListener('click', (e) => {
@@ -428,14 +525,36 @@
 
   /* ── 5. 날짜 ── */
   const sameMonth = (y, m, d) => y === d.getFullYear() && m === d.getMonth();
-  // 관리자 일정 관리와 연결되는 값 (더미): 휴무일(정기 휴무 요일 · 공휴일에 쉬기 · 임시 휴무) · 마감일(그날 확정 예약이 하루 최대 예약만큼 참) → 선택 불가
-  // 손 없는 날은 휴무가 아님 — 초록 점으로 표시만 (외부 API 값, 더미는 고정)
+  // 관리자 일정 관리와 연결되는 값: 휴무일(정기 휴무 요일 · 공휴일에 쉬기 · 임시 휴무) · 마감일(그날 확정 예약이 하루 최대 예약만큼 참) → 선택 불가
+  // 실제 값은 GET /quote/calendar?month= 로 달마다 받는다. 아래 CLOSE · HOLIDAYS 는 캡처 미리보기용
+  // 손 없는 날은 휴무가 아님 — 표시만. 음력 계산 연동 전이라 미리보기에서만 표시
   const CLOSE = { weekdays: [], holiday: true, dates: ['2026-03-10'], full: ['2026-03-13', '2026-03-20'] };
   const HOLIDAYS = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-03-01', '2026-03-02', '2026-05-05', '2026-05-24', '2026-05-25', '2026-06-03', '2026-06-06'];
   const NO_MOVE = [7, 8, 17, 18, 27, 28];
   const ymd = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const months = {}; // 'yyyy-MM' → { closed, full, holidays } (Set)
+  async function loadMonth(y, m) {
+    const key = ymd(y, m, 1).slice(0, 7);
+    if (months[key]) return;
+    months[key] = { closed: new Set(), full: new Set(), holidays: new Set(), loading: true };
+    const result = await request(`/quote/calendar?month=${key}`);
+    months[key] = result.ok
+      ? { closed: new Set(result.closed), full: new Set(result.full), holidays: new Set(result.holidays) }
+      : { closed: new Set(), full: new Set(), holidays: new Set(), failed: true };
+    if (state.step === 5 && state.view.y === y && state.view.m === m) renderCalendar();
+  }
   const dayState = (y, m, d) => {
-    const key = ymd(y, m, d), wd = new Date(y, m, d).getDay(), holiday = HOLIDAYS.includes(key);
+    const key = ymd(y, m, d);
+    if (!PREVIEW) {
+      const month = months[key.slice(0, 7)];
+      const holiday = !!month && month.holidays.has(key);
+      if (!month || month.loading) return { off: '', holiday, wait: true };
+      if (month.failed) return { off: '', holiday }; // 못 받았으면 고를 수 있게 두고 제출 때 서버가 확인
+      if (month.closed.has(key)) return { off: '휴무', holiday };
+      if (month.full.has(key)) return { off: '마감', holiday };
+      return { off: '', holiday };
+    }
+    const wd = new Date(y, m, d).getDay(), holiday = HOLIDAYS.includes(key);
     if (CLOSE.weekdays.includes(wd) || (CLOSE.holiday && holiday) || CLOSE.dates.includes(key)) return { off: '휴무', holiday };
     if (CLOSE.full.includes(key)) return { off: '마감', holiday };
     return { off: '', holiday, noMove: NO_MOVE.includes(d) };
@@ -443,6 +562,7 @@
 
   function renderCalendar() {
     const { y, m } = state.view;
+    if (!PREVIEW) loadMonth(y, m);
     $('[data-q-cal-title]', root).textContent = `${y}년 ${m + 1}월`;
     $('[data-q-cal-prev]', root).disabled = y < TODAY.getFullYear() || sameMonth(y, m, TODAY) || (y === TODAY.getFullYear() && m < TODAY.getMonth());
     const first = new Date(y, m, 1).getDay();
@@ -457,9 +577,10 @@
         span.innerHTML = '<b class="q-day-num"></b><span class="q-day-mark"></span>'; // 앞뒤 달 날짜는 빈칸 (흐린 숫자 = 고를 수 없는 날 하나만 뜻하게)
         span.setAttribute('aria-hidden', 'true');
       } else {
-        const past = sameMonth(y, m, TODAY) && d < TODAY.getDate();
+        // 당일 이사는 받지 않는다 (미리보기는 캡처대로 오늘부터 선택 가능)
+        const past = sameMonth(y, m, TODAY) && (PREVIEW ? d < TODAY.getDate() : d <= TODAY.getDate());
         const ds = dayState(y, m, d);
-        const blocked = past || !!ds.off;
+        const blocked = past || !!ds.off || !!ds.wait;
         const picked = !blocked && state.date && state.date.y === y && state.date.m === m && state.date.d === d;
         span.className = picked ? 'picked' : blocked ? 'muted' : 'selectable';
         if (ds.holiday || new Date(y, m, d).getDay() === 0) span.classList.add('is-red');
@@ -527,11 +648,20 @@
   });
 
   /* ── 하단 버튼 · 뒤로 ── */
-  $('[data-q-next]', root).addEventListener('click', () => {
-    if (!canNext()) return;
+  $('[data-q-next]', root).addEventListener('click', async () => {
+    if (!canNext() || submitting) return;
     if (state.step === TOTAL) {
       stopVoice();
-      location.href = root.dataset.completeUrl || '/quote/complete';
+      if (PREVIEW) { location.href = root.dataset.completeUrl || '/quote/complete'; return; }
+      // 견적 요청 제출 (POST /quote) — 요청과 견적서 초안이 함께 저장된다
+      submitting = true;
+      const next = $('[data-q-next]', root);
+      next.disabled = true;
+      const result = await postJson('/quote', payload());
+      submitting = false;
+      if (result.ok && result.redirect) { location.href = result.redirect; return; }
+      next.disabled = false;
+      alert(result.message || '견적 요청을 보내지 못했어요. 다시 시도해 주세요.');
       return;
     }
     go(state.step + 1);
@@ -617,11 +747,12 @@
     if (step === 5 && st === 'unknown') open('#qUnknownSheet');
   }
 
-  const params = new URLSearchParams(location.search);
-  const startStep = Math.min(TOTAL, Math.max(1, parseInt(params.get('step'), 10) || 1));
-  const startState = params.get('state') || '';
   state.voice = params.get('voice') === 'on';
   renderVoice();
-  preset(startStep, startState);
+  if (PREVIEW) {
+    preset(Math.min(TOTAL, Math.max(1, parseInt(params.get('step'), 10) || 1)), params.get('state') || '');
+  } else {
+    render(); // 실제 요청은 항상 1단계 영상 올리기부터
+  }
   speak();
 })();

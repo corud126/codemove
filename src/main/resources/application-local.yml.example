@@ -19,3 +19,11 @@ codemove:
         # 네이버 개발자센터 > 애플리케이션 > Client ID / Client Secret
         client-id: <NAVER_CLIENT_ID>
         client-secret: <NAVER_CLIENT_SECRET>
+
+  # 도로명주소 검색 API 승인키 (business.juso.go.kr > API 신청 > 검색API)
+  juso:
+    confm-key: <JUSO_CONFM_KEY>
+
+  # 공공데이터포털 특일 정보 (한국천문연구원 SpcdeInfoService) 키
+  holiday:
+    service-key: <HOLIDAY_SERVICE_KEY>

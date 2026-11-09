@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <!--/* SCR-A-001 견적 관리 — 디자인 기준: docs/ui/관리자디자인기준.md
   상태: (기본) | ?state=date-search (A 검색 열림) | ?state=empty (B 검색 결과 없음) | ?state=delete-confirm (C 삭제 확인)
-  분류 필터 · 검색(이름·날짜 YY.MM.DD) · 페이지(8건) · 삭제 · 분류별 현황은 estimate.js 에서 처리 (더미 데이터) */-->
+  분류 필터 · 검색(이름·날짜 YY.MM.DD) · 페이지(8건) · 삭제 · 분류별 현황은 estimate.js 에서 처리
+  행: model rows (TBL_QUOTE), 삭제는 POST /admin/estimates/{id}/delete (확정 견적은 삭제 불가) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='견적 관리', active='estimate', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
-  <div id="estimateList" class="px-4 pb-28 pt-5" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}">
+  <div id="estimateList" class="px-4 pb-28 pt-5" th:with="state=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${state}, data-live=${rows != null}">
     <!--/* 1행: 페이지 제목만 */-->
     <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">견적 관리</h2>
 
@@ -42,10 +43,11 @@
         <span>분류</span><span>이름</span><span>날짜</span><span class="text-center">삭제</span>
       </div>
       <div id="estimateRows">
-        <div th:each="e : ${ {'1|견적 검토|홍길동|26.03.25', '2|견적 승인|김명품|25.11.08', '3|견적 확정|이서준|25.04.17', '4|견적 검토|박서준|24.12.02',
+        <!--/* rows: 컨트롤러가 TBL_QUOTE 로 만든 행. 없으면(미리보기 /dev) 아래 예시 행 */-->
+        <div th:each="e : ${rows ?: {'1|견적 검토|홍길동|26.03.25', '2|견적 승인|김명품|25.11.08', '3|견적 확정|이서준|25.04.17', '4|견적 검토|박서준|24.12.02',
                               '5|견적 승인|최유진|24.06.21', '6|견적 확정|정도현|23.09.14', '7|견적 검토|한지민|23.02.28', '8|견적 승인|윤서아|22.10.05',
                               '9|견적 확정|강민준|22.01.19', '10|견적 검토|송하윤|21.07.30', '11|견적 승인|임지호|21.03.12',
-                              '12|만료|오지훈|25.08.22', '13|만료|배수아|24.03.07'} }"
+                              '12|만료|오지훈|25.08.22', '13|만료|배수아|24.03.07'}}"
              th:with="t=${#strings.arraySplit(e, '|')}"
              th:attr="data-row=${t[0]}, data-status=${t[1]}, data-name=${t[2]}, data-date=${t[3]}, data-href=@{/admin/estimates/{id}(id=${t[0]})}"
              role="link" tabindex="0"

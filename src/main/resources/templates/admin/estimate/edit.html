@@ -9,24 +9,28 @@
     견적 정보 = QUOTE_NO · SOURCE_TYPE · ESTIMATE_DATE · APPROVED_AT · EXPIRES_AT (UPDATED_AT·ADMIN_ID 는 DB 기록용, 화면 표시 안 함)
                + 요청 정보(HOUSE_TYPE · PACK_TYPE · MOVE_DATE/TIME · 주소+상세 · REQUESTED_AT) + AI 분석(AI_*) + 요청 품목(TBL_REQUEST_ITEM)
     견적서 = TBL_QUOTE 본문 + TBL_QUOTE_ITEM + TBL_QUOTE_OPTION (admin/estimate/sheet :: sheet) · 고객 영상 = TBL_RE_VIDEO · 원본 파일 = DOCUMENT_PATH
-  문서 확대(두 손가락·맞춤) · 수정/저장 · 승인 · 하단 버튼 · 만료 카운트다운은 estimate.js (더미 데이터: 견적 QT-20260325-0001 홍길동) */-->
+  문서 확대(두 손가락·맞춤) · 수정/저장 · 승인 · 하단 버튼 · 만료 카운트다운은 estimate.js
+  model: detail (QuoteDetailView) · sheetView (SheetView). 상태·등록 방식은 detail 값, ?state= · ?source= 가 있으면 미리보기로 그 값 사용
+         모델이 없으면(미리보기 /dev) 예시 QuoteDetailView.SAMPLE */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='견적 확인', active='estimate', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
   <th:block th:replace="~{admin/estimate/sheet :: styles}"/>
   <div id="estimateEdit" class="flex min-h-full flex-col"
-       th:with="state=${param.state != null ? param.state[0] : ''},
-                source=${param.source != null ? param.source[0] : 'request'},
+       th:with="d=${detail ?: T(com.codemove.quote.QuoteDetailView).SAMPLE},
+                state=${param.state != null ? param.state[0] : d.state},
+                source=${param.source != null ? param.source[0] : d.source},
                 fromRequest=${source != 'photo' and source != 'pdf'},
                 tab=${param.tab != null} ? ${param.tab[0]} : (${state == 'video' or state == 'no-video'} ? 'video' : (${state == 'file'} ? 'file' : (${state == 'editing' or state == 'save-confirm' or state == 'approve-confirm' or state == 'no-date'} ? 'doc' : 'info'))),
-                hasVideo=${state != 'no-video'},
+                hasVideo=${state != 'no-video' and d.hasVideo},
                 confirmed=${state == 'confirmed'},
                 expired=${state == 'expired'},
                 approved=${state == 'approved' or confirmed or expired},
                 noDate=${state == 'no-date'},
                 tabCls='relative h-12 text-[15px] font-semibold text-[#888] after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 [&.is-active]:font-bold [&.is-active]:text-[#346538] [&.is-active]:after:bg-[#346538]'"
-       th:attr="data-state=${state}, data-source=${source}, data-name='홍길동', data-id='QT-20260325-0001'">
+       th:attr="data-state=${state}, data-source=${source}, data-name=${d.name}, data-id=${d.quoteNo},
+                data-url=${d.quoteId != null} ? @{/admin/estimates/{id}(id=${d.quoteId})} : null">
     <!--/* data-viewer: estimate.js 가 다운로드·수정 버튼을 이 안에서 찾음 (제목 줄 다운로드 포함) */-->
     <div data-viewer class="flex flex-1 flex-col">
 
@@ -98,14 +102,14 @@
         <section th:class="${card}">
           <h3 class="text-[16px] font-bold text-[#1a1a1a]">기본 정보</h3>
           <dl class="mt-3 space-y-2.5 text-[15px]">
-            <div class="flex gap-3"><dt th:class="${key}">견적 번호</dt><dd class="tabular-nums text-[#292929]">QT-20260325-0001</dd></div>
+            <div class="flex gap-3"><dt th:class="${key}">견적 번호</dt><dd class="tabular-nums text-[#292929]" th:text="${d.quoteNo}">QT-20260325-0001</dd></div>
             <div class="flex gap-3"><dt th:class="${key}">등록 방식</dt><dd class="text-[#292929]" th:text="${source == 'photo'} ? '사진 등록' : (${source == 'pdf'} ? 'PDF 등록' : '견적 요청')">견적 요청</dd></div>
-            <div class="flex gap-3"><dt th:class="${key}">견적일</dt><dd class="tabular-nums text-[#292929]">26.03.25</dd></div>
-            <div data-sum="approved" th:hidden="${!approved}" class="flex gap-3"><dt th:class="${key}">승인일</dt><dd class="tabular-nums text-[#292929]" data-sum-value>26.03.26 14:20</dd></div>
+            <div class="flex gap-3"><dt th:class="${key}">견적일</dt><dd class="tabular-nums text-[#292929]" th:text="${d.estimateDate}">26.03.25</dd></div>
+            <div data-sum="approved" th:hidden="${!approved}" class="flex gap-3"><dt th:class="${key}">승인일</dt><dd class="tabular-nums text-[#292929]" data-sum-value th:text="${d.approvedAt}">26.03.26 14:20</dd></div>
             <!--/* 만료: 견적 요청(01)만 · 승인 중이면 남은 시간(주황), 만료됐으면 만료 시각, 확정 후 숨김 */-->
             <div data-sum="expires" th:hidden="${!approved or confirmed or !fromRequest}" class="flex gap-3"><dt th:class="${key}">만료</dt>
               <dd class="font-semibold tabular-nums" th:classappend="${expired} ? 'text-[#d8663d]' : 'text-[#d9701a]'" data-sum-value
-                  th:attr="data-countdown=${expired} ? null : '85268'" th:text="${expired} ? '26.03.29 14:20 만료됨' : '23:41:08 후 만료'">23:41:08 후 만료</dd></div>
+                  th:attr="data-countdown=${expired} ? null : ${d.expiresInSeconds}" th:text="${expired} ? ${d.expiredAt} + ' 만료됨' : '23:41:08 후 만료'">23:41:08 후 만료</dd></div>
           </dl>
         </section>
 
@@ -113,13 +117,14 @@
           <section th:class="${card}">
             <h3 class="text-[16px] font-bold text-[#1a1a1a]">요청 정보</h3>
             <dl class="mt-3 space-y-2.5 text-[15px]">
-              <div class="flex gap-3"><dt th:class="${key}">이사 유형</dt><dd class="text-[#292929]">가정이사 · 아파트</dd></div>
-              <div class="flex gap-3"><dt th:class="${key}">포장 방식</dt><dd class="text-[#292929]">반포장</dd></div>
-              <div class="flex gap-3"><dt th:class="${key}">희망일</dt>
-                <dd class="tabular-nums" th:classappend="${noDate} ? 'font-semibold text-[#d9701a]' : 'text-[#292929]'" th:text="${noDate} ? '미정' : '26.04.12 (일) · 오전'">26.04.12 (일) · 오전</dd></div>
-              <div class="flex gap-3"><dt th:class="${key}">출발지</dt><dd class="text-[#292929]">서울 강남구 테헤란로 123, 101동 1203호</dd></div>
-              <div class="flex gap-3"><dt th:class="${key}">도착지</dt><dd class="text-[#292929]">경기 성남시 분당구 판교로 45, 2층</dd></div>
-              <div class="flex gap-3"><dt th:class="${key}">요청일</dt><dd class="tabular-nums text-[#292929]">26.03.25 13:40</dd></div>
+              <div class="flex gap-3"><dt th:class="${key}">이사 유형</dt><dd class="text-[#292929]" th:text="${d.houseLabel}">가정이사 · 아파트</dd></div>
+              <div class="flex gap-3"><dt th:class="${key}">포장 방식</dt><dd class="text-[#292929]" th:text="${d.packLabel}">반포장</dd></div>
+              <!--/* 희망일: 고객이 고른 날짜(MOVE_DATE · PREFER_TIME). 미리보기 no-date 는 미정 */-->
+              <div class="flex gap-3" th:with="preferUnknown=${(noDate and detail == null) or d.preferLabel == '미정'}"><dt th:class="${key}">희망일</dt>
+                <dd class="tabular-nums" th:classappend="${preferUnknown} ? 'font-semibold text-[#d9701a]' : 'text-[#292929]'" th:text="${preferUnknown} ? '미정' : ${d.preferLabel}">26.04.12 (일) · 오전</dd></div>
+              <div class="flex gap-3"><dt th:class="${key}">출발지</dt><dd class="text-[#292929]" th:text="${d.from}">서울 강남구 테헤란로 123, 101동 1203호</dd></div>
+              <div class="flex gap-3"><dt th:class="${key}">도착지</dt><dd class="text-[#292929]" th:text="${d.to}">경기 성남시 분당구 판교로 45, 2층</dd></div>
+              <div class="flex gap-3"><dt th:class="${key}">요청일</dt><dd class="tabular-nums text-[#292929]" th:text="${d.requestedAt}">26.03.25 13:40</dd></div>
             </dl>
           </section>
 
@@ -128,34 +133,32 @@
             <h3 class="text-[16px] font-bold text-[#1a1a1a]">AI 분석</h3>
             <div class="mt-3 flex items-baseline justify-between">
               <span class="text-[14px] font-semibold text-[#346538]">총 산출 부피</span>
-              <b class="text-[30px] font-extrabold leading-none tracking-[-0.02em] text-[#346538]">7.7 CBM</b>
+              <b class="text-[30px] font-extrabold leading-none tracking-[-0.02em] text-[#346538]" th:text="${d.cbm}">7.7 CBM</b>
             </div>
+            <!--/* 신뢰도·분석 시간은 AI 모듈이 값을 주지 않으면(NULL) 숨김 (ERD) */-->
             <div class="mt-4 grid grid-cols-3 divide-x divide-[#e3e7e2] text-center">
-              <div><p class="text-[12px] text-[#888]">예상 금액</p><p class="mt-1 text-[16px] font-bold tabular-nums text-[#292929]">105만원</p></div>
-              <div><p class="text-[12px] text-[#888]">신뢰도</p><p class="mt-1 text-[16px] font-bold tabular-nums text-[#292929]">92%</p></div>
-              <div><p class="text-[12px] text-[#888]">분석 시간</p><p class="mt-1 text-[16px] font-bold tabular-nums text-[#292929]">18초</p></div>
+              <div><p class="text-[12px] text-[#888]">예상 금액</p><p class="mt-1 text-[16px] font-bold tabular-nums text-[#292929]" th:text="${d.estAmount}">105만원</p></div>
+              <div th:if="${d.confidence != null}"><p class="text-[12px] text-[#888]">신뢰도</p><p class="mt-1 text-[16px] font-bold tabular-nums text-[#292929]" th:text="${d.confidence}">92%</p></div>
+              <div th:if="${d.analysisSec != null}"><p class="text-[12px] text-[#888]">분석 시간</p><p class="mt-1 text-[16px] font-bold tabular-nums text-[#292929]" th:text="${d.analysisSec}">18초</p></div>
             </div>
-            <p class="mt-4 text-center text-[13px] text-[#555]">예상 범위 <b class="font-semibold tabular-nums text-[#292929]">950,000 ~ 1,180,000원</b></p>
+            <p class="mt-4 text-center text-[13px] text-[#555]">예상 범위 <b class="font-semibold tabular-nums text-[#292929]" th:text="${d.estRange}">950,000 ~ 1,180,000원</b></p>
           </section>
 
           <!--/* 요청 품목: 사용자 앱 '인식된 품목'과 같은 행 — 아이콘 · 이름(분류·크기) · ×수량 · 부피, 신뢰도는 검토 필요일 때만 */-->
           <section th:class="${card}" class="pb-2" data-items>
-            <h3 class="text-[16px] font-bold text-[#1a1a1a]">요청 품목 <span class="font-semibold text-[#888]">6종</span></h3>
-            <div th:each="r : ${ {'item-fridge.svg|냉장고|전자기기 · 대형|1|1.2|97|N|AI', 'item-washer.svg|세탁기|전자기기 · 중형|1|0.8|93|N|AI',
-                                  'item-bed.svg|침대|가구 · 대형|1|1.8|95|N|AI', 'item-table.svg|책상|가구 · 중형|2|0.9|88|N|AI',
-                                  'item-table.svg|의자|가구 · 소형|4|0.4|61|Y|AI', 'item-box.svg|박스|생활용품 · 소형|25|2.6|-|N|USER'} }"
-                 th:with="t=${#strings.arraySplit(r, '|')}" class="flex items-center gap-3 border-b border-[#e9ece8] py-3 last:border-none">
-              <span class="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] bg-white"><img alt="" class="h-7 w-7" th:src="@{'/images/user/' + ${t[0]}}"></span>
+            <h3 class="text-[16px] font-bold text-[#1a1a1a]">요청 품목 <span class="font-semibold text-[#888]" th:text="${#lists.size(d.items)} + '종'">6종</span></h3>
+            <div th:each="r : ${d.items}" class="flex items-center gap-3 border-b border-[#e9ece8] py-3 last:border-none">
+              <span class="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] bg-white"><img alt="" class="h-7 w-7" th:src="@{'/images/user/' + ${r.icon}}"></span>
               <div class="min-w-0 flex-1">
                 <p class="flex items-center gap-1.5">
-                  <span class="truncate text-[15px] font-semibold text-[#292929]" th:text="${t[1]}">냉장고</span>
-                  <span th:if="${t[6] == 'Y'}" class="chip chip-review shrink-0" th:text="'검토 필요 ' + ${t[5]} + '%'">검토 필요 61%</span>
-                  <span th:if="${t[7] == 'USER'}" class="chip chip-progress shrink-0">고객 추가</span>
+                  <span class="truncate text-[15px] font-semibold text-[#292929]" th:text="${r.name}">냉장고</span>
+                  <span th:if="${r.review}" class="chip chip-review shrink-0" th:text="'검토 필요 ' + ${r.confidence} + '%'">검토 필요 61%</span>
+                  <span th:if="${r.user}" class="chip chip-progress shrink-0">고객 추가</span>
                 </p>
-                <p class="mt-0.5 text-[13px] text-[#888]" th:text="${t[2]}">전자기기 · 대형</p>
+                <p class="mt-0.5 text-[13px] text-[#888]" th:text="${r.sub}">전자기기 · 대형</p>
               </div>
-              <span class="text-[14px] tabular-nums text-[#888]" th:text="'×' + ${t[3]}">×1</span>
-              <b class="w-[64px] text-right text-[15px] font-bold tabular-nums text-[#346538]" th:text="${t[4]} + ' CBM'">1.2 CBM</b>
+              <span class="text-[14px] tabular-nums text-[#888]" th:text="'×' + ${r.quantity}">×1</span>
+              <b class="w-[64px] text-right text-[15px] font-bold tabular-nums text-[#346538]" th:text="${r.volume} + ' CBM'">1.2 CBM</b>
             </div>
           </section>
         </th:block>
@@ -164,7 +167,8 @@
       <!--/* 고객 영상 탭 (견적 요청만) — 영상만. 파일 이름·업로드 시각·첨부 표시·이동 버튼 없음 (수정·승인은 하단 버튼) */-->
       <div th:if="${fromRequest}" data-panel="video" th:hidden="${tab != 'video'}" class="px-4 pb-8 pt-6">
         <video th:if="${hasVideo}" class="block w-full rounded-[16px] bg-black" controls playsinline preload="metadata"
-               aria-label="고객 이사 현장 영상" src="https://assets.mixkit.co/videos/15149/15149-360.mp4">
+               aria-label="고객 이사 현장 영상"
+               th:src="${d.quoteId != null} ? @{/admin/estimates/{id}/video(id=${d.quoteId})} : 'https://assets.mixkit.co/videos/15149/15149-360.mp4'">
           고객 영상을 재생할 수 없는 브라우저입니다.
         </video>
         <div th:unless="${hasVideo}" class="flex min-h-[380px] flex-col items-center justify-center text-center">

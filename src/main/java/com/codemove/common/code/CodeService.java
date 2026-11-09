@@ -40,6 +40,20 @@ public class CodeService {
 		return found != null ? found.getDisplayName() : null;
 	}
 
+	/**
+	 * 화면 표시명으로 코드 찾기. 사용자앱 표시명과 같거나 그 앞부분인 경우('원룸' → '원룸 / 오피스텔'), 또는 관리자 표시명과 같은 경우.
+	 * 없으면 null
+	 */
+	public String codeOf(String groupCode, String label) {
+		if (label == null || label.isBlank()) {
+			return null;
+		}
+		return list(groupCode).stream()
+				.filter(c -> c.getDisplayName().equals(label) || c.getDisplayName().startsWith(label + " ")
+						|| c.getCodeName().equals(label))
+				.map(Code::getCode).findFirst().orElse(null);
+	}
+
 	public void reload() {
 		cache = null;
 	}
