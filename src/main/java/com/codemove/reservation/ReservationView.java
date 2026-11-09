@@ -44,7 +44,7 @@ public record ReservationView(Long id, String status, String statusLabel, String
 		return i < 0 ? address : address.substring(i + district.length() + 1);
 	}
 
-	public static final ReservationView SAMPLE = new ReservationView(1L, "01", "예약 확정", "D-30", "ME-20260318-1042",
+	public static final ReservationView SAMPLE = new ReservationView(1L, "01", "예약 확정", "D-30", "RSV-20260318-1042",
 			"서울 강남구 테헤란로 123, 301호", "서울 서초구 서초대로 456, 804호", "2026. 03. 18 (수) 오전 10:00",
 			"원룸 / 오피스텔 · 일반포장", "410,000원",
 			List.of(new MyQuoteView.ReceiptRow("이사비용", null, "370,000원"),

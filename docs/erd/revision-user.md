@@ -123,7 +123,7 @@
 | 컬럼 | 형식 | 예 | 날짜 의미 |
 |---|---|---|---|
 | `TBL_QUOTE.QUOTE_NO` | `QT-YYYYMMDD-NNNN` | QT-20260310-0042 | 견적일 |
-| `TBL_RESERVATION.RESERVATION_NO` | `ME-YYYYMMDD-NNNN` | ME-20260318-1042 | 이사일 |
+| `TBL_RESERVATION.RESERVATION_NO` | `RSV-YYYYMMDD-NNNN` | RSV-20260318-1042 | 이사일 (11/09 ME- → RSV- 로 변경, 시안의 ME- 표기 대신 예약임이 드러나게) |
 
 - 화면 수정 필요: 내 이사 탭의 `No. 20260318-0412`(user/move/index.html), 관리자의 `EST-0006`·`RSV-0006`
 

@@ -8,7 +8,7 @@
  *  - 실제 데이터: AdminScheduleController 가 연 화면은 루트에 data-base(/admin/schedule) · data-today 가 있음
  *    → GET {base}/settings (예약 설정 · 임시 휴무) · GET {base}/month?ym=YYYY-MM (예약 · 공휴일 · 손 없는 날), 저장은 POST {base}/setting · /closed-days · /closed-days/delete
  *  - 더미(/dev 미리보기, data-base 없음): 오늘 = 26.09.27 가정 → 이사일이 지난 예약은 이사 완료 (Q7) · 휴무일·설정을 sessionStorage 로 두 화면이 공유
- *  - 번호: 견적 QT-YYYYMMDD-NNNN(견적일) · 예약 ME-YYYYMMDD-NNNN(이사일)
+ *  - 번호: 견적 QT-YYYYMMDD-NNNN(견적일) · 예약 RSV-YYYYMMDD-NNNN(이사일)
  */
 (function () {
   const STATUS_KEY = 'codemove.admin.dayStatus';
@@ -92,7 +92,7 @@
     id, name, phone: phoneOf(name), date, time, service, origin, destination,
     status: date < TODAY ? '이사 완료' : '예약 완료',
     payStatus: date < TODAY || id % 3 === 0 ? '결제 완료' : '결제 대기', // PAY_STATUS 01 결제 대기 · 02 결제 완료
-    reservationNo: `ME-20${date.replace(/\./g, '')}-${pad(id).padStart(4, '0')}`,
+    reservationNo: `RSV-20${date.replace(/\./g, '')}-${pad(id).padStart(4, '0')}`,
   }));
   // LIVE: ensureMonth 가 달마다 채움 (예약 완료 · 이사 완료만, 시각 미정이면 time = '')
   const reservations = LIVE ? [] : dummyReservations();

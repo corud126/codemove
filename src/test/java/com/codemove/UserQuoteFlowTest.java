@@ -105,7 +105,7 @@ class UserQuoteFlowTest {
 
 		assertThat(jdbc.queryForObject("SELECT STATUS FROM TBL_QUOTE WHERE QUOTE_ID = ?", String.class, id)).isEqualTo("03");
 		Map<String, Object> rsv = jdbc.queryForMap("SELECT R.* FROM TBL_RESERVATION R JOIN TBL_QUOTE Q ON Q.REQUEST_ID = R.REQUEST_ID WHERE Q.QUOTE_ID = ?", id);
-		assertThat((String) rsv.get("RESERVATION_NO")).matches("ME-" + date.toString().replace("-", "") + "-\\d{4}");
+		assertThat((String) rsv.get("RESERVATION_NO")).matches("RSV-" + date.toString().replace("-", "") + "-\\d{4}");
 		assertThat(rsv.get("STATUS")).isEqualTo("01");
 		assertThat(rsv.get("PAY_STATUS")).isEqualTo("01");
 		assertThat(rsv.get("MOVE_TIME")).isEqualTo("10:00");

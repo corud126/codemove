@@ -100,7 +100,7 @@ class ScheduleFlowTest {
 		long reservationId = jdbc.queryForObject("SELECT SEQ_RESERVATION.NEXTVAL FROM DUAL", Long.class);
 		jdbc.update("INSERT INTO TBL_RESERVATION (RESERVATION_ID, RESERVATION_NO, REQUEST_ID, STATUS, PAY_STATUS, MOVE_DATE, MOVE_TIME) "
 				+ "VALUES (?, ?, ?, ?, '01', ?, ?)",
-				reservationId, "ME-T" + reservationId, requestId, status, Date.valueOf(moveDate), time);
+				reservationId, "RSV-T" + reservationId, requestId, status, Date.valueOf(moveDate), time);
 		return reservationId;
 	}
 

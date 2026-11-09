@@ -48,7 +48,7 @@
 
 | 컬럼 | 목록 | 상세 |
 | --- | --- | --- |
-| RESERVATION_NO (ME-YYYYMMDD-NNNN) | 검색 | 표시 |
+| RESERVATION_NO (RSV-YYYYMMDD-NNNN) | 검색 | 표시 |
 | 연결 견적 QUOTE_NO | — | 표시 |
 | 회원 이름·휴대폰 | 표시·검색 | 표시 |
 | STATUS (예약 완료·이사 완료·예약 취소) | 칩·필터는 예약 완료·예약 취소 둘만 (이사 완료는 예약 완료로 묶음) | 표시 (이사 완료 포함) |

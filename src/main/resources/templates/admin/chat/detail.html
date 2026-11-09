@@ -258,7 +258,7 @@
           <span th:class="'chip shrink-0 ' + ${v.status == '03' ? 'chip-cancel' : 'chip-done'}" th:text="${@codeService.name('RSV_STATUS', v.status)}">예약 완료</span>
           <span class="min-w-0 flex-1">
             <span class="block text-[15px] font-semibold text-[#292929]">예약 <span class="font-medium text-[#555]" th:text="|· ${#temporals.format(v.moveDate, 'MM.dd')}${v.moveTime != null ? ' ' + v.moveTime : ''}|">· 11.15 오전 9시</span></span>
-            <span class="block text-[13px] tabular-nums text-[#888]" th:text="${v.reservationNo}">ME-20261030-0031</span>
+            <span class="block text-[13px] tabular-nums text-[#888]" th:text="${v.reservationNo}">RSV-20261030-0031</span>
           </span>
           <svg class="icon shrink-0 text-[#b0b4b1]" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
         </a>
@@ -276,7 +276,7 @@
           <span class="chip chip-done shrink-0">예약 완료</span>
           <span class="min-w-0 flex-1">
             <span class="block text-[15px] font-semibold text-[#292929]">예약 <span class="font-medium text-[#555]">· 11.15 오전 9시</span></span>
-            <span class="block text-[13px] tabular-nums text-[#888]">ME-20261030-0031</span>
+            <span class="block text-[13px] tabular-nums text-[#888]">RSV-20261030-0031</span>
           </span>
           <svg class="icon shrink-0 text-[#b0b4b1]" width="20" height="20"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg>
         </a>

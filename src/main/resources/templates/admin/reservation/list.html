@@ -3,7 +3,7 @@
   상태: (기본) | ?state=detail (A 예약 상세, 결제 대기) | ?state=paid (B 결제 완료) | ?state=cancel-filter (C 예약 취소 필터)
         ?state=search (검색 열림) | ?state=empty (검색 결과 없음) | ?state=cancel-detail (취소 건 상세: 취소일·취소 주체) | ?state=done-detail (이사 완료 건 상세)
         ?state=reschedule (일정 변경 창) | ?state=cancel-confirm (예약 취소 확인) — 예약 완료 건만 [일정 변경]·[예약 취소] (이사 완료는 자동, Q7)
-  ERD 반영: 예약 상태 RSV_STATUS(예약 완료·이사 완료·예약 취소), 결제 상태 PAY_STATUS, 번호 형식 QT-/ME-YYYYMMDD-NNNN
+  ERD 반영: 예약 상태 RSV_STATUS(예약 완료·이사 완료·예약 취소), 결제 상태 PAY_STATUS, 번호 형식 QT-YYYYMMDD-NNNN(견적일) · RSV-YYYYMMDD-NNNN(이사일)
   행 데이터: model rows (AdminReservationController, TBL_RESERVATION + 회원·견적 요청·견적서). 없으면(미리보기 /dev) 아래 더미 30건
     id|예약 상태|이름|휴대폰|신청일|이사 유형|포장 방식|이사일|이사 시간|출발지|도착지|결제 상태|총액|이사 메모(-)|계약금 결제일(-)|취소일(-)|취소 주체(-)
     (실데이터만) |계약금|잔금|견적 번호|예약 번호 — 더미는 계약금 10%·번호를 JS 가 만든다
@@ -138,7 +138,7 @@
         <dl class="mt-2.5 grid grid-cols-[76px_1fr] gap-x-2 gap-y-2 text-[14px]">
           <dt class="text-[#888]">회원 정보</dt><dd class="font-medium text-[#292929]" data-d="member">정하윤 · 010-9834-1420</dd>
           <dt class="text-[#888]">견적 번호</dt><dd class="font-medium tabular-nums text-[#292929]" data-d="estimateNo">QT-20260927-0006</dd>
-          <dt class="text-[#888]">예약 번호</dt><dd class="font-medium tabular-nums text-[#292929]" data-d="reservationNo">ME-20261026-0006</dd>
+          <dt class="text-[#888]">예약 번호</dt><dd class="font-medium tabular-nums text-[#292929]" data-d="reservationNo">RSV-20261026-0006</dd>
         </dl>
       </section>
 

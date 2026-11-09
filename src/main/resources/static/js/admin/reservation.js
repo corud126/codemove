@@ -65,7 +65,7 @@
   const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
   const no = (r) => String(r.dataset.row).padStart(4, '0');
   // 예약 번호는 생성 시점의 이사일 기준 — 일정 변경 후에도 그대로 (처음 계산한 값을 보관)
-  const reservationNo = (r) => (r.dataset.rsvNo ||= `ME-20${digits(r.dataset.movingDate)}-${no(r)}`);
+  const reservationNo = (r) => (r.dataset.rsvNo ||= `RSV-20${digits(r.dataset.movingDate)}-${no(r)}`);
   // 실데이터는 서버가 준 번호(data-quote-no · data-rsv-no), 더미는 견적일 기준 (더미: 신청일)
   const estimateNo = (r) => r.dataset.quoteNo || `QT-20${digits(r.dataset.applied)}-${no(r)}`;
 
@@ -102,12 +102,12 @@
   }
 
 
-  // 검색: 'ME-' → 예약 번호 / 010 으로 시작하는 7자리 이상 → 휴대폰 번호 / 날짜 형태 → 예약일(MOVE_DATE) / 그 외 → 이름
+  // 검색: 'RSV-' → 예약 번호 / 010 으로 시작하는 7자리 이상 → 휴대폰 번호 / 날짜 형태 → 예약일(MOVE_DATE) / 그 외 → 이름
   const isPhone = (q) => /^[\d\s-]+$/.test(q) && digits(q).startsWith('010') && digits(q).length >= 7;
   function matches(r) {
     const q = query.trim();
     if (!q) return true;
-    if (/^me-?/i.test(q)) return reservationNo(r).toLowerCase().includes(q.toLowerCase());
+    if (/^rsv-?/i.test(q)) return reservationNo(r).toLowerCase().includes(q.toLowerCase());
     if (isPhone(q)) return digits(r.dataset.phone).includes(digits(q));
     const byDate = dateMatcher(q);
     return byDate ? byDate(r.dataset.movingDate) : r.dataset.name.includes(q);
