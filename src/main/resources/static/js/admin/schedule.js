@@ -5,12 +5,17 @@
  *    TBL_RESERVATION 예약 완료(01)·이사 완료(02)만, 휴무일(정기 · 공휴일 · 임시 TBL_CLOSED_DAY)은 표시만
  *  - 일정 관리: 글자 탭 [설정 | 연동] — 설정: 하루 최대 예약 · 정기 휴무 · 공휴일에 쉬기(TBL_RESERVATION_SETTING) · 임시 휴무(TBL_CLOSED_DAY) / 연동: 공휴일 · 손 없는 날(외부 API, 저장 안 함)
  *    (예약 있는 날을 휴무로 지정하면 경고, 자동 알림 없음 Q23)
- *  - 오늘 = 26.09.27 가정 → 이사일이 지난 예약은 이사 완료 (Q7) · 더미 단계에서는 휴무일·설정을 sessionStorage 로 두 화면이 공유
+ *  - 실제 데이터: AdminScheduleController 가 연 화면은 루트에 data-base(/admin/schedule) · data-today 가 있음
+ *    → GET {base}/settings (예약 설정 · 임시 휴무) · GET {base}/month?ym=YYYY-MM (예약 · 공휴일 · 손 없는 날), 저장은 POST {base}/setting · /closed-days · /closed-days/delete
+ *  - 더미(/dev 미리보기, data-base 없음): 오늘 = 26.09.27 가정 → 이사일이 지난 예약은 이사 완료 (Q7) · 휴무일·설정을 sessionStorage 로 두 화면이 공유
  *  - 번호: 견적 QT-YYYYMMDD-NNNN(견적일) · 예약 ME-YYYYMMDD-NNNN(이사일)
  */
 (function () {
   const STATUS_KEY = 'codemove.admin.dayStatus';
-  const TODAY = '26.09.27';
+  const ROOT = document.getElementById('scheduleCalendar') || document.getElementById('scheduleManage');
+  const BASE = ROOT?.dataset.base || ''; // 비어 있으면 더미 데이터
+  const LIVE = Boolean(BASE);
+  const TODAY = LIVE && ROOT.dataset.today ? ROOT.dataset.today : '26.09.27';
   const ICONS = (document.querySelector('use[href*="icons-v2"]')?.getAttribute('href') || '/images/admin/icons-v2.svg').split('#')[0];
   const icon = (name, size, cls = '') => `<svg class="icon ${cls}" width="${size}" height="${size}"><use href="${ICONS}#i-${name}"/></svg>`;
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,7 +26,43 @@
   const daysIn = (y, m) => new Date(y, m, 0).getDate();
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
   const dateLabel = (key) => { const dt = dateOf(key); return `${dt.getMonth() + 1}월 ${dt.getDate()}일 (${WD[dt.getDay()]})`; };
-  const shortAddr = (a) => a.split(' ').slice(0, 2).join(' ');
+  const shortAddr = (a) => String(a || '').split(' ').slice(0, 2).join(' ');
+  const toIso = (key) => `20${key.replace(/\./g, '-')}`; // 26.09.27 → 2026-09-27
+  const fromIso = (iso) => iso.slice(2).replace(/-/g, '.');
+
+  /* ---------- 서버 통신 (LIVE) — 더미 단계에서는 바로 성공 ---------- */
+  async function getJson(path) {
+    const res = await fetch(BASE + path, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(String(res.status));
+    return res.json();
+  }
+  async function post(path, data) {
+    if (!LIVE) return { ok: true };
+    try {
+      const res = await fetch(BASE + path, { method: 'POST', body: new URLSearchParams(data || {}) });
+      return Object.assign({ ok: res.ok }, await res.json());
+    } catch (_) {
+      return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+    }
+  }
+  // 달마다 한 번만 불러 둠: 예약 · 공휴일 · 손 없는 날
+  const loadedMonths = new Map();
+  const holidayMap = {}; // 'yy.MM.dd' → 공휴일 이름
+  const noMoveSet = new Set();
+  function ensureMonth(y, m) {
+    if (!LIVE) return Promise.resolve();
+    const ym = `${y}-${pad(m)}`;
+    if (!loadedMonths.has(ym)) {
+      loadedMonths.set(ym, getJson(`/month?ym=${ym}`).then((d) => {
+        d.reservations.forEach((r) => reservations.push({ ...r, date: fromIso(r.date) }));
+        d.holidays.forEach((h) => { holidayMap[fromIso(h.date)] = h.name; });
+        d.noMove.forEach((iso) => noMoveSet.add(fromIso(iso)));
+      }).catch(() => { loadedMonths.delete(ym); }));
+    }
+    return loadedMonths.get(ym);
+  }
+  // 달력 앞뒤 칸(전달 · 다음 달)까지
+  const ensureAround = (y, m) => Promise.all([-1, 0, 1].map((k) => { const d = new Date(y, m - 1 + k, 1); return ensureMonth(d.getFullYear(), d.getMonth() + 1); }));
 
   /* ---------- 더미 데이터 ---------- */
   const customers = [
@@ -32,7 +73,7 @@
   ];
   const phoneOf = (name) => (customers.find((c) => c[0] === name) || [, ''])[1];
   // [id, 이름, 이사일, 시간, 이사 유형, 출발지, 도착지]
-  const reservations = [
+  const dummyReservations = () => [
     [9, '한유진', '26.09.21', '16:00', '원룸이사', '인천 남동구 정각로 29', '서울 중구 세종대로 110'],
     [7, '윤서아', '26.09.22', '14:00', '가정이사', '경기 수원시 팔달구 효원로 241', '서울 강남구 테헤란로 521'],
     [8, '송지호', '26.09.22', '15:00', '가정이사', '경기 고양시 덕양구 고양시청로 10', '서울 송파구 올림픽로 300'],
@@ -53,32 +94,43 @@
     payStatus: date < TODAY || id % 3 === 0 ? '결제 완료' : '결제 대기', // PAY_STATUS 01 결제 대기 · 02 결제 완료
     reservationNo: `ME-20${date.replace(/\./g, '')}-${pad(id).padStart(4, '0')}`,
   }));
-  const resOn = (key) => reservations.filter((r) => r.date === key).sort((a, b) => a.time.localeCompare(b.time));
+  // LIVE: ensureMonth 가 달마다 채움 (예약 완료 · 이사 완료만, 시각 미정이면 time = '')
+  const reservations = LIVE ? [] : dummyReservations();
+  const resOn = (key) => reservations.filter((r) => r.date === key).sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
 
-  // 공휴일(외부 데이터)·손 없는 날(음력 계산) — 저장하지 않음 (Q17)
+  // 공휴일(외부 데이터)·손 없는 날(음력 계산) — 저장하지 않음 (Q17). LIVE 는 서버(HolidayProvider) 값
   const FIXED_HOLIDAYS = ['01-01', '03-01', '05-05', '06-06', '08-15', '10-03', '10-09', '12-25'];
   const YEAR_HOLIDAYS = { 2026: ['02-16', '02-17', '02-18', '03-02', '05-24', '05-25', '06-03', '08-17', '09-24', '09-25', '09-26', '10-05'] };
-  const holidaysOf = (y, m) => [...FIXED_HOLIDAYS, ...(YEAR_HOLIDAYS[y] || [])].filter((md) => Number(md.slice(0, 2)) === m).map((md) => Number(md.slice(3)));
+  const holidaysOf = (y, m) => LIVE
+    ? Object.keys(holidayMap).filter((k) => k.startsWith(`${String(y).slice(-2)}.${pad(m)}.`)).map((k) => Number(k.slice(6)))
+    : [...FIXED_HOLIDAYS, ...(YEAR_HOLIDAYS[y] || [])].filter((md) => Number(md.slice(0, 2)) === m).map((md) => Number(md.slice(3)));
   const isRed = (key) => { const dt = dateOf(key); return dt.getDay() === 0 || holidaysOf(dt.getFullYear(), dt.getMonth() + 1).includes(dt.getDate()); };
-  const noMoveOf = (key) => [7, 8, 17, 18, 27, 28].includes(dateOf(key).getDate()); // 손 없는 날 (더미: 음력 계산 대신 고정값)
+  const noMoveOf = (key) => LIVE ? noMoveSet.has(key) : [7, 8, 17, 18, 27, 28].includes(dateOf(key).getDate()); // 손 없는 날 (더미: 음력 계산 대신 고정값)
+  const holidayName = (key) => LIVE ? holidayMap[key] || '공휴일' : HOLIDAY_NAMES[key.slice(3).replace('.', '-')] || '공휴일';
   // 공휴일 이름 · 손 없는 날 — 외부 API(공공데이터 특일 정보 · 음력)에서 불러오는 값 (더미)
   const HOLIDAY_NAMES = { '01-01': '신정', '03-01': '삼일절', '05-05': '어린이날', '06-06': '현충일', '08-15': '광복절', '10-03': '개천절', '10-09': '한글날', '12-25': '성탄절',
     '09-24': '추석 연휴', '09-25': '추석', '09-26': '추석 연휴', '10-05': '대체공휴일', '08-17': '대체공휴일', '02-16': '설날 연휴', '02-17': '설날', '02-18': '설날 연휴', '03-02': '대체공휴일', '05-24': '부처님오신날', '05-25': '대체공휴일', '06-03': '지방선거' };
 
   // TBL_CLOSED_DAY: 임시 휴무 날짜 (하루 1건, 종류 구분 없음) — UPDATED_AT·ADMIN_ID 는 감사용, 화면에 표시하지 않음
   const DEFAULT_STATUS = { '26.09.11': { status: 'closed' }, '26.09.20': { status: 'closed' }, '26.10.09': { status: 'closed' }, '26.10.15': { status: 'closed' } };
+  // LIVE: GET {base}/settings 결과 — statuses 값에 그날 예약 확정 건수(booked)를 함께 둠
+  let server = null;
   function loadStatuses() {
+    if (LIVE) return Object.fromEntries((server?.closedDays || []).map((d) => [fromIso(d.date), { status: 'closed', booked: d.booked }]));
     try { const raw = sessionStorage.getItem(STATUS_KEY); if (raw) return JSON.parse(raw); } catch (e) { /* 기본값 */ }
     return { ...DEFAULT_STATUS };
   }
-  function saveStatuses(v) { try { sessionStorage.setItem(STATUS_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ } }
-  // 예약 설정 (ERD 반영 대기: 하루 최대 예약 · 정기 휴무 요일 · 공휴일 휴무) — 더미 단계에서는 sessionStorage 로 두 화면이 공유
+  function saveStatuses(v) { if (LIVE) return; try { sessionStorage.setItem(STATUS_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+  // 예약 설정 TBL_RESERVATION_SETTING (하루 최대 예약 · 정기 휴무 요일 · 공휴일 휴무) — 더미 단계에서는 sessionStorage 로 두 화면이 공유
   const CONFIG_KEY = 'codemove.admin.closeConfig';
   function loadConfig() {
+    if (LIVE) return { weekdays: server?.weekdays || [], holiday: Boolean(server?.holiday), daily: server?.daily || 3 };
     try { const raw = sessionStorage.getItem(CONFIG_KEY); if (raw) return JSON.parse(raw); } catch (e) { /* 기본값 */ }
     return { weekdays: [], holiday: false, daily: 3 };
   }
-  function saveConfig(v) { try { sessionStorage.setItem(CONFIG_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+  function saveConfig(v) { if (LIVE) return; try { sessionStorage.setItem(CONFIG_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+  // 설정 저장 요청 (LIVE: POST {base}/setting, 더미: 바로 성공)
+  const postConfig = (c) => post('/setting', { daily: c.daily, weekdays: c.weekdays.join(','), holiday: c.holiday });
   // 그날 쉬는지: 임시 휴무(TBL_CLOSED_DAY) · 정기 휴무 요일 · 공휴일 휴무
   const isClosed = (key, statuses, cfg) => {
     const dt = dateOf(key);
@@ -93,8 +145,9 @@
     const statuses = loadStatuses(), cfg = loadConfig();
     const s = { selected: TODAY, cursor: dateOf(TODAY), collapsed: false };
     const body = root.querySelector('[data-view-body]');
-    const NOW = '11:00'; // 더미: 오늘 현재 시각 가정 → 지난 예약은 흐리게, 다음 이사에 남은 시간
-    const done = (r) => r.status === '이사 완료' || (r.date === TODAY && r.time < NOW);
+    const now = new Date();
+    const NOW = LIVE ? `${pad(now.getHours())}:${pad(now.getMinutes())}` : '11:00'; // 더미: 오늘 현재 시각 가정 → 지난 예약은 흐리게, 다음 이사에 남은 시간
+    const done = (r) => r.status === '이사 완료' || (r.date === TODAY && Boolean(r.time) && r.time < NOW);
 
     // 월 달력 — 날짜 + 예약 수만큼 점(최대 3) · 오늘 초록 테두리 · 고른 날 초록 원 · 휴무일 줄 긋기, 예약 불가 주황 점
     // 칸을 낮게 두어 아래 예약 목록이 한 화면에 보이게 · [달력 접기] = 고른 날이 있는 주만 · 다른 달·날을 보고 있으면 [오늘]
@@ -140,18 +193,18 @@
       const list = resOn(key);
       // 머리: 날짜 · 건수(또는 휴무) / 오른쪽에 공휴일 이름 · 손 없는 날 (이삿날 고를 때 사장님이 보는 정보)
       const dt = dateOf(key);
-      const holiday = holidaysOf(dt.getFullYear(), dt.getMonth() + 1).includes(dt.getDate()) ? HOLIDAY_NAMES[`${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`] || '공휴일' : '';
+      const holiday = holidaysOf(dt.getFullYear(), dt.getMonth() + 1).includes(dt.getDate()) ? holidayName(key) : '';
       const tags = [holiday && `<span class="text-[13px] font-semibold text-[#d8663d]">${holiday}</span>`, noMoveOf(key) && '<span class="text-[13px] font-semibold text-[#346538]">손 없는 날</span>'].filter(Boolean).join('<span class="text-[#dcdfdc]">·</span>');
       const head = `<div class="mt-6 flex items-baseline gap-2 px-1"><h3 class="text-[17px] font-bold text-[#1a1a1a]">${key === TODAY ? '오늘 · ' : ''}${dateLabel(key)}</h3>
         <span class="text-[14px] ${ds ? 'text-[#888]' : 'text-[#9a9f9b]'}">${ds ? '휴무일' : list.length ? `${list.length}건` : ''}</span>
         ${tags ? `<span class="ml-auto flex items-baseline gap-1.5">${tags}</span>` : ''}</div>`;
       if (!list.length) return head + `<p class="py-10 text-center text-[14px] text-[#9a9f9b]">${ds ? `휴무일로 지정된 날이에요` : '예약이 없습니다'}</p>`;
       // 모든 날 같은 박스 목록 (시간 · 이름 / 출발 → 도착) — 오늘만: 지난 이사는 흐리게, 다음 이사 이름 옆에 남은 시간
-      const next = key === TODAY ? list.find((r) => !done(r)) : null;
+      const next = key === TODAY ? list.find((r) => !done(r) && r.time) : null;
       return head + `<div class="mt-3 overflow-hidden rounded-[20px] bg-white shadow-[0_2px_12px_rgba(26,26,26,.05)]">${list.map((r) => {
         const past = done(r), isNext = r === next; // 다음 이사 = 초록 시간 + 오른쪽 '2시간 후' (바탕·꼬리표 없이, 유형 칩과 겹치지 않게)
         return `<button type="button" data-record="${r.id}" class="flex w-full items-center gap-4 border-b border-[#eef0ee] px-5 py-4 text-left last:border-none hover:bg-[#f7f8f6] ${past ? 'opacity-45' : ''}">
-          <b class="w-12 shrink-0 text-[17px] font-bold tabular-nums ${isNext ? 'text-[#346538]' : 'text-[#1a1a1a]'}">${r.time}</b>
+          <b class="w-12 shrink-0 text-[17px] font-bold tabular-nums ${isNext ? 'text-[#346538]' : 'text-[#1a1a1a]'}">${r.time || '-'}</b>
           <span class="min-w-0 flex-1">
             <span class="flex items-center gap-2"><b class="truncate text-[16px] font-semibold text-[#292929]">${esc(r.name)}</b>${serviceChip(r.service)}
               </span>
@@ -160,7 +213,9 @@
       }).join('')}</div>`;
     }
 
-    function render() { body.innerHTML = calendar() + dayList(s.selected); }
+    function draw() { body.innerHTML = calendar() + dayList(s.selected); }
+    // LIVE: 보고 있는 달(앞뒤 달 포함) 데이터를 불러온 뒤 다시 그림 — 이미 불러온 달은 바로
+    function render() { draw(); if (LIVE) ensureAround(s.cursor.getFullYear(), s.cursor.getMonth() + 1).then(draw); }
 
     // 간단한 예약 정보 시트
     const sheet = root.querySelector('#reservationSheet');
@@ -168,7 +223,7 @@
       const r = reservations.find((x) => x.id === id);
       const set = (k, v) => { sheet.querySelector(`[data-r-${k}]`).textContent = v; };
       set('date', dateLabel(r.date)); sheet.querySelector('[data-r-today]').hidden = r.date !== TODAY;
-      set('time', r.time); set('name', r.name);
+      set('time', r.time || '-'); set('name', r.name);
       const sv = sheet.querySelector('[data-r-service]'); sv.outerHTML = serviceChip(r.service).replace('<span ', '<span data-r-service ');
       set('origin', r.origin); set('destination', r.destination);
       sheet.querySelector('[data-r-tel]').href = `tel:${r.phone.replace(/\D/g, '')}`;
@@ -194,18 +249,19 @@
     render();
 
     const state = root.dataset.state;
+    if (state === 'collapsed') { s.collapsed = true; render(); }
+    if (LIVE) return; // 아래 상태는 더미 날짜 기준 미리보기
     if (state === 'day') { s.selected = '26.09.29'; render(); }
     if (state === 'closed') { s.selected = '26.09.20'; render(); }
     if (state === 'next-month') { s.cursor = new Date(2026, 9, 1); s.selected = '26.10.02'; render(); }
     if (state === 'detail') openRecord(16); // 홍서윤 (오늘)
-    if (state === 'collapsed') { s.collapsed = true; render(); }
     if (state === 'weekly') { cfg.weekdays = [1]; cfg.holiday = true; render(); }
   }
 
   /* ================= SCR-A-022 일정 관리 — 글자 탭 [설정 | 연동] (개인 일정 등록 SCR-A-021 은 뺌) ================= */
   function initManage(root) {
     let statuses = loadStatuses(), cfg = loadConfig(); // 예약 일정과 공유
-    const s = { tab: 'days', showPast: false, hy: 2026, hm: 9 };
+    const s = { tab: 'days', showPast: false, hy: dateOf(TODAY).getFullYear(), hm: dateOf(TODAY).getMonth() + 1 };
     const toKey = (v) => { const [y, m, d] = v.split('-').map(Number); return keyOf(y, m, d); };
     const listBox = root.querySelector('[data-list]');
     const toast = root.querySelector('[data-toast]');
@@ -227,7 +283,7 @@
       const wds = cfg.weekdays.slice().sort();
       const regular = !wds.length ? '없음' : wds.length === 1 ? `매주 ${WD[wds[0]]}요일` : `매주 ${wds.map((i) => WD[i]).join(' · ')}`;
       const dateRows = (list, dim) => card(list.map((k) => {
-        const booked = resOn(k).filter((r) => r.status === '예약 완료').length;
+        const booked = LIVE ? statuses[k].booked || 0 : resOn(k).filter((r) => r.status === '예약 완료').length;
         return `<button type="button" data-daykey="${k}" class="${rowCls} hover:bg-[#f7f8f6] ${dim ? 'opacity-50' : ''}">
           <span class="text-[16px] font-medium text-[#292929]">${dateLabel(k)}</span>
           <span class="flex items-center gap-1">${booked && !dim ? `<span class="text-[13px] font-semibold text-[#d9701a]">예약 ${booked}건</span>` : ''}${icon('chevronRight', 18, 'text-[#c4c8c5]')}</span></button>`;
@@ -256,9 +312,14 @@
     dWheel.addEventListener('scroll', dMark);
     dWheel.addEventListener('click', (e) => { const o = e.target.closest('[role=option]'); if (o) dWheel.scrollTo({ top: dOpts().indexOf(o) * ROW, behavior: 'smooth' }); });
     function openDaily() { dSheet.hidden = false; dWheel.scrollTop = ((cfg.daily || 3) - 1) * ROW; dMark(); }
+    // 설정 저장: 서버가 받아 준 뒤에 화면 값 바꿈 (실패하면 안내 토스트)
+    async function saveCfg(next, msg, after) {
+      const res = await postConfig(next);
+      if (!res.ok) { showToast(res.message || '잠시 후 다시 시도해 주세요.'); return; }
+      cfg = next; saveConfig(cfg); if (after) after(); render(); showToast(msg);
+    }
     dSheet.querySelector('[data-daily-save]').addEventListener('click', () => {
-      cfg = { ...cfg, daily: Number(dOpts()[Math.round(dWheel.scrollTop / ROW)].dataset.value) };
-      saveConfig(cfg); dSheet.hidden = true; render(); showToast('저장되었습니다');
+      saveCfg({ ...cfg, daily: Number(dOpts()[Math.round(dWheel.scrollTop / ROW)].dataset.value) }, '저장되었습니다', () => { dSheet.hidden = true; });
     });
     // 정기 휴무 시트 — 요일 7개를 누르면 켜짐/꺼짐, [완료]로 저장
     const wdSheet = root.querySelector('#weekdaySheet');
@@ -273,14 +334,14 @@
     wdSheet.addEventListener('click', (e) => {
       const b = e.target.closest('[data-weekday]');
       if (b) { const i = Number(b.dataset.weekday); wdDraft = wdDraft.includes(i) ? wdDraft.filter((x) => x !== i) : [...wdDraft, i]; renderWeekdays(); return; }
-      if (e.target.closest('[data-wd-save]')) { cfg = { ...cfg, weekdays: wdDraft }; saveConfig(cfg); wdSheet.hidden = true; render(); showToast('저장되었습니다'); }
+      if (e.target.closest('[data-wd-save]')) saveCfg({ ...cfg, weekdays: wdDraft.slice().sort() }, '저장되었습니다', () => { wdSheet.hidden = true; });
     });
     // 공휴일 · 손 없는 날 — 외부 API 값을 그때그때 불러와 보여 줌(DB 저장 없음, Q17), 확인만
     function renderHolidays() {
       const { hy: y, hm: m } = s;
       const items = [
-        ...holidaysOf(y, m).map((d) => ({ d, kind: 'holiday', name: HOLIDAY_NAMES[`${pad(m)}-${pad(d)}`] || '공휴일' })),
-        ...[7, 8, 17, 18, 27, 28].filter((d) => d <= daysIn(y, m)).map((d) => ({ d, kind: 'nomove', name: '손 없는 날' })),
+        ...holidaysOf(y, m).map((d) => ({ d, kind: 'holiday', name: holidayName(keyOf(y, m, d)) })),
+        ...Array.from({ length: daysIn(y, m) }, (_, i) => i + 1).filter((d) => noMoveOf(keyOf(y, m, d))).map((d) => ({ d, kind: 'nomove', name: '손 없는 날' })),
       ].sort((a, b) => a.d - b.d || (a.kind === 'holiday' ? -1 : 1));
       const rows = items.map((it) => {
         const key = keyOf(y, m, it.d);
@@ -301,6 +362,8 @@
       root.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.tab === s.tab)));
 
       if (s.tab === 'days') renderDays(); else renderHolidays();
+      // LIVE: 연동 탭은 그 달 공휴일 · 손 없는 날을 불러온 뒤 다시 그림
+      if (LIVE && s.tab === 'holidays') { const { hy, hm } = s; ensureMonth(hy, hm).then(() => { if (s.tab === 'holidays' && s.hy === hy && s.hm === hm) renderHolidays(); }); }
     }
     root.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { s.tab = b.dataset.tab; s.showPast = false; render(); }));
     listBox.addEventListener('click', (e) => {
@@ -311,7 +374,7 @@
       if (e.target.closest('[data-add-day]')) { openDay(); return; }
       if (e.target.closest('[data-open-daily]')) { openDaily(); return; }
       if (e.target.closest('[data-open-weekdays]')) { openWeekdays(); return; }
-      if (e.target.closest('[data-holiday-toggle]')) { cfg = { ...cfg, holiday: !cfg.holiday }; saveConfig(cfg); render(); showToast(cfg.holiday ? '공휴일에는 예약을 받지 않아요' : '공휴일에도 예약을 받아요'); return; }
+      if (e.target.closest('[data-holiday-toggle]')) { const on = !cfg.holiday; saveCfg({ ...cfg, holiday: on }, on ? '공휴일에는 예약을 받지 않아요' : '공휴일에도 예약을 받아요'); return; }
       if (dk) openDay(dk.dataset.daykey);
     });
 
@@ -346,30 +409,40 @@
       day.querySelector('[data-warning-count]').textContent = booked;
       day.querySelector('[data-day-save]').disabled = !pick || pick === editingKey;
     }
+    // LIVE: 작은 달력의 달(앞뒤 포함) 예약 · 공휴일을 불러온 뒤 다시 그림
+    function showMini() {
+      renderMini();
+      if (LIVE) { const c = miniCursor; ensureAround(c.getFullYear(), c.getMonth() + 1).then(() => { if (c === miniCursor && !day.hidden) renderMini(); }); }
+    }
     function openDay(key) {
       editingKey = key || null; pick = key || '';
       miniCursor = key ? dateOf(key) : dateOf(TODAY);
       day.querySelector('[data-day-title]').textContent = key ? '휴무일 수정' : '휴무일 추가';
       day.querySelector('[data-day-delete]').hidden = !key;
       day.querySelector('[data-day-save]').textContent = key ? '저장' : '등록';
-      renderMini();
       day.hidden = false;
+      showMini();
     }
     miniCal.addEventListener('click', (e) => {
       const st = e.target.closest('[data-mini-step]');
-      if (st) { miniCursor = new Date(miniCursor.getFullYear(), miniCursor.getMonth() + Number(st.dataset.miniStep), 1); renderMini(); return; }
+      if (st) { miniCursor = new Date(miniCursor.getFullYear(), miniCursor.getMonth() + Number(st.dataset.miniStep), 1); showMini(); return; }
       const b = e.target.closest('[data-mini]');
       if (b && !b.disabled) { pick = b.dataset.mini; renderMini(); }
     });
-    day.querySelector('[data-day-save]').addEventListener('click', () => {
+    // 저장 · 삭제: LIVE 는 서버(TBL_CLOSED_DAY)가 받아 준 뒤 화면 반영, 실패하면 안내 토스트
+    day.querySelector('[data-day-save]').addEventListener('click', async () => {
       const key = pick;
+      const res = await post('/closed-days', { date: toIso(key), before: editingKey ? toIso(editingKey) : '' });
+      if (!res.ok) { showToast(res.message || '잠시 후 다시 시도해 주세요.'); return; }
       statuses = { ...statuses };
       if (editingKey && editingKey !== key) delete statuses[editingKey];
-      statuses[key] = { status: 'closed' };
+      statuses[key] = { status: 'closed', booked: res.booked };
       saveStatuses(statuses);
       day.hidden = true; render(); showToast(editingKey ? '저장되었습니다' : '휴무일이 등록되었습니다');
     });
-    day.querySelector('[data-day-delete]').addEventListener('click', () => {
+    day.querySelector('[data-day-delete]').addEventListener('click', async () => {
+      const res = await post('/closed-days/delete', { date: toIso(editingKey) });
+      if (!res.ok && res.message !== '이미 해제된 날짜예요.') { showToast(res.message || '잠시 후 다시 시도해 주세요.'); return; }
       statuses = { ...statuses }; delete statuses[editingKey]; saveStatuses(statuses);
       day.hidden = true; render(); showToast('삭제되었습니다');
     });
@@ -377,18 +450,24 @@
     render();
     const state = root.dataset.state;
     if (state === 'past') { s.showPast = true; render(); }
-    if (state === 'weekly') { cfg = { weekdays: [1], holiday: true, daily: 3 }; render(); }
     if (state === 'weekdays') openWeekdays();
-    if (state === 'daily') openDaily(); // 검토용: 매주 월요일 + 공휴일 휴무
+    if (state === 'daily') openDaily();
     if (state === 'holidays') { s.tab = 'holidays'; render(); }
     if (state === 'day-add') openDay();
+    if (state === 'saved') { toast.hidden = false; }
+    if (LIVE) return; // 아래 상태는 더미 날짜 기준 미리보기
+    if (state === 'weekly') { cfg = { weekdays: [1], holiday: true, daily: 3 }; render(); } // 검토용: 매주 월요일 + 공휴일 휴무
     if (state === 'day-edit') openDay('26.10.09');
     if (state === 'day-warning') { openDay(); pick = '26.09.29'; renderMini(); }
-    if (state === 'saved') { toast.hidden = false; }
   }
 
-  const reservationsRoot = document.getElementById('scheduleCalendar');
-  if (reservationsRoot) initReservations(reservationsRoot);
-  const manage = document.getElementById('scheduleManage');
-  if (manage) initManage(manage);
+  function init() {
+    const reservationsRoot = document.getElementById('scheduleCalendar');
+    if (reservationsRoot) initReservations(reservationsRoot);
+    const manage = document.getElementById('scheduleManage');
+    if (manage) initManage(manage);
+  }
+  // LIVE: 예약 설정 · 임시 휴무를 먼저 불러옴 (실패하면 기본값으로 그림)
+  if (LIVE) getJson('/settings').then((d) => { server = d; }).catch(() => { server = null; }).finally(init);
+  else init();
 })();
