@@ -58,16 +58,4 @@
 		   AND ROWNUM = 1
 	</select>
 
-	<delete id="deleteItems">
-		DELETE FROM TBL_REQUEST_ITEM WHERE REQUEST_ID = #{requestId}
-	</delete>
-
-	<delete id="deleteVideo">
-		DELETE FROM TBL_RE_VIDEO WHERE REQUEST_ID = #{requestId}
-	</delete>
-
-	<delete id="deleteRequest">
-		DELETE FROM TBL_MOVE_REQUEST WHERE REQUEST_ID = #{requestId}
-	</delete>
-
 </mapper>

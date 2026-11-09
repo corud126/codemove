@@ -183,8 +183,8 @@ class AuthFlowTest {
 	void adminLoginForcesPasswordChange() throws Exception {
 		String loginId = "t" + ThreadLocalRandom.current().nextInt(1_000_000);
 		jdbc.update("INSERT INTO TBL_ADMIN (ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE) "
-				+ "VALUES (SEQ_ADMIN.NEXTVAL, ?, ?, '테스트', '010-0000-0000')",
-				loginId, new BCryptPasswordEncoder().encode("init1234"));
+				+ "VALUES (SEQ_ADMIN.NEXTVAL, ?, ?, '테스트', ?)",
+				loginId, new BCryptPasswordEncoder().encode("init1234"), testPhone());
 		MockHttpSession session = new MockHttpSession();
 
 		mvc.perform(post("/admin/login").param("id", loginId).param("pw", "wrong"))

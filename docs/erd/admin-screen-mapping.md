@@ -29,6 +29,7 @@
 | CONTACT_NAME(또는 회원 이름) | 표시·검색 | |
 | ESTIMATE_DATE | 표시·검색 | |
 | QUOTE_NO · SOURCE_TYPE(견적 요청·사진 등록·PDF 등록) · APPROVED_AT · EXPIRES_AT | — | 목록에는 넣지 않고, 행을 누르면 열리는 견적 수정(A-002) 상단 요약에 표시 |
+| (삭제) | 사진·PDF 등록(SOURCE_TYPE 02·03)만 | 고객 견적 요청(01)으로 만든 견적은 고객 화면에서 사라지면 안 되므로 삭제 없음 (11/09 결정) |
 
 ## SCR-A-002 견적 수정 — `TBL_QUOTE`, `TBL_QUOTE_ITEM`, `TBL_QUOTE_OPTION`, `TBL_MOVE_REQUEST`, `TBL_REQUEST_ITEM`, `TBL_RE_VIDEO`
 

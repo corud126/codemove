@@ -53,8 +53,8 @@ class AdminEstimateFlowTest {
 		jdbc.update("INSERT INTO TBL_MEMBER (MEMBER_ID, MEMBER_NAME, PHONE, IS_VERIFIED, TERMS_AGREED_AT) VALUES (?, '관리테스트', ?, 'Y', SYSDATE)",
 				memberId, phone);
 		Long adminId = jdbc.queryForObject("SELECT SEQ_ADMIN.NEXTVAL FROM DUAL", Long.class);
-		jdbc.update("INSERT INTO TBL_ADMIN (ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE) VALUES (?, ?, 'x', '테스트관리자', '010-0000-0001')",
-				adminId, "t" + adminId);
+		jdbc.update("INSERT INTO TBL_ADMIN (ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE) VALUES (?, ?, 'x', '테스트관리자', ?)",
+				adminId, "t" + adminId, String.format("010-4%03d-%04d", ThreadLocalRandom.current().nextInt(1000), ThreadLocalRandom.current().nextInt(10000)));
 		admin = new MockHttpSession();
 		admin.setAttribute(AdminAuthController.ADMIN_KEY, new LoginAdmin(adminId, "t" + adminId, "테스트관리자", "02"));
 		admin.setAttribute(AdminAuthController.PW_CHANGED_KEY, true);
@@ -146,11 +146,21 @@ class AdminEstimateFlowTest {
 		mvc.perform(get("/admin/estimates").session(admin)).andExpect(status().isOk());
 		assertThat(jdbc.queryForObject("SELECT STATUS FROM TBL_QUOTE WHERE QUOTE_ID = ?", String.class, id)).isEqualTo("04");
 
-		// 삭제: 견적서와 요청이 함께 지워진다
-		Long requestId = jdbc.queryForObject("SELECT REQUEST_ID FROM TBL_QUOTE WHERE QUOTE_ID = ?", Long.class, id);
-		mvc.perform(post(url + "/delete").session(admin)).andExpect(status().isOk());
+		// 고객이 요청한 견적은 삭제할 수 없다 (11/09 결정)
+		mvc.perform(post(url + "/delete").session(admin)).andExpect(status().isConflict());
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TBL_QUOTE WHERE QUOTE_ID = ?", Integer.class, id)).isEqualTo(1);
+	}
+
+	/** 사진·PDF 등록 견적만 삭제할 수 있다 */
+	@Test
+	void onlyAdminRegisteredQuoteIsDeletable() throws Exception {
+		Long id = jdbc.queryForObject("SELECT SEQ_QUOTE.NEXTVAL FROM DUAL", Long.class);
+		jdbc.update("INSERT INTO TBL_QUOTE (QUOTE_ID, QUOTE_NO, SOURCE_TYPE, STATUS, CONTACT_NAME, ESTIMATE_DATE) "
+				+ "VALUES (?, 'QT-TEST-' || ?, '02', '01', '수기고객', TRUNC(SYSDATE))", id, id);
+		mvc.perform(get("/admin/estimates").session(admin)).andExpect(status().isOk())
+				.andExpect(content().string(org.hamcrest.Matchers.containsString("data-href=\"/admin/estimates/" + id + "\"")));
+		mvc.perform(post("/admin/estimates/" + id + "/delete").session(admin)).andExpect(status().isOk());
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TBL_QUOTE WHERE QUOTE_ID = ?", Integer.class, id)).isZero();
-		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TBL_MOVE_REQUEST WHERE REQUEST_ID = ?", Integer.class, requestId)).isZero();
 	}
 
 	/** 미리보기(/dev)는 모델 없이 예시 값(SAMPLE)으로 그린다 */

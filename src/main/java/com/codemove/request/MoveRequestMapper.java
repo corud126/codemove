@@ -23,11 +23,4 @@ public interface MoveRequestMapper {
 	List<RequestItem> selectItems(Long requestId);
 
 	ReVideo selectVideo(Long requestId);
-
-	/** 견적 삭제 시 요청까지 지울 때: 품목 → 영상 → 요청 순서 (FK) */
-	int deleteItems(Long requestId);
-
-	int deleteVideo(Long requestId);
-
-	int deleteRequest(Long requestId);
 }

@@ -39,11 +39,11 @@ public class AdminEstimateController {
 
 	private final QuoteService quoteService;
 
-	/** SCR-A-001 견적 관리 — 행은 템플릿 형식 'id|분류|이름|YY.MM.DD' (분류 필터·검색·페이지는 estimate.js) */
+	/** SCR-A-001 견적 관리 — 행은 템플릿 형식 'id|분류|이름|YY.MM.DD|삭제 가능(Y/N)' (분류 필터·검색·페이지는 estimate.js) */
 	@GetMapping
 	public String list(Model model) {
 		model.addAttribute("rows", quoteService.list().stream()
-				.map(r -> r.id() + "|" + r.status() + "|" + r.name().replace("|", " ") + "|" + r.date())
+				.map(r -> r.id() + "|" + r.status() + "|" + r.name().replace("|", " ") + "|" + r.date() + "|" + (r.deletable() ? "Y" : "N"))
 				.toList());
 		return "admin/estimate/list";
 	}

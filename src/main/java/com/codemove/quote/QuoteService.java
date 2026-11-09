@@ -75,7 +75,7 @@ public class QuoteService {
 	private final PriceCalculator priceCalculator;
 
 	/** 견적 관리 목록 행: 분류 · 이름 · 견적일(YY.MM.DD) */
-	public record ListRow(Long id, String status, String name, String date) {
+	public record ListRow(Long id, String status, String name, String date, boolean deletable) {
 	}
 
 	/** 만료 시각이 지난 견적 승인을 만료로 바꾼 뒤 전체 목록 */
@@ -84,7 +84,7 @@ public class QuoteService {
 		quoteMapper.expireOverdue();
 		return quoteMapper.selectAll().stream()
 				.map(q -> new ListRow(q.getQuoteId(), codeService.name("QUOTE_STATUS", q.getStatus()), q.getContactName(),
-						q.getEstimateDate().format(YMD)))
+						q.getEstimateDate().format(YMD), deletable(q)))
 				.toList();
 	}
 
@@ -383,8 +383,8 @@ public class QuoteService {
 	}
 
 	/**
-	 * 견적 삭제: 견적서(품목·옵션 포함)와, 견적 요청으로 만든 견적이면 그 요청(품목·영상 기록)까지 지운다.
-	 * 확정된 견적은 예약이 연결돼 있어 지울 수 없다. 영상 파일은 남긴다.
+	 * 견적 삭제 (11/09 결정): 관리자가 직접 등록한 사진·PDF 견적(SOURCE_TYPE 02·03)만 지울 수 있다.
+	 * 고객이 보낸 견적 요청(01)으로 만든 견적은 고객 화면에서 사라지면 안 되므로 지우지 않는다 (검토 상태로 두거나 만료).
 	 */
 	@Transactional
 	public String delete(Long quoteId) {
@@ -392,18 +392,18 @@ public class QuoteService {
 		if (q == null) {
 			throw new IllegalArgumentException("견적서를 찾을 수 없어요.");
 		}
-		if (CONFIRMED.equals(q.getStatus())) {
-			throw new IllegalStateException("확정된 견적은 예약이 있어 삭제할 수 없어요.");
+		if (SOURCE_REQUEST.equals(q.getSourceType())) {
+			throw new IllegalStateException("고객이 요청한 견적은 삭제할 수 없어요.");
 		}
 		quoteMapper.deleteItems(quoteId);
 		quoteMapper.deleteOptions(quoteId);
 		quoteMapper.deleteQuote(quoteId);
-		if (q.getRequestId() != null) {
-			requestMapper.deleteItems(q.getRequestId());
-			requestMapper.deleteVideo(q.getRequestId());
-			requestMapper.deleteRequest(q.getRequestId());
-		}
 		return q.getContactName();
+	}
+
+	/** 목록에서 삭제 버튼을 보여줄지 (사진·PDF 등록만) */
+	public static boolean deletable(Quote q) {
+		return !SOURCE_REQUEST.equals(q.getSourceType());
 	}
 
 	/** 만료 시각 = 지금 + 72시간. 단 작업일이 그보다 빠르면 작업일 전날 23:59 */
