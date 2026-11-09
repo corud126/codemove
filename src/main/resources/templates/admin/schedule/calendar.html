@@ -6,13 +6,14 @@
   예약을 누르면 간단한 예약 정보 시트(날짜 · 시간 · 이름 · 유형 · 출발·도착 · 전화) → [예약 상세 보기] = 예약 관리
   ERD: TBL_RESERVATION 예약 완료(01)·이사 완료(02)만 (취소 미표시), PAY_STATUS 는 예약 정보 시트에만, 휴무일(정기 · 공휴일 · 임시 TBL_CLOSED_DAY)은 표시만
   state: (기본) 오늘 고름 · day(9/29) · closed(휴무일 9/20) · next-month(10월) · collapsed(달력 접기) · detail(예약 정보 시트)
-  더미 데이터·동작: js/admin/schedule.js (오늘 = 26.09.27 가정) */-->
+  데이터: AdminScheduleController 가 열면 data-base 로 JSON(/admin/schedule/month 등)을 불러옴 · /dev 미리보기는 js/admin/schedule.js 더미(오늘 = 26.09.27 가정) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='예약 일정', active='schedule', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
 <th:block th:fragment="content">
   <div id="scheduleCalendar" class="px-4 pb-28 pt-5"
-       th:with="ic=@{/images/admin/icons-v2.svg}, st=${param.state != null ? param.state[0] : ''}" th:attr="data-state=${st}">
+       th:with="ic=@{/images/admin/icons-v2.svg}, st=${param.state != null ? param.state[0] : ''}, base=@{/admin/schedule}"
+       th:attr="data-state=${st}, data-base=${live != null ? base : ''}, data-today=${today ?: ''}">
     <!--/* 1행: 페이지 제목만 */-->
     <h2 class="px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">예약 일정</h2>
 
