@@ -8,19 +8,24 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.codemove.member.LoginMember;
+import com.codemove.reservation.HistoryService;
 
 import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 사용자 홈 (SCR-U-001~002).
- * 앱 진입점: 로그인하지 않았으면 온보딩으로 보낸다.
- * 로그인 회원은 세션의 LOGIN_KEY(LoginMember). 견적·예약 상태는 아직 ?state= 로 바꿔 확인한다(guest 외에는 로그인 필요).
- * 견적·예약 연동 시 로그인 회원의 견적·예약 상태로 대체.
+ * 앱 진입점: 로그인하지 않았으면 온보딩으로 보낸다 (둘러보기 ?state=guest 만 비회원 허용).
+ * 로그인 회원은 세션의 LOGIN_KEY(LoginMember). 상태 카드는 회원의 견적·예약 상태 (HistoryService.home):
+ * 견적 도착 > 다가오는 예약 확정 > 검토 중 > 견적 없음. ?state= 가 있으면 그 상태로 미리보기 (예시 값).
  */
 @Controller
+@RequiredArgsConstructor
 public class HomeController {
 
 	public static final String LOGIN_KEY = "loginMember";
+
+	private final HistoryService historyService;
 
 	@GetMapping("/")
 	public String home(@RequestParam(required = false) String state, HttpSession session, Model model) {
@@ -30,10 +35,15 @@ public class HomeController {
 			return "redirect:/onboarding";
 		}
 		if (state == null) {
-			state = "none";
+			HistoryService.Home home = historyService.home(member.memberId());
+			state = home.state();
+			if (home.booking() != null) {
+				model.addAttribute("booking", home.booking());
+			}
 		}
 		model.addAttribute("state", state);
 		model.addAttribute("userName", member != null ? member.name() : null);
+		// 후기 카드: 후기 연동 전까지 예시 (리뷰 단계에서 실제 후기로 교체)
 		model.addAttribute("reviews", List.of(
 				new ReviewCard("김코드", "이용 2회차 · 어제", "원룸(반포장)", "★★★★★",
 						"친절하게 응대해주시고, 주의사항이나 필요한 부분 꼼꼼히 체크해주셔서 이사 잘 할 수 있었습니다."),

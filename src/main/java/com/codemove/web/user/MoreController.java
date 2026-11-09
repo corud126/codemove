@@ -9,6 +9,7 @@ import com.codemove.domain.Member;
 import com.codemove.domain.Social;
 import com.codemove.member.LoginMember;
 import com.codemove.member.MemberService;
+import com.codemove.reservation.HistoryService;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class MoreController {
 
 	private final MemberService memberService;
+	private final HistoryService historyService;
 
 	@GetMapping("/more")
 	public String more() {
@@ -52,13 +54,19 @@ public class MoreController {
 		return "redirect:/onboarding";
 	}
 
+	/** 견적내역: 견적 도착 카드 + 전체 견적 (HistoryService) */
 	@GetMapping("/more/estimates")
-	public String estimates() {
+	public String estimates(HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		model.addAttribute("estimates", historyService.estimates(login.memberId()));
 		return "user/more/estimates";
 	}
 
+	/** 예약내역: 다가오는 예약 확정 + 지난 이사(이사 완료 · 취소) 연도별 (HistoryService) */
 	@GetMapping("/more/reservations")
-	public String reservations() {
+	public String reservations(HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		model.addAttribute("reservations", historyService.reservations(login.memberId()));
 		return "user/more/reservations";
 	}
 
