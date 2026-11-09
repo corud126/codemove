@@ -51,6 +51,10 @@ codemove:
     idle-end-minutes: 30
     upload-dir: uploads/chat
     max-file-mb: 10
+  # 후기 사진 저장 폴더 · 사진 1장 최대 크기(MB)
+  review:
+    upload-dir: uploads/reviews
+    max-photo-mb: 10
   # 견적 요청: 톤 환산은 ERD 임시 규칙, 단가(pricing)는 업체 기준이 정해질 때까지 임시값
   quote:
     upload-dir: uploads

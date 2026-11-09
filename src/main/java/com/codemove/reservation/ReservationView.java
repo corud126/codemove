@@ -18,6 +18,32 @@ public record ReservationView(Long id, String status, String statusLabel, String
 		return "01".equals(status);
 	}
 
+	/** 홈 예약 카드: 출발지 구 이름 뒤 주소 (서울 강남구 테헤란로 123, 301호 → 테헤란로 123, 301호) */
+	public String fromRest() {
+		return afterDistrict(from, routeFrom);
+	}
+
+	public String toRest() {
+		return afterDistrict(to, routeTo);
+	}
+
+	/** 쉬운 모드 홈: 3월 18일 오전 10시에 이사해요 (시각이 없으면 3월 18일에 이사해요) */
+	public String easyWhen() {
+		String date = cardDate.replaceAll("\\s*\\(.\\)$", "");
+		if (cardTime == null || cardTime.isBlank()) {
+			return date + "에 이사해요";
+		}
+		return date + " " + cardTime.replace(":00", "시").replaceAll(":(\\d{2})$", "시 $1분") + "에 이사해요";
+	}
+
+	private static String afterDistrict(String address, String district) {
+		if (address == null || district == null || district.isEmpty()) {
+			return address == null ? "" : address;
+		}
+		int i = address.indexOf(district + " ");
+		return i < 0 ? address : address.substring(i + district.length() + 1);
+	}
+
 	public static final ReservationView SAMPLE = new ReservationView(1L, "01", "예약 확정", "D-30", "ME-20260318-1042",
 			"서울 강남구 테헤란로 123, 301호", "서울 서초구 서초대로 456, 804호", "2026. 03. 18 (수) 오전 10:00",
 			"원룸 / 오피스텔 · 일반포장", "410,000원",

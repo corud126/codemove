@@ -25,6 +25,7 @@ import com.codemove.domain.ReviewPhoto;
 import com.codemove.domain.Social;
 import com.codemove.member.LoginMember;
 import com.codemove.member.MemberService;
+import com.codemove.reservation.HistoryService;
 import com.codemove.review.ReviewService;
 import com.codemove.review.ReviewTargetView;
 
@@ -33,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * 더보기 화면 그룹 (G-H01~H14): 더보기, 내 정보 수정, 견적내역, 예약내역, 후기, 후기 작성, 알림.
- * 내 정보 수정·탈퇴는 DB 연동. 나머지는 더미 데이터가 템플릿에 있고, ?state= 로 캡처 상태를 바로 연다.
+ * 내 정보 수정·탈퇴, 견적내역·예약내역, 후기는 DB 연동. 화면에 ?state= 가 있으면 캡처 상태 미리보기.
  */
 @Controller
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class MoreController {
 
 	private final MemberService memberService;
 	private final ReviewService reviewService;
+	private final HistoryService historyService;
 
 	@GetMapping("/more")
 	public String more() {
@@ -71,13 +73,19 @@ public class MoreController {
 		return "redirect:/onboarding";
 	}
 
+	/** 견적내역: 견적 도착 카드 + 전체 견적 (HistoryService) */
 	@GetMapping("/more/estimates")
-	public String estimates() {
+	public String estimates(HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		model.addAttribute("estimates", historyService.estimates(login.memberId()));
 		return "user/more/estimates";
 	}
 
+	/** 예약내역: 다가오는 예약 확정 + 지난 이사(이사 완료 · 취소) 연도별 (HistoryService) */
 	@GetMapping("/more/reservations")
-	public String reservations() {
+	public String reservations(HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		model.addAttribute("reservations", historyService.reservations(login.memberId()));
 		return "user/more/reservations";
 	}
 

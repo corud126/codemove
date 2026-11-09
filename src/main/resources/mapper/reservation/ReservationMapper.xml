@@ -75,4 +75,54 @@
 		SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM TBL_REVIEW WHERE RESERVATION_ID = #{reservationId}
 	</select>
 
+	<!-- ===== 관리자 예약 관리 · 사용자 예약내역 공용 행 (예약 + 견적 요청 + 회원 + 견적서) ===== -->
+	<sql id="rowSelect">
+		SELECT RS.RESERVATION_ID, RS.RESERVATION_NO, RS.STATUS, RS.PAY_STATUS, RS.MOVE_DATE, RS.MOVE_TIME, RS.MOVE_MEMO,
+		       RS.APPLIED_AT, RS.DEPOSIT_PAID_AT, RS.CANCELLED_AT, RS.CANCELLED_BY,
+		       MB.MEMBER_NAME, MB.PHONE,
+		       Q.QUOTE_NO, M.HOUSE_TYPE, M.PACK_TYPE, Q.WORK_TYPE, Q.FROM_ADDRESS, Q.TO_ADDRESS,
+		       Q.TOTAL_AMOUNT, Q.DEPOSIT_AMOUNT, Q.BALANCE_AMOUNT
+		  FROM TBL_RESERVATION RS
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = RS.REQUEST_ID
+		  JOIN TBL_MEMBER MB ON MB.MEMBER_ID = M.MEMBER_ID
+		  LEFT JOIN TBL_QUOTE Q ON Q.REQUEST_ID = RS.REQUEST_ID
+	</sql>
+
+	<select id="selectAdminRows" resultType="com.codemove.reservation.ReservationRow">
+		<include refid="rowSelect"/>
+		 ORDER BY RS.MOVE_DATE DESC, RS.RESERVATION_ID DESC
+	</select>
+
+	<update id="completePayment">
+		UPDATE TBL_RESERVATION
+		   SET PAY_STATUS = '02',
+		       DEPOSIT_PAID_AT = SYSDATE
+		 WHERE RESERVATION_ID = #{reservationId}
+		   AND PAY_STATUS = '01'
+		   AND STATUS IN ('01', '02')
+	</update>
+
+	<update id="updateSchedule">
+		UPDATE TBL_RESERVATION
+		   SET MOVE_DATE = #{moveDate},
+		       MOVE_TIME = #{moveTime}
+		 WHERE RESERVATION_ID = #{reservationId}
+		   AND STATUS = '01'
+	</update>
+
+	<select id="selectHistoryByMember" resultType="com.codemove.reservation.ReservationRow">
+		<include refid="rowSelect"/>
+		 WHERE M.MEMBER_ID = #{memberId}
+		 ORDER BY RS.MOVE_DATE DESC, RS.RESERVATION_ID DESC
+	</select>
+
+	<select id="selectQuoteHistory" resultType="com.codemove.reservation.QuoteHistoryRow">
+		SELECT Q.QUOTE_ID, Q.STATUS, Q.ESTIMATE_DATE, Q.FROM_ADDRESS, Q.TO_ADDRESS, Q.WORK_DATE, Q.TOTAL_AMOUNT, Q.EXPIRES_AT,
+		       Q.WORK_TYPE, M.HOUSE_TYPE, M.PACK_TYPE
+		  FROM TBL_QUOTE Q
+		  LEFT JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = Q.REQUEST_ID
+		 WHERE Q.MEMBER_ID = #{memberId}
+		 ORDER BY Q.QUOTE_ID DESC
+	</select>
+
 </mapper>

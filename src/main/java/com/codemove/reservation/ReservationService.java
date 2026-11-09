@@ -4,6 +4,8 @@ import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -25,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * 예약. 사용자가 견적을 확정하면 견적서 작업일·작업시각으로 예약(RSV_STATUS 01 · PAY_STATUS 01 결제 대기)을 만든다 (ERD 0·2단계).
  * 이사일 다음 날 0시에 이사 완료(02)로 바꾼다 (ERD Q7). 화면을 열 때도 한 번 더 확인한다.
+ * 관리자 예약 관리(SCR-A-011): 목록 · [결제 완료](PAY_STATUS 02) · [예약 취소](CANCELLED_BY 02) · [일정 변경](MOVE_DATE·MOVE_TIME).
  * 할 수 없는 동작이면 화면에 보여줄 문구로 IllegalStateException.
  */
 @Service
@@ -35,6 +38,9 @@ public class ReservationService {
 	public static final String COMPLETED = "02";
 	public static final String CANCELLED = "03";
 	private static final String BY_MEMBER = "01";
+	private static final String BY_ADMIN = "02";
+	private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yy.MM.dd");
+	private static final DateTimeFormatter YMD_STRICT = DateTimeFormatter.ofPattern("uu.MM.dd").withResolverStyle(ResolverStyle.STRICT);
 
 	private final QuoteMapper quoteMapper;
 	private final QuoteService quoteService;
@@ -122,6 +128,109 @@ public class ReservationService {
 			throw new IllegalStateException("취소할 수 없는 예약이에요. 업체에 문의해 주세요.");
 		}
 		// 알림 단계에서 추가: 관리자에게 '예약 취소' 알림
+	}
+
+	/* ---------- 관리자 예약 관리 (SCR-A-011) ---------- */
+
+	/**
+	 * 관리자 목록 행. 값은 화면 글자 그대로(없으면 '-'), total·deposit·balance 는 숫자만.
+	 * status·payment·cancelledBy 는 관리자 표시명 (예약 완료·이사 완료·예약 취소 / 결제 대기·결제 완료·결제 취소 / 회원·관리자)
+	 */
+	public record AdminRow(Long id, String status, String name, String phone, String applied, String service, String pack,
+			String moveDate, String moveTime, String origin, String destination, String payment, String total, String memo,
+			String paidAt, String cancelledAt, String cancelledBy, String deposit, String balance, String quoteNo,
+			String reservationNo) {
+	}
+
+	/** 전체 예약 (이사 완료 처리 후, 이사일 최근 순) */
+	@Transactional
+	public List<AdminRow> adminRows() {
+		reservationMapper.completeOverdue();
+		return reservationMapper.selectAdminRows().stream()
+				.map(r -> new AdminRow(r.getReservationId(), codeService.name("RSV_STATUS", r.getStatus()), dash(r.getMemberName()),
+						dash(r.getPhone()), ymd(r.getAppliedAt()), dash(codeService.name("HOUSE_TYPE", r.getHouseType())),
+						dash(codeService.name("PACK_TYPE", r.getWorkType() != null ? r.getWorkType() : r.getPackType())),
+						r.getMoveDate().format(YMD), dash(r.getMoveTime()), dash(r.getFromAddress()), dash(r.getToAddress()),
+						codeService.name("PAY_STATUS", r.getPayStatus()), String.valueOf(nz(r.getTotalAmount())),
+						dash(r.getMoveMemo()), ymd(r.getDepositPaidAt()), ymd(r.getCancelledAt()),
+						dash(codeService.name("CANCELLED_BY", r.getCancelledBy())), String.valueOf(nz(r.getDepositAmount())),
+						String.valueOf(nz(r.getBalanceAmount())), dash(r.getQuoteNo()), r.getReservationNo()))
+				.toList();
+	}
+
+	/** [결제 완료]: 계약금 결제 대기 → 결제 완료 + 결제일. 결제일(YY.MM.DD)을 돌려준다 */
+	@Transactional
+	public String completePayment(Long reservationId) {
+		if (reservationMapper.selectById(reservationId) == null) {
+			throw new IllegalArgumentException("예약을 찾을 수 없어요.");
+		}
+		if (reservationMapper.completePayment(reservationId) == 0) {
+			throw new IllegalStateException("결제 대기 중인 예약만 결제 완료로 바꿀 수 있어요.");
+		}
+		// 알림 단계에서 추가: 고객에게 '계약금 결제 완료' 알림
+		return ymd(reservationMapper.selectById(reservationId).getDepositPaidAt());
+	}
+
+	/** 관리자 예약 취소: 예약 완료(01)만. 취소 주체 관리자(02), 결제 대기였으면 결제 취소(03). 취소일(YY.MM.DD)을 돌려준다 */
+	@Transactional
+	public String cancelByAdmin(Long reservationId) {
+		if (reservationMapper.selectById(reservationId) == null) {
+			throw new IllegalArgumentException("예약을 찾을 수 없어요.");
+		}
+		if (reservationMapper.cancel(reservationId, BY_ADMIN) == 0) {
+			throw new IllegalStateException("예약 완료 상태인 예약만 취소할 수 있어요.");
+		}
+		// 알림 단계에서 추가: 고객에게 '예약 취소' 알림 (NTF_DETAIL)
+		return ymd(reservationMapper.selectById(reservationId).getCancelledAt());
+	}
+
+	/**
+	 * 관리자 일정 변경: 예약의 MOVE_DATE · MOVE_TIME 만 고친다 (견적서 작업일은 그대로, revision-user.md TBL_RESERVATION).
+	 * date: YY.MM.DD, time: 고정 시간대(QuoteService.WORK_TIMES). 날짜가 바뀌면 그날 예약 가능한지(휴무·마감) 확인한다
+	 */
+	@Transactional
+	public void reschedule(Long reservationId, String date, String time) {
+		Reservation r = reservationMapper.selectById(reservationId);
+		if (r == null) {
+			throw new IllegalArgumentException("예약을 찾을 수 없어요.");
+		}
+		LocalDate moveDate = parseShortDate(date);
+		if (time == null || !QuoteService.WORK_TIMES.contains(time)) {
+			throw new IllegalArgumentException("예약 시간은 오전 8:00 · 10:00, 오후 1:00 · 3:00 · 5:00 중에서 골라 주세요.");
+		}
+		if (!BOOKED.equals(r.getStatus())) {
+			throw new IllegalStateException("예약 완료 상태인 예약만 일정을 바꿀 수 있어요.");
+		}
+		if (!moveDate.equals(r.getMoveDate())) {
+			if (!moveDate.isAfter(LocalDate.now())) {
+				throw new IllegalArgumentException("예약일은 내일 이후 날짜로만 바꿀 수 있어요.");
+			}
+			// 설정 행을 잠그고 그날 확정 건수를 다시 센다 (동시에 확정·변경해도 하루 최대 예약을 넘지 않게, Q18)
+			if (!availabilityService.isAvailableForConfirm(moveDate)) {
+				throw new IllegalStateException("그날은 휴무일이거나 예약이 마감되었어요. 다른 날짜를 골라 주세요.");
+			}
+		}
+		if (reservationMapper.updateSchedule(reservationId, moveDate, time) == 0) {
+			throw new IllegalStateException("예약 완료 상태인 예약만 일정을 바꿀 수 있어요.");
+		}
+		// 알림 단계에서 추가: 고객에게 '일정 변경' 알림 (NTF_DETAIL 06)
+	}
+
+	/** 26.10.21 → 2026-10-21 */
+	private static LocalDate parseShortDate(String text) {
+		try {
+			return LocalDate.parse(text == null ? "" : text.trim(), YMD_STRICT);
+		} catch (DateTimeParseException e) {
+			throw new IllegalArgumentException("예약일은 26.10.21 처럼 입력해 주세요.");
+		}
+	}
+
+	private static String ymd(LocalDateTime t) {
+		return t == null ? "-" : t.format(YMD);
+	}
+
+	private static String dash(String s) {
+		return s == null || s.isBlank() ? "-" : s;
 	}
 
 	/** 화면 표시값 */

@@ -73,8 +73,8 @@ class ScheduleFlowTest {
 	void setUp() {
 		adminId = jdbc.queryForObject("SELECT SEQ_ADMIN.NEXTVAL FROM DUAL", Long.class);
 		String loginId = "s" + ThreadLocalRandom.current().nextInt(1_000_000);
-		jdbc.update("INSERT INTO TBL_ADMIN (ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE) VALUES (?, ?, 'x', '테스트', '010-0000-0000')",
-				adminId, loginId);
+		jdbc.update("INSERT INTO TBL_ADMIN (ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE) VALUES (?, ?, 'x', '테스트', '010-2' || LPAD(MOD(?, 1000), 3, '0') || '-' || LPAD(MOD(?, 10000), 4, '0'))",
+				adminId, loginId, adminId, adminId / 1000);
 		session = new MockHttpSession();
 		session.setAttribute(AdminAuthController.ADMIN_KEY, new LoginAdmin(adminId, loginId, "테스트", "01"));
 		session.setAttribute(AdminAuthController.PW_CHANGED_KEY, true);

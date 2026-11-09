@@ -1,8 +1,8 @@
 /*
- * 더보기 화면 그룹 (G-H01~H14) — 백엔드 없이 동작만 시뮬레이션
+ * 더보기 화면 그룹 (G-H01~H14) (서버 연동: 견적내역·예약내역·후기, 미리보기 /dev 는 시뮬레이션)
  *  내 정보 수정: 휴대폰 번호 입력 → 인증번호 발송(3분 타이머) → 6자리 입력 → 변경
- *  견적내역·예약내역: [data-filter-toggle] / [data-filter] 로 목록 필터
  *  후기 작성: 별점, 사진 첨부(최대 5장), 등록 → POST /more/reviews (multipart) → 후기 목록(?state=done). 미리보기(/dev)는 서버 없이 시뮬레이션
+ *  견적내역·예약내역 (목록은 서버 값): [data-filter-toggle] / [data-filter] 로 목록 필터, 견적 도착 카드 남은 시간 [data-countdown]
  *  알림: 탭(전체·내 이사), 행 클릭 시 읽음, 모두 읽음
  */
 (function () {
@@ -61,6 +61,24 @@
       return;
     }
     if (e.target.closest('[data-close]')) setToggleOpen(false);
+  });
+
+  /* ---------- 견적내역: 견적 도착 남은 시간 (24시간 이상 N일 N시간, 미만 HH:MM:SS — move.js 와 같은 규칙) ---------- */
+  const pad = (n) => String(n).padStart(2, '0');
+  $$('[data-countdown]').forEach((el) => {
+    let left = Number(el.dataset.countdown);
+    if (!el.dataset.countdown || !Number.isFinite(left)) return;
+    const suffix = el.dataset.suffix || '';
+    const target = el.querySelector('[data-countdown-text]') || el;
+    const draw = () => {
+      const text = left >= 86400
+        ? `${Math.floor(left / 86400)}일 ${Math.floor((left % 86400) / 3600)}시간`
+        : `${pad(Math.floor(left / 3600))}:${pad(Math.floor((left % 3600) / 60))}:${pad(left % 60)}`;
+      target.textContent = `${text}${suffix}`;
+      left = Math.max(0, left - 1);
+    };
+    draw();
+    setInterval(draw, 1000);
   });
 
   /* ---------- 알림: 탭(전체·내 이사), 읽음 처리, 모두 읽음 ---------- */

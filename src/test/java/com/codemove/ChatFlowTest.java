@@ -65,8 +65,8 @@ class ChatFlowTest {
 		member.setAttribute(HomeController.LOGIN_KEY, new LoginMember(memberId, memberName, "010-0000-0000"));
 
 		adminId = jdbc.queryForObject("SELECT SEQ_ADMIN.NEXTVAL FROM DUAL", Long.class);
-		jdbc.update("INSERT INTO TBL_ADMIN (ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE) VALUES (?, ?, 'x', '김상담', '010-0000-0000')",
-				adminId, "c" + adminId);
+		jdbc.update("INSERT INTO TBL_ADMIN (ADMIN_ID, LOGIN_ID, PASSWORD, ADMIN_NAME, PHONE) VALUES (?, ?, 'x', '김상담', '010-3' || LPAD(MOD(?, 1000), 3, '0') || '-' || LPAD(MOD(?, 10000), 4, '0'))",
+				adminId, "c" + adminId, adminId, adminId / 1000);
 		admin = new MockHttpSession();
 		admin.setAttribute(AdminAuthController.ADMIN_KEY, new LoginAdmin(adminId, "c" + adminId, "김상담", "02"));
 		admin.setAttribute(AdminAuthController.PW_CHANGED_KEY, true);
