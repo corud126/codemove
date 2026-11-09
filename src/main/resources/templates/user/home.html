@@ -13,7 +13,7 @@
   <div class="screen home-screen" data-easy-class="easy-home"
        th:with="userName=${state == 'booked' and booking == null ? '김코드' : userName},
                 b=${booking ?: T(com.codemove.reservation.ReservationView).SAMPLE}"><!--/* 예약 완료 미리보기(G/E-B06)는 김코드님 · 예시 예약(SAMPLE) */-->
-    <div th:replace="~{fragments/user-layout :: header(notificationCount=${state == 'guest' ? 0 : 1})}"></div>
+    <div th:replace="~{fragments/user-layout :: header(notificationCount=${state == 'guest' ? 0 : unreadNotifications})}"></div>
 
     <!--/* ── 쉬운 모드 ── */-->
     <main class="easy-home-content" data-easy-only>

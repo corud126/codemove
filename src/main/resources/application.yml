@@ -51,6 +51,16 @@ codemove:
     idle-end-minutes: 30
     upload-dir: uploads/chat
     max-file-mb: 10
+  # 알림: 기본 조회 기간(일) · 관리자 내역 한 번에 불러올 개수 · 사용자 목록·관리자 패널 최대 개수 · 이사 임박 알림(D-n)
+  #        이사 임박 알림 시각(cron) · 방해 금지 시간에 보류한 알림 발송 주기(cron)
+  notification:
+    recent-days: 30
+    page-size: 20
+    user-list-size: 100
+    panel-size: 100
+    reminder-days: 3
+    reminder-cron: "0 0 9 * * *"
+    flush-cron: "0 */10 * * * *"
   # 후기 사진 저장 폴더 · 사진 1장 최대 크기(MB)
   review:
     upload-dir: uploads/reviews

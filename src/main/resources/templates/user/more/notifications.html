@@ -19,33 +19,21 @@
       <button type="button" class="active" role="tab" aria-selected="true" data-noti-tab="all">전체</button>
       <button type="button" role="tab" aria-selected="false" data-noti-tab="move">내 이사</button>
     </div>
-    <div class="notification-feed" id="notificationFeed">
-      <div class="action notification-row unread" role="button" tabindex="0" data-tab="move" th:attr="data-href=@{/reservations/1}">
-        <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('schedule')}"></svg></div>
+    <!--/* 목록: notifications (NotificationViews.UserItem, 최근 순). 모델이 없으면(미리보기 /dev) 예시 UserItem.SAMPLE
+         행 클릭 = POST /notifications/{id}/read 후 LINK_URL 이동 · 모두 읽음 = POST /notifications/read-all */-->
+    <div class="notification-feed" id="notificationFeed"
+         th:with="items=${notifications ?: T(com.codemove.notification.NotificationViews$UserItem).SAMPLE}">
+      <div th:each="n : ${items}" class="action notification-row" th:classappend="${n.unread()} ? 'unread'" role="button" tabindex="0"
+           th:attr="data-tab=${n.tab()},data-id=${notifications != null ? n.id() : null},data-href=${n.link() != null} ? @{${n.link()}} : null">
+        <div class="notification-type-icon"><svg th:replace="~{:: notiIcon(${n.icon()})}"></svg></div>
         <div class="notification-copy">
-          <strong>이사 예약이 확정되었어요</strong>
-          <p>3월 18일 오전 10시 예약과 방문 주소를 확인해주세요.</p>
-          <small>14시간 전</small>
+          <strong th:text="${n.title()}">이사 예약이 확정되었어요</strong>
+          <p th:text="${n.content()}">3월 18일 오전 10시 예약과 방문 주소를 확인해주세요.</p>
+          <small th:text="${n.time()}">14시간 전</small>
         </div>
-        <i aria-label="읽지 않음"></i>
+        <i th:if="${n.unread()}" aria-label="읽지 않음"></i>
       </div>
-      <div class="action notification-row" role="button" tabindex="0" data-tab="move" th:attr="data-href=@{/estimates/1}">
-        <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('estimate')}"></svg></div>
-        <div class="notification-copy">
-          <strong>견적서가 도착했어요</strong>
-          <p>담당자가 확인한 견적 금액과 작업 내용을 확인해주세요.</p>
-          <small>2일 전</small>
-        </div>
-      </div>
-      <div class="action notification-row" role="button" tabindex="0" data-tab="move" th:attr="data-href=@{/reservations/1}">
-        <div class="notification-type-icon"><svg th:replace="~{:: notiIcon('payment')}"></svg></div>
-        <div class="notification-copy">
-          <strong>계약금 결제가 완료되었어요</strong>
-          <p>결제 내역과 이사 당일 잔금을 확인할 수 있어요.</p>
-          <small>5일 전</small>
-        </div>
-      </div>
-      <div class="notification-empty" id="notificationEmpty" hidden>해당하는 알림이 없어요.</div>
+      <div class="notification-empty" id="notificationEmpty" th:hidden="${!items.isEmpty()}">해당하는 알림이 없어요.</div>
     </div>
   </div>
 </div>

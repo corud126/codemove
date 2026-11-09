@@ -125,4 +125,11 @@
 		 ORDER BY Q.QUOTE_ID DESC
 	</select>
 
+	<select id="selectMemberId" resultType="long">
+		SELECT M.MEMBER_ID
+		  FROM TBL_RESERVATION R
+		  JOIN TBL_MOVE_REQUEST M ON M.REQUEST_ID = R.REQUEST_ID
+		 WHERE R.RESERVATION_ID = #{reservationId}
+	</select>
+
 </mapper>

@@ -18,6 +18,8 @@ import com.codemove.domain.QuoteItem;
 import com.codemove.domain.ReVideo;
 import com.codemove.domain.RequestItem;
 import com.codemove.member.LoginMember;
+import com.codemove.notification.NotificationDetail;
+import com.codemove.notification.NotificationService;
 import com.codemove.quote.QuoteMapper;
 import com.codemove.schedule.AvailabilityService;
 
@@ -38,6 +40,7 @@ public class MoveRequestService {
 	private static final String SOURCE_USER = "02";
 
 	private final MoveRequestMapper requestMapper;
+	private final NotificationService notificationService;
 	private final QuoteMapper quoteMapper;
 	private final ItemCatalog catalog;
 	private final PriceCalculator priceCalculator;
@@ -164,7 +167,8 @@ public class MoveRequestService {
 			qi.setSortOrder(order++);
 			quoteMapper.insertQuoteItem(qi);
 		}
-		// 알림 단계에서 추가: 관리자에게 '견적 접수' 알림
+		notificationService.notifyAdmins(member.memberId(), NotificationDetail.QUOTE_RECEIVED.code(), "견적 접수",
+				member.name() + " 고객님의 견적 요청이 접수되었습니다.", "/admin/estimates/" + quote.getQuoteId());
 	}
 
 	private static QuoteForm.Address checkAddress(QuoteForm.Address a) {

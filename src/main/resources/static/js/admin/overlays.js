@@ -136,11 +136,13 @@
 
   /* ---------- SCR-A-019 알림 패널 ---------- */
   // 탭(전체 / 안 읽음) · 행 클릭 = 읽음 처리 후 LINK_URL 이동 · [모두 읽음] (안 읽은 알림이 없으면 비활성)
-  // TODO 백엔드 연결 시 읽음 처리(IS_READ = 'Y')를 서버에 저장
+  // 읽음 저장: 행 = POST /admin/notifications/{id}/read, 모두 읽음 = POST /admin/notifications/read-all (관리자 공용)
+  // 미리보기 예시 행(data-id 없음)은 화면에서만 처리
   const panel = $('#notificationPanel');
   const readAll = $('#notificationReadAll');
   let notificationTab = 'all';
   let notificationsEmpty = false; // 최근 30일 알림 자체가 없는 상태
+  const postRead = (url) => fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
 
   function syncUnread() {
     if (!panel) return;
@@ -149,6 +151,8 @@
     readAll.disabled = unread === 0;
     countEl.textContent = unread;
     countEl.hidden = unread === 0;
+    const dot = $('#notificationDot');
+    if (dot) dot.hidden = unread === 0;
   }
 
   function applyNotifications() {
@@ -180,15 +184,23 @@
   }
 
   if (panel) {
-    readAll.addEventListener('click', markAllRead);
+    readAll.addEventListener('click', () => {
+      if (panel.querySelector('[data-notification][data-unread][data-id]')) postRead('/admin/notifications/read-all');
+      markAllRead();
+    });
     panel.querySelectorAll('[data-notification-tab]').forEach((tab) => tab.addEventListener('click', () => {
       notificationTab = tab.dataset.notificationTab;
       applyNotifications();
     }));
-    // 행 클릭: 읽음 표시 후 링크로 이동 (기본 동작 유지)
-    panel.querySelectorAll('[data-notification]').forEach((row) => row.addEventListener('click', () => {
+    // 행 클릭: 읽음 표시 · 저장 후 링크로 이동 (링크가 없으면 이동 없음)
+    panel.querySelectorAll('[data-notification]').forEach((row) => row.addEventListener('click', (e) => {
+      const href = row.getAttribute('href');
+      const saved = row.hasAttribute('data-unread') && row.dataset.id
+        ? postRead(`/admin/notifications/${row.dataset.id}/read`) : null;
       row.removeAttribute('data-unread');
       syncUnread();
+      if (!href || href === '#') { e.preventDefault(); return; }
+      if (saved) { e.preventDefault(); saved.finally(() => { location.href = href; }); }
     }));
     applyNotifications();
   }

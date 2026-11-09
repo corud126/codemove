@@ -35,6 +35,9 @@ public interface ReservationMapper {
 	/** 후기를 남겼는지 (예약 1건당 후기 1개) */
 	boolean hasReview(Long reservationId);
 
+	/** 예약한 회원 (알림 받는 사람) */
+	Long selectMemberId(Long reservationId);
+
 	/* ---------- 관리자 예약 관리 (SCR-A-011) ---------- */
 
 	/** 전체 예약 (이사일 최근 순) — 회원 · 견적서 연결 */

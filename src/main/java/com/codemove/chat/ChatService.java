@@ -20,6 +20,8 @@ import com.codemove.domain.ChatRoom;
 import com.codemove.domain.ChatSetting;
 import com.codemove.domain.ChatbotAction;
 import com.codemove.member.LoginMember;
+import com.codemove.notification.NotificationDetail;
+import com.codemove.notification.NotificationService;
 
 /**
  * 채팅 상담 흐름.
@@ -47,13 +49,14 @@ public class ChatService {
 	private final ChatSettingService settingService;
 	private final ChatbotEngine engine;
 	private final ChatFileStore fileStore;
+	private final NotificationService notificationService;
 	/** 대기 후 지연 안내를 보낼 때까지(분) */
 	private final int delayMinutes;
 	/** 챗봇 응대 · 상담 중인 방을 자동 종료할 무응답 시간(분) */
 	private final int idleMinutes;
 
 	public ChatService(ChatMapper chatMapper, ChatbotMapper chatbotMapper, ChatSettingService settingService,
-			ChatbotEngine engine, ChatFileStore fileStore,
+			ChatbotEngine engine, ChatFileStore fileStore, NotificationService notificationService,
 			@Value("${codemove.chat.delay-minutes:10}") int delayMinutes,
 			@Value("${codemove.chat.idle-end-minutes:30}") int idleMinutes) {
 		this.chatMapper = chatMapper;
@@ -61,6 +64,7 @@ public class ChatService {
 		this.settingService = settingService;
 		this.engine = engine;
 		this.fileStore = fileStore;
+		this.notificationService = notificationService;
 		this.delayMinutes = delayMinutes;
 		this.idleMinutes = idleMinutes;
 	}
@@ -120,7 +124,7 @@ public class ChatService {
 			chatMapper.updateWaiting(room.getRoomId());
 			room.setStatus(ChatRoom.WAITING);
 			added.add(insertBot(room, waitingNotice(setting), null));
-			// TODO 알림 단계: 관리자에게 '채팅 상담 대기'(NTF_DETAIL 13) 알림
+			notifyWaiting(member);
 		} else if (ChatRoom.BOT.equals(room.getStatus())) {
 			ChatbotEngine.Reply reply = engine.answer(
 					new ChatbotEngine.Question(member.memberId(), member.name(), text, topicId));
@@ -128,7 +132,7 @@ public class ChatService {
 			buttons = reply.buttons();
 		} else if (opened.created()) {
 			added.add(insertBot(room, waitingNotice(setting), null));
-			// TODO 알림 단계: 관리자에게 '채팅 상담 대기'(NTF_DETAIL 13) 알림
+			notifyWaiting(member);
 		}
 		return toUserView(added, buttons);
 	}
@@ -146,7 +150,7 @@ public class ChatService {
 			if (setting.isConsultOn()) {
 				chatMapper.updateWaiting(room.getRoomId());
 				notice = waitingNotice(setting);
-				// TODO 알림 단계: 관리자에게 '채팅 상담 대기'(NTF_DETAIL 13) 알림
+				notifyWaiting(member);
 			} else {
 				// 상담 운영 꺼짐(휴무 등): 연결 대신 부재 안내
 				notice = awayText(setting);
@@ -250,7 +254,14 @@ public class ChatService {
 		}
 		chatMapper.updateActive(room.getRoomId(), adminId);
 		chatMapper.insertMessage(m);
-		// TODO 알림 단계: 고객에게 '상담 답변 도착'(NTF_DETAIL 15) 알림
+		notificationService.notifyMember(memberId, NotificationDetail.CHAT_REPLY.code(), "상담 답변이 도착했어요",
+				"상담원이 답변을 보냈어요. 채팅에서 확인해 주세요.", "/chat");
+	}
+
+	/** 관리자에게 '채팅 상담 대기' 알림 (NTF_DETAIL 13, 중요) */
+	private void notifyWaiting(LoginMember member) {
+		notificationService.notifyAdmins(member.memberId(), NotificationDetail.CHAT_WAITING.code(), "채팅 상담 대기",
+				member.name() + " 고객님이 상담원 연결을 요청했습니다.", "/admin/chats/" + member.memberId());
 	}
 
 	/** 상담 종료 */

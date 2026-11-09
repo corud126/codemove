@@ -112,7 +112,7 @@ public class ReviewService {
 				photo.setSortOrder(order++);
 				reviewMapper.insertPhoto(photo);
 			}
-			// 알림 단계에서 추가: 관리자에게 '새 후기' 알림
+			// 새 후기 알림: 공통코드 NTF_DETAIL 에 해당 종류가 없어 보내지 않음 (필요하면 코드 추가)
 			return review.getReviewId();
 		} catch (DuplicateKeyException e) {
 			saved.forEach(storage::delete);

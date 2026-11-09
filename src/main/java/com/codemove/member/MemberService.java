@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.codemove.domain.Member;
 import com.codemove.domain.Social;
+import com.codemove.notification.NotificationDetail;
+import com.codemove.notification.NotificationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 public class MemberService {
 
 	private final MemberMapper memberMapper;
+	private final NotificationService notificationService;
 
 	/** 휴대폰 번호를 010-0000-0000 형식으로 맞춘다. 휴대폰 번호(01X + 10~11자리)가 아니면 null */
 	public static String normalizePhone(String raw) {
@@ -64,6 +67,8 @@ public class MemberService {
 		member.setIsVerified("Y");
 		member.setTermsAgreedAt(termsAgreedAt);
 		memberMapper.insertMember(member);
+		notificationService.notifyAdmins(member.getMemberId(), NotificationDetail.MEMBER_JOINED.code(), "신규 가입",
+				name + " 고객님이 회원으로 가입했습니다.", "/admin/members");
 		if (social != null) {
 			linkSocial(member.getMemberId(), social);
 		}
@@ -108,7 +113,7 @@ public class MemberService {
 			// 확인과 변경 사이에 같은 번호로 가입된 경우
 			throw new IllegalStateException("이미 가입된 번호예요. 다른 번호를 입력해 주세요.");
 		}
-		// 알림 단계에서 추가: 이전 번호로 '휴대폰 번호가 변경되었어요' 안내
+		// 번호 변경 알림: 공통코드 NTF_DETAIL 에 해당 종류가 없어 보내지 않음 (필요하면 코드 추가)
 		return findActiveById(memberId);
 	}
 

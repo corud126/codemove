@@ -26,6 +26,7 @@ import com.codemove.domain.ReviewPhoto;
 import com.codemove.domain.Social;
 import com.codemove.member.LoginMember;
 import com.codemove.member.MemberService;
+import com.codemove.notification.NotificationService;
 import com.codemove.reservation.HistoryService;
 import com.codemove.review.ReviewService;
 import com.codemove.review.ReviewTargetView;
@@ -48,6 +49,7 @@ public class MoreController {
 	private final ReviewService reviewService;
 	private final HistoryService historyService;
 	private final PhoneVerifier phoneVerifier;
+	private final NotificationService notificationService;
 
 	@GetMapping("/more")
 	public String more() {
@@ -198,8 +200,11 @@ public class MoreController {
 		return ResponseEntity.ok().contentType(type).body(new FileSystemResource(photo.getFilePath()));
 	}
 
+	/** 알림 (G-H13): 최근 알림 목록. 읽음 · 모두 읽음은 NotificationController */
 	@GetMapping("/notifications")
-	public String notifications() {
+	public String notifications(HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		model.addAttribute("notifications", notificationService.memberItems(login.memberId()));
 		return "user/more/notifications";
 	}
 }

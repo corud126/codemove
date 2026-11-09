@@ -9,7 +9,7 @@
 <body>
 <div class="app-shell">
   <div class="screen page-with-nav more-screen">
-    <div th:replace="~{fragments/user-layout :: header(notificationCount=1)}"></div>
+    <div th:replace="~{fragments/user-layout :: header(notificationCount=${unreadNotifications})}"></div>
 
     <main class="sub-content profile-content">
       <div class="page-title">더보기</div>

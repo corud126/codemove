@@ -28,6 +28,8 @@ import com.codemove.domain.QuoteItem;
 import com.codemove.domain.QuoteOption;
 import com.codemove.domain.ReVideo;
 import com.codemove.domain.RequestItem;
+import com.codemove.notification.NotificationDetail;
+import com.codemove.notification.NotificationService;
 import com.codemove.request.ItemCatalog;
 import com.codemove.request.MoveRequestMapper;
 import com.codemove.request.PriceCalculator;
@@ -70,6 +72,7 @@ public class QuoteService {
 	private static final Pattern QUANTITY = Pattern.compile("\\s*(\\d{1,3})\\s*(\\S{0,5})\\s*");
 
 	private final QuoteMapper quoteMapper;
+	private final NotificationService notificationService;
 	private final MoveRequestMapper requestMapper;
 	private final AdminMapper adminMapper;
 	private final CodeService codeService;
@@ -328,7 +331,10 @@ public class QuoteService {
 
 		quoteMapper.deleteItems(quoteId);
 		insertLines(quoteId, parsed);
-		// 알림 단계에서 추가: 견적 승인 상태에서 고치면 고객에게 "견적이 변경되었어요"
+		if (APPROVED.equals(q.getStatus()) && q.getMemberId() != null) {
+			notificationService.notifyMember(q.getMemberId(), NotificationDetail.QUOTE_CHANGED.code(), "견적이 변경되었어요",
+					"승인된 견적 내용이 수정되었어요. 다시 확인해 주세요.", "/estimates/" + quoteId);
+		}
 	}
 
 	/** 문서 칸에서 읽은 품목 · 옵션 (견적서에 저장하기 전) */
@@ -409,7 +415,10 @@ public class QuoteService {
 		if (quoteMapper.approve(q) == 0) {
 			throw new IllegalStateException("이미 승인했거나 확정된 견적이에요.");
 		}
-		// 알림 단계에서 추가: 고객에게 '견적 도착' 알림
+		if (q.getMemberId() != null) {
+			notificationService.notifyMember(q.getMemberId(), NotificationDetail.QUOTE_ARRIVED.code(), "견적서가 도착했어요",
+					"담당자가 확인한 견적 금액과 작업 내용을 확인해 주세요.", "/estimates/" + quoteId);
+		}
 	}
 
 	/**

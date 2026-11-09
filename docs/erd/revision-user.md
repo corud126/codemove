@@ -763,3 +763,22 @@
 | 시퀀스 추가 | `SEQ_CHATBOT_TOPIC`, `SEQ_CHATBOT_ACTION`, `SEQ_SAVED_REPLY`, `SEQ_RESERVATION_SETTING` |
 | 시퀀스 변경 | `SEQ_CHATBOT_SCENARIO` → `SEQ_LOREBOOK` |
 | 시퀀스 삭제 | `SEQ_SCHEDULE` |
+
+---
+
+## 알림 단계 (2026-11-09, 백엔드 구현)
+
+### 인덱스 (alter-20261109-notification.sql, ddl.sql 반영)
+
+| 구분 | 대상 | 용도 |
+|---|---|---|
+| 🟢 | `IX_NTF_RECEIVER_CREATED` (`RECEIVER_TYPE`, `CREATED_AT`) | 관리자 알림 패널 · 발송 내역 최근 30일 · 오늘 발송 · 보류 수 |
+| 🟢 | `IX_NTF_MEMBER` (`MEMBER_ID`) | 사용자 알림 화면 · 헤더 종 안 읽은 수 · D-3 중복 확인 |
+
+### 규칙 (구현 기준)
+
+- 이사 임박 알림: 세부 종류 `07`, 매일 오전 9시 이사일이 오늘 + 3일인 예약 확정(`01`) 건의 회원에게 한 번 (같은 예약은 `LINK_URL`로 중복 확인)
+- 고객 알림의 `NTF_CHANNEL`: 자동 발송이 켜져 있고 번호가 있으면 `02` 알림톡(실패 시 문자 대체면 `03`), 아니면 `01` 앱. 야간 보류 중이면 `SENT_AT` NULL → 보류가 끝나면 일괄 발송(10분마다 확인)
+- 관리자 알림은 `01` 앱, 생성 즉시 `SENT_AT`. 알림 받기(`PUSH_ENABLED`)를 켠 관리자에게만 휴대폰 푸시
+- 중요 표시(`IS_IMPORTANT`)는 세부 종류로 정함: `13` 채팅 대기만 `Y`
+- 알림 보관 기간은 아직 보류 (삭제 작업 없음)

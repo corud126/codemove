@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.codemove.common.code.CodeService;
 import com.codemove.domain.Quote;
 import com.codemove.domain.Reservation;
+import com.codemove.notification.NotificationDetail;
+import com.codemove.notification.NotificationService;
 import com.codemove.quote.QuoteMapper;
 import com.codemove.quote.QuoteService;
 import com.codemove.schedule.AvailabilityService;
@@ -43,6 +45,7 @@ public class ReservationService {
 	private static final DateTimeFormatter YMD_STRICT = DateTimeFormatter.ofPattern("uu.MM.dd").withResolverStyle(ResolverStyle.STRICT);
 
 	private final QuoteMapper quoteMapper;
+	private final NotificationService notificationService;
 	private final QuoteService quoteService;
 	private final ReservationMapper reservationMapper;
 	private final AvailabilityService availabilityService;
@@ -77,7 +80,10 @@ public class ReservationService {
 		reservation.setMoveDate(q.getWorkDate());
 		reservation.setMoveTime(q.getWorkTime());
 		reservationMapper.insertReservation(reservation);
-		// 알림 단계에서 추가: 관리자에게 '예약 확정' 알림, 고객에게 계약금 안내
+		notificationService.notifyAdmins(memberId, NotificationDetail.RESERVATION_CONFIRMED.code(), "예약 확정",
+				q.getContactName() + " 고객님이 견적을 확정해 예약이 생성되었습니다.", "/admin/reservations");
+		notificationService.notifyMember(memberId, NotificationDetail.RESERVATION_CONFIRMED.code(), "이사 예약이 확정되었어요",
+				"예약 내용과 계약금 결제 안내를 확인해 주세요.", "/reservations/" + reservation.getReservationId());
 		return reservation.getReservationId();
 	}
 
@@ -127,7 +133,8 @@ public class ReservationService {
 		if (!r.getMoveDate().isAfter(LocalDate.now()) || reservationMapper.cancel(reservationId, BY_MEMBER) == 0) {
 			throw new IllegalStateException("취소할 수 없는 예약이에요. 업체에 문의해 주세요.");
 		}
-		// 알림 단계에서 추가: 관리자에게 '예약 취소' 알림
+		notificationService.notifyAdmins(memberId, NotificationDetail.RESERVATION_CANCELLED.code(), "예약 취소",
+				"고객님이 " + r.getMoveDate().getMonthValue() + "월 " + r.getMoveDate().getDayOfMonth() + "일 이사 예약을 취소했습니다.", "/admin/reservations");
 	}
 
 	/* ---------- 관리자 예약 관리 (SCR-A-011) ---------- */
@@ -167,7 +174,7 @@ public class ReservationService {
 		if (reservationMapper.completePayment(reservationId) == 0) {
 			throw new IllegalStateException("결제 대기 중인 예약만 결제 완료로 바꿀 수 있어요.");
 		}
-		// 알림 단계에서 추가: 고객에게 '계약금 결제 완료' 알림
+		notifyMemberOf(reservationId, NotificationDetail.DEPOSIT_PAID, "계약금 결제가 완료되었어요", "이사 당일 잔금만 결제하시면 돼요.");
 		return ymd(reservationMapper.selectById(reservationId).getDepositPaidAt());
 	}
 
@@ -180,7 +187,7 @@ public class ReservationService {
 		if (reservationMapper.cancel(reservationId, BY_ADMIN) == 0) {
 			throw new IllegalStateException("예약 완료 상태인 예약만 취소할 수 있어요.");
 		}
-		// 알림 단계에서 추가: 고객에게 '예약 취소' 알림 (NTF_DETAIL)
+		notifyMemberOf(reservationId, NotificationDetail.RESERVATION_CANCELLED, "이사 예약이 취소되었어요", "자세한 내용은 채팅 상담으로 문의해 주세요.");
 		return ymd(reservationMapper.selectById(reservationId).getCancelledAt());
 	}
 
@@ -213,7 +220,16 @@ public class ReservationService {
 		if (reservationMapper.updateSchedule(reservationId, moveDate, time) == 0) {
 			throw new IllegalStateException("예약 완료 상태인 예약만 일정을 바꿀 수 있어요.");
 		}
-		// 알림 단계에서 추가: 고객에게 '일정 변경' 알림 (NTF_DETAIL 06)
+		notifyMemberOf(reservationId, NotificationDetail.SCHEDULE_CHANGED, "이사 일정이 변경되었어요",
+				moveDate.getMonthValue() + "월 " + moveDate.getDayOfMonth() + "일 " + QuoteService.clock(time) + "로 바뀌었어요.");
+	}
+
+	/** 예약한 회원에게 관리자 처리 결과 알림 (결제 완료 · 취소 · 일정 변경) */
+	private void notifyMemberOf(Long reservationId, NotificationDetail detail, String title, String content) {
+		Long memberId = reservationMapper.selectMemberId(reservationId);
+		if (memberId != null) {
+			notificationService.notifyMember(memberId, detail.code(), title, content, "/reservations/" + reservationId);
+		}
 	}
 
 	/** 26.10.21 → 2026-10-21 */

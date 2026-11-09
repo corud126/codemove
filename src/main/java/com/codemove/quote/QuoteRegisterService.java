@@ -17,6 +17,8 @@ import com.codemove.common.code.CodeService;
 import com.codemove.domain.Member;
 import com.codemove.domain.Quote;
 import com.codemove.member.MemberService;
+import com.codemove.notification.NotificationDetail;
+import com.codemove.notification.NotificationService;
 import com.codemove.quote.RegisterDraft.PdfForm;
 import com.codemove.quote.SheetView.OptionRow;
 import com.codemove.quote.SheetView.TransportRow;
@@ -42,6 +44,7 @@ public class QuoteRegisterService {
 	private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yy.MM.dd");
 
 	private final QuoteService quoteService;
+	private final NotificationService notificationService;
 	private final QuoteMapper quoteMapper;
 	private final QuoteFileStore fileStore;
 	private final SheetReader sheetReader;
@@ -160,7 +163,10 @@ public class QuoteRegisterService {
 			quoteService.insertLines(q.getQuoteId(), parsed);
 		}
 		fileStore.move(attached, target);
-		// 알림 단계에서 추가: 회원을 연결해 견적 승인으로 등록하면 고객에게 '견적 도착' 알림
+		if (q.getMemberId() != null && QuoteService.APPROVED.equals(q.getStatus())) {
+			notificationService.notifyMember(q.getMemberId(), NotificationDetail.QUOTE_ARRIVED.code(), "견적서가 도착했어요",
+					"담당자가 확인한 견적 금액과 작업 내용을 확인해 주세요.", "/estimates/" + q.getQuoteId());
+		}
 		return q.getQuoteId();
 	}
 
