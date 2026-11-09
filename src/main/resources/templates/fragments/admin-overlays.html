@@ -147,39 +147,30 @@
       </button>
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto pb-[calc(var(--nav)+24px)]">
-      <!--/* 더미: NTF_DETAIL 이름|NTF_CONTENT|CREATED_AT 표시|아이콘|LINK_URL|IS_IMPORTANT|IS_READ */-->
-      <section th:each="g : ${ {'오늘', '어제', '이전'} }" data-notification-group
-               th:with="items=${g == '오늘'
-                 ? {'채팅 대기|강민주 고객님이 상담원 연결을 요청했습니다.|10분 전|chat|/admin/chats/1011|Y|N',
-                    '오늘의 일정|오늘 이서준 고객님의 이사가 있습니다.|2시간 전|truck|/admin/schedule|N|N',
-                    '계약금 결제|최지우 고객님이 계약금 결제를 완료했습니다.|3시간 전|card|/admin/reservations|N|N',
-                    '예약 확정|최지우 고객님이 견적을 확정해 예약이 생성되었습니다.|5시간 전|calendarCheck|/admin/reservations|N|N'}
-                 : (g == '어제'
-                 ? {'견적 접수|홍길동 고객님의 견적 요청이 접수되었습니다.|오후 4:20|document|/admin/estimates|N|Y',
-                    '이사 D-3|김명품 고객님의 이사가 3일 남았습니다.|오전 9:00|clock|/admin/reservations|N|Y'}
-                 : {'예약 취소|박철수 고객님이 11월 14일 이사 예약을 취소했습니다.|10.26|x|/admin/reservations|N|Y',
-                    '신규 가입|윤서연 고객님(010-2345-4412)이 회원으로 가입했습니다.|10.22|user|/admin/members|N|Y',
-                    '견적 접수|정하늘 고객님의 견적 요청이 접수되었습니다.|10.19|document|/admin/estimates|N|Y'})}">
-        <h3 class="px-5 pb-1 pt-5 text-[13px] font-semibold text-[#888]" th:text="${g}">오늘</h3>
-        <a th:each="n : ${items}" th:with="t=${#strings.arraySplit(n, '|')}, important=${t[5] == 'Y'}, unread=${t[6] == 'N'}"
-           th:href="@{${t[4]}}" th:attr="data-unread=${unread} ? 'Y' : null" data-notification
+      <!--/* 값: adminNotificationPanel (NotificationViews.AdminPanel, NotificationModelInterceptor 가 관리자 화면마다 넣음).
+           없으면(미리보기 /dev) 예시 AdminPanel.SAMPLE. 행 data-id 가 있으면 읽음을 서버에 저장 (overlays.js) */-->
+      <section th:each="g : ${(adminNotificationPanel ?: T(com.codemove.notification.NotificationViews$AdminPanel).SAMPLE).groups()}" data-notification-group
+               th:with="items=${g.items()}" th:hidden="${items.isEmpty()}">
+        <h3 class="px-5 pb-1 pt-5 text-[13px] font-semibold text-[#888]" th:text="${g.label()}">오늘</h3>
+        <a th:each="n : ${items}" th:with="important=${n.important()}, unread=${n.unread()}"
+           th:href="${n.link() != null} ? @{${n.link()}} : '#'" th:attr="data-unread=${unread} ? 'Y' : null, data-id=${n.id()}" data-notification
            class="group relative flex items-start gap-3 border-b border-[#eef0ee] px-5 py-3.5 last:border-none active:bg-[#f7f8f6]">
           <span th:if="${important}" class="absolute inset-y-2.5 left-0 w-[3px] rounded-r-full bg-[#f5831a]"></span>
           <!--/* 왼쪽 아이콘 칸 (연회색 원, 중요 알림만 연주황) · 오른쪽에 분류·시간 / 내용 두 줄 */-->
           <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
                 th:classappend="${important} ? 'bg-[#fff3e6] text-[#d9701a]' : 'bg-[#f2f3f1] text-[#7d827e]'">
-            <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-' + ${t[3]}"/></svg>
+            <svg class="icon" width="18" height="18"><use th:href="@{/images/admin/icons-v2.svg} + '#i-' + ${n.icon()}"/></svg>
           </span>
           <span class="min-w-0 flex-1">
             <span class="flex items-center justify-between gap-2">
               <strong class="truncate text-[15px] font-medium group-data-unread:font-semibold"
-                      th:classappend="${important} ? 'text-[#d9701a]' : 'text-[#888] group-data-unread:text-[#292929]'" th:text="${t[0]}">채팅 대기</strong>
+                      th:classappend="${important} ? 'text-[#d9701a]' : 'text-[#888] group-data-unread:text-[#292929]'" th:text="${n.detail()}">채팅 대기</strong>
               <span class="flex shrink-0 items-center gap-1.5 text-[13px] text-[#888]">
-                <span th:text="${t[2]}">10분 전</span>
+                <span th:text="${n.time()}">10분 전</span>
                 <span class="hidden h-2 w-2 rounded-full bg-[#f5831a] group-data-unread:block" aria-label="안 읽음"></span>
               </span>
             </span>
-            <span class="mt-0.5 line-clamp-2 text-[14px] leading-[1.5] text-[#888] group-data-unread:text-[#555]" th:text="${t[1]}">알림 내용</span>
+            <span class="mt-0.5 line-clamp-2 text-[14px] leading-[1.5] text-[#888] group-data-unread:text-[#555]" th:text="${n.content()}">알림 내용</span>
           </span>
         </a>
       </section>

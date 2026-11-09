@@ -9,6 +9,7 @@ import com.codemove.domain.Member;
 import com.codemove.domain.Social;
 import com.codemove.member.LoginMember;
 import com.codemove.member.MemberService;
+import com.codemove.notification.NotificationService;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class MoreController {
 
 	private final MemberService memberService;
+	private final NotificationService notificationService;
 
 	@GetMapping("/more")
 	public String more() {
@@ -72,8 +74,11 @@ public class MoreController {
 		return "user/more/review-new";
 	}
 
+	/** 알림 (G-H13): 최근 알림 목록. 읽음 · 모두 읽음은 NotificationController */
 	@GetMapping("/notifications")
-	public String notifications() {
+	public String notifications(HttpSession session, Model model) {
+		LoginMember login = (LoginMember) session.getAttribute(HomeController.LOGIN_KEY);
+		model.addAttribute("notifications", notificationService.memberItems(login.memberId()));
 		return "user/more/notifications";
 	}
 }

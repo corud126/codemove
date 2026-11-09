@@ -66,6 +66,8 @@
   /* ---------- 알림: 탭(전체·내 이사), 읽음 처리, 모두 읽음 ---------- */
   const notiFeed = $('#notificationFeed');
   if (notiFeed) {
+    // 읽음 저장: 행 = POST /notifications/{id}/read, 모두 읽음 = POST /notifications/read-all (미리보기 행은 data-id 없음 → 화면만)
+    const post = (url) => fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
     const markRead = (row) => {
       row.classList.remove('unread');
       const dot = row.querySelector(':scope > i');
@@ -88,11 +90,18 @@
     document.addEventListener('click', (e) => {
       const tab = e.target.closest('[data-noti-tab]');
       if (tab) { showTab(tab.dataset.notiTab); return; }
-      if (e.target.closest('#readAll')) { $$('.notification-row.unread', notiFeed).forEach(markRead); return; }
+      if (e.target.closest('#readAll')) {
+        const unread = $$('.notification-row.unread', notiFeed);
+        unread.forEach(markRead);
+        if (unread.some((r) => r.dataset.id)) post('/notifications/read-all');
+        return;
+      }
       const row = e.target.closest('.notification-row');
       if (row) {
+        const wasUnread = row.classList.contains('unread');
         markRead(row);
-        if (row.dataset.href) location.href = row.dataset.href;
+        const saved = wasUnread && row.dataset.id ? post(`/notifications/${row.dataset.id}/read`) : Promise.resolve();
+        if (row.dataset.href) saved.finally(() => { location.href = row.dataset.href; });
       }
     });
     const initial = new URLSearchParams(location.search).get('tab');

@@ -5,7 +5,7 @@
   <head th:replace="~{fragments/user-layout :: head(title='홈', links=~{::link})}">
     <link rel="stylesheet" th:href="@{/css/user/home.css}">
   </head>
-  <div th:replace="~{fragments/user-layout :: header(notificationCount=1)}"></div>
+  <div th:replace="~{fragments/user-layout :: header(notificationCount=${unreadNotifications})}"></div>
   <nav th:replace="~{fragments/user-layout :: bottomNav(active='home', locked=false)}"></nav>
   <th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
   <th:block th:replace="~{fragments/user-layout :: splash}"></th:block>   (앱 진입 화면만, .app-shell 안)
@@ -43,8 +43,11 @@
   <path class="brand-mark-smile" d="M35 80c17 16 45 16 62 0"/>
 </svg>
 
-<!--/* 상단 헤더: 로고 · 일반/쉬운 모드 · 알림 */-->
-<div th:fragment="header(notificationCount)" class="app-header">
+<!--/* 상단 헤더: 로고 · 일반/쉬운 모드 · 알림
+  알림 점: notificationCount 를 넘기면 그 값, null 이면 로그인 회원의 안 읽은 알림 수(unreadNotifications, NotificationModelInterceptor)
+  예) header(notificationCount=${unreadNotifications}) · 비회원 화면은 header(notificationCount=0) */-->
+<div th:fragment="header(notificationCount)" class="app-header"
+     th:with="notiCount=${notificationCount != null ? notificationCount : (unreadNotifications != null ? unreadNotifications : 0)}">
   <div class="brand-row">
     <a class="action brand-home" th:href="@{/}" aria-label="홈으로 이동">
       <svg th:replace="~{:: brandMark('header-brand-mark')}"></svg>
@@ -57,7 +60,7 @@
     </div>
     <a class="action notification-button" th:href="@{/notifications}" aria-label="알림">
       <img alt="" class="bell" th:src="@{/images/user/0ebe3.svg}">
-      <span class="notification-dot" th:if="${notificationCount > 0}"></span>
+      <span class="notification-dot" th:if="${notiCount > 0}"></span>
     </a>
   </div>
 </div>
