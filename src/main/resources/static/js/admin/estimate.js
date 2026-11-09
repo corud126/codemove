@@ -2,9 +2,9 @@
  * 견적 관리 화면 그룹
  *  SCR-A-001 견적 관리   #estimateList     분류 필터 · 검색(이름·날짜) · 페이지(8건) · 삭제 확인 · 분류별 현황
  *  SCR-A-002 견적 확인   #estimateEdit     문서 확대(두 손가락·맞춤) · 수정→저장 확인 · 견적 승인 · 하단 버튼 · 견적 정보(승인일·만료 카운트다운)
- *  SCR-A-003/004 견적서 등록 #regFlow      첨부 → (사진) 읽는 중 → 확인·수정 → 등록 / (PDF) 확인 → 정보 입력 → 등록. 단계 이동은 ?state= 주소 (아직 모의 동작)
+ *  SCR-A-003/004 견적서 등록 #regFlow      첨부 → (사진) 읽는 중 → 확인·수정 → 등록 / (PDF) 확인 → 정보 입력 → 등록. 단계 이동은 ?state= 주소, 단계마다 서버에 보관 (사진 읽기는 AI 연동 전이라 빈 칸)
  *  공통 문서 [data-viewer] + .estimate-sheet (templates/admin/estimate/sheet.html)
- * 서버 연동: 목록 삭제 · 견적서 저장 · 승인 (AdminEstimateController). 미리보기(/dev, 모델 없음)에서는 서버를 부르지 않고 모의 동작
+ * 서버 연동: 목록 삭제 · 견적서 저장 · 승인 · 견적서 등록 (AdminEstimateController). 미리보기(/dev, 모델 없음)에서는 서버를 부르지 않고 모의 동작
  */
 (function () {
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -568,14 +568,37 @@
     const params = new URLSearchParams(location.search);
     const go = (q) => { location.href = `${location.pathname}?${q}`; };
     const next = $('#reviewNext', reg);
+    // 서버 연동: 첨부 단계는 회원 연결 목록이 있으면(실제 화면), 이후 단계는 등록 중인 내용(data-live)이 있으면. 미리보기(/dev)는 모의 동작
+    const base = '/admin/estimates/new';
+    const live = reg.dataset.live === 'true' || (s === '' && !location.pathname.startsWith('/dev'));
 
-    // 1. 첨부: 파일을 고르면 확인 화면으로
-    $$('[data-attach]', reg).forEach((input) => input.addEventListener('change', () => {
+    // 1. 첨부: 파일을 서버에 올리고 확인 화면으로 (사진 → 사진 확인, PDF → 파일 확인)
+    $$('[data-attach]', reg).forEach((input) => input.addEventListener('change', async () => {
       const file = input.files[0];
-      if (file) go(/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name) ? 'state=pdf-preview' : 'state=photo-preview');
+      if (!file) return;
+      if (!live) { go(/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name) ? 'state=pdf-preview' : 'state=photo-preview'); return; }
+      const body = new FormData();
+      body.append('file', file);
+      let res;
+      try {
+        const r = await fetch(`${base}/file`, { method: 'POST', body });
+        res = Object.assign({ ok: r.ok }, await r.json().catch(() => ({})));
+      } catch (_) { res = { ok: false, message: '잠시 후 다시 시도해 주세요.' }; }
+      input.value = '';
+      if (res.ok) go(`state=${res.next}`);
+      else snack(res.message || '파일을 다시 선택해 주세요.');
     }));
-    // 읽는 중: 첨부에서 넘어온 경우만 자동 이동 (?state=analyzing 으로 직접 열면 멈춤)
-    if (s === 'analyzing' && params.get('auto')) setTimeout(() => go('state=review'), 1800);
+    // 읽는 중: 첨부에서 넘어온 경우만 사진을 읽고 이동 (?state=analyzing 으로 직접 열면 멈춤). 꼭 필요한 칸이 비면 '확인이 필요한 항목' 화면
+    if (s === 'analyzing' && params.get('auto')) {
+      if (!live) setTimeout(() => go('state=review'), 1800);
+      else {
+        const started = Date.now();
+        post(`${base}/read`).then((res) => {
+          // 화면 전환이 너무 빠르지 않게 최소 1.2초는 읽는 중 화면을 보여 준다
+          setTimeout(() => go(res.ok ? `state=${res.next}` : 'state=photo-preview'), Math.max(0, 1200 - (Date.now() - started)));
+        });
+      }
+    }
 
     // 2. 토글 (작업 형태는 하나만, 운반 방법·옵션은 켜고 끄기) · 분류 세그먼트
     reg.addEventListener('click', (e) => {
@@ -621,7 +644,62 @@
       input.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(() => input.focus({ preventScroll: true }), 300);
     }));
-    next?.addEventListener('click', () => { if (!next.disabled) location.href = next.dataset.href; });
+    // 품목 [추가]: 그룹 아래에 빈 줄(품목 · 수량 · 단위)을 붙이고 품목 칸으로
+    $$('[data-add-item]', reg).forEach((b) => b.addEventListener('click', () => {
+      const group = b.closest('[data-group]');
+      const box = $('[data-items]', group);
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-[1fr_56px_48px] gap-1.5';
+      row.setAttribute('data-item-row', '');
+      row.innerHTML = '<input class="reg-input h-11" maxlength="50" aria-label="품목">'
+        + '<input class="reg-input h-11 px-2 text-right tabular-nums" inputmode="numeric" maxlength="3" value="1" aria-label="수량">'
+        + '<input class="reg-input h-11 px-1 text-center" maxlength="5" value="개" aria-label="단위">';
+      box.appendChild(row);
+      box.hidden = false;
+      $('[data-item-count]', group).textContent = $$('[data-item-row]', box).length;
+      row.firstElementChild.focus();
+    }));
+
+    // 확인·수정 값 → 견적서 수정과 같은 형식(SheetForm). 품목은 문서처럼 행마다 8칸(전자기기·가구·생활용품·기타 × 품목·수량)
+    function collectRegSheet() {
+      const v = (n) => (($(`[data-field="${n}"]`, reg) || {}).value || '').trim();
+      const pressed = (b) => b.getAttribute('aria-pressed') === 'true';
+      const cols = [0, 1, 2, 3].map((g) => $$(`[data-group="${g}"] [data-item-row]`, reg)
+        .map((row) => $$('input', row).map((i) => i.value.trim()))
+        .filter(([name]) => name)
+        .map(([name, qty, unit]) => [name, qty ? `${qty}${unit}` : '']));
+      const height = Math.max(0, ...cols.map((c) => c.length));
+      const items = Array.from({ length: height }, (_, r) => cols.flatMap((c) => c[r] || ['', '']));
+      return {
+        companyName: v('companyName'), customer: v('customer'), phone: v('phone'), estimateDate: v('estimateDate'),
+        origin: v('fromAddress'), moveDate: v('workDate'), destination: v('toAddress'), transportDate: v('transportDate'),
+        items,
+        options: $$('[data-option-row]', reg).map((row) => {
+          const [a, b] = $$('.reg-toggle', row);
+          return { on1: pressed(a), on2: pressed(b), cost: $('[data-option]', row).value };
+        }),
+        workMethod: (($('[data-radio] .reg-toggle[aria-pressed="true"]', reg) || {}).textContent || '').trim(),
+        transports: $$('[data-transport]', reg).map((row) => {
+          const [from, to] = $$('.reg-toggle', row);
+          return { from: pressed(from), to: pressed(to) };
+        }),
+        volume: v('volume'), note: v('note'), movingCost: v('movingCost'),
+        fromLadderFloor: v('fromLadderFloor'), departureLadder: v('fromLadderCost'),
+        toLadderFloor: v('toLadderFloor'), destinationLadder: v('toLadderCost'),
+      };
+    }
+
+    // [다음]: 서버가 검증·보관한 뒤 등록 단계로 (틀린 값은 안내 문구)
+    next?.addEventListener('click', async () => {
+      if (next.disabled) return;
+      if (!live) { location.href = next.dataset.href; return; }
+      const v = (n) => (($(`[data-field="${n}"]`, reg) || {}).value || '').trim();
+      const res = s === 'pdf-review'
+        ? await post(`${base}/pdf`, { name: v('pdfName'), phone: v('pdfPhone'), estimateDate: v('pdfEstimateDate'), total: v('pdfTotal') })
+        : await post(`${base}/sheet`, collectRegSheet());
+      if (res.ok) location.href = next.dataset.href;
+      else snack(res.message || '잠시 후 다시 시도해 주세요.');
+    });
 
     reg.addEventListener('input', (e) => {
       const i = e.target;
@@ -643,14 +721,30 @@
     const showDoc = s === 'register' || s === 'pdf-preview' || s === 'pdf-review';
     $('[data-full="photo"]', full).hidden = showDoc;
     $('[data-full="doc"]', full).hidden = !showDoc;
-    $('[data-full-title]', full).textContent = !showDoc ? 'photo.jpg'
-      : (reg.dataset.source === 'pdf' || s.startsWith('pdf') ? '견적서_정도현_230914.pdf' : '견적서 미리보기');
+    const fileName = reg.dataset.fileName || 'photo.jpg';
+    $('[data-full-title]', full).textContent = !showDoc ? fileName
+      : (reg.dataset.source === 'pdf' || s.startsWith('pdf') ? fileName : '견적서 미리보기');
     if (s === 'full-view' || params.get('full') === 'open') layer.open('#fullView');
 
-    // 3. 회원 연결 (?state=register&picker=open)
+    // 3. 회원 연결 (?state=register&picker=open): 이름 · 번호(숫자만 비교) 검색, 맞는 회원 5명까지
+    let memberId = null;
+    const search = $('[data-member-search]');
+    const filterMembers = () => {
+      const q = search.value.trim();
+      const digits = q.replace(/\D/g, '');
+      let shown = 0;
+      $$('[data-member-list] [data-member]').forEach((b) => {
+        const hit = !q || (b.dataset.name || '').includes(q) || (digits.length >= 2 && (b.dataset.phone || '').replace(/\D/g, '').includes(digits));
+        b.hidden = !hit || shown >= 5;
+        if (!b.hidden) shown++;
+      });
+    };
+    search?.addEventListener('input', filterMembers);
+    filterMembers();
     $('#memberPicker').addEventListener('click', (e) => {
       const b = e.target.closest('[data-member]');
       if (!b) return;
+      memberId = b.dataset.name && b.dataset.id ? Number(b.dataset.id) : null;
       const label = $('#memberLinked');
       if (label) {
         label.textContent = b.dataset.name ? `${b.dataset.name} · ${b.dataset.phone}` : '연결 안 함';
@@ -660,10 +754,22 @@
     });
     if (params.get('picker') === 'open') layer.open('#memberPicker');
 
-    // [견적 관리에 등록]: 목록 맨 위에 추가 + 완료 알림 (모의)
-    $('#registerSubmit', reg)?.addEventListener('click', () => {
+    // [견적 관리에 등록]: 서버에 등록 → 견적 관리로 이동 + 완료 알림 (분류: 견적 검토 01 · 견적 승인 02 · 견적 확정 03)
+    $('#registerSubmit', reg)?.addEventListener('click', async (e) => {
       const submit = $('#registerSubmit', reg);
       const status = ($('[data-segment] [aria-checked="true"]', reg) || {}).textContent || '견적 검토';
+      if (live) {
+        e.preventDefault();
+        if (submit.dataset.busy) return;
+        submit.dataset.busy = '1';
+        const code = ['견적 검토', '견적 승인', '견적 확정'].indexOf(status.trim()) + 1;
+        const res = await post(base, { memberId, status: `0${Math.max(code, 1)}` });
+        delete submit.dataset.busy;
+        if (!res.ok) { snack(res.message || '잠시 후 다시 시도해 주세요.'); return; }
+        toastAfterReload({ title: '견적서 등록 완료', message: `${res.name} 고객님의 견적서가 등록되었습니다.`, href: `/admin/estimates/${res.id}` });
+        location.href = '/admin/estimates';
+        return;
+      }
       try {
         sessionStorage.setItem('newEstimate', JSON.stringify({ name: submit.dataset.name, date: submit.dataset.date, status: status.trim() }));
         sessionStorage.setItem('adminToast', JSON.stringify({

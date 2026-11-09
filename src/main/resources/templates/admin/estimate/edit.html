@@ -185,14 +185,22 @@
       </div>
 
       <!--/* 원본 파일 탭 (사진·PDF 등록만, DOCUMENT_PATH) */-->
-      <div th:unless="${fromRequest}" data-panel="file" th:hidden="${tab != 'file'}" class="px-4 pb-8 pt-4">
-        <div th:if="${source == 'photo'}" class="lined-paper aspect-[3/4] w-full rounded-[12px]" role="img" aria-label="등록한 수기 견적서 사진"></div>
-        <div th:unless="${source == 'photo'}" class="rounded-[12px] bg-[#eeefec] px-10 py-6">
-          <div class="mx-auto w-[72%] shadow-[0_1px_8px_rgba(0,0,0,.06)]" inert><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></div>
+      <!--/* 실제 원본(d.documentName 있음): GET /admin/estimates/{id}/file (?download=true 내려받기). 미리보기는 예시 모양 */-->
+      <div th:unless="${fromRequest}" data-panel="file" th:hidden="${tab != 'file'}" class="px-4 pb-8 pt-4"
+           th:with="hasFile=${d.quoteId != null and d.documentName != null},
+                    fileUrl=${d.quoteId != null} ? @{/admin/estimates/{id}/file(id=${d.quoteId})} : null,
+                    isPdf=${hasFile} ? ${#strings.endsWith(#strings.toLowerCase(d.documentName), '.pdf')} : ${source != 'photo'}">
+        <img th:if="${hasFile and !isPdf}" th:src="${fileUrl}" alt="등록한 수기 견적서 사진" class="block w-full rounded-[12px]">
+        <div th:if="${!hasFile and !isPdf}" class="lined-paper aspect-[3/4] w-full rounded-[12px]" role="img" aria-label="등록한 수기 견적서 사진"></div>
+        <div th:if="${isPdf}" class="rounded-[12px] bg-[#eeefec] px-10 py-6">
+          <div class="mx-auto w-[72%] shadow-[0_1px_8px_rgba(0,0,0,.06)]" inert><iframe th:if="${hasFile}" th:src="${fileUrl + '#toolbar=0&navpanes=0&view=FitH'}" title="등록한 PDF 견적서" tabindex="-1" class="block aspect-[3/4] w-full bg-white"></iframe><th:block th:unless="${hasFile}"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></th:block></div>
         </div>
         <div class="mt-3 flex items-center justify-between gap-3 pl-1">
-          <p class="min-w-0 truncate text-[15px] font-semibold text-[#292929]" th:text="${source == 'photo'} ? '수기견적서_홍길동.jpg' : '견적서_홍길동_260325.pdf'">견적서.pdf</p>
-          <button type="button" aria-label="원본 파일 다운로드" class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#2a2d28] hover:bg-black/5">
+          <p class="min-w-0 truncate text-[15px] font-semibold text-[#292929]" th:text="${hasFile} ? ${d.documentName} : (${source == 'photo'} ? '수기견적서_홍길동.jpg' : '견적서_홍길동_260325.pdf')">견적서.pdf</p>
+          <a th:if="${hasFile}" th:href="${fileUrl + '?download=true'}" aria-label="원본 파일 다운로드" class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#2a2d28] hover:bg-black/5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10.5 5 5 5-5"/><path d="M5 20h14"/></svg>
+          </a>
+          <button th:unless="${hasFile}" type="button" aria-label="원본 파일 다운로드" class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#2a2d28] hover:bg-black/5">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10.5 5 5 5-5"/><path d="M5 20h14"/></svg>
           </button>
         </div>

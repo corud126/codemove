@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.codemove.admin.AdminMapper;
 import com.codemove.common.code.CodeService;
@@ -53,10 +55,10 @@ public class QuoteService {
 	/** 승인 후 만료까지 (ERD 0단계 제안) */
 	private static final Duration EXPIRES_AFTER = Duration.ofHours(72);
 	/** 문서 품목 칸 순서 → ITEM_CATEGORY: 전자기기 02 · 가구 01 · 생활용품 03 · 기타 04 */
-	private static final List<String> SHEET_COLUMNS = List.of("02", "01", "03", "04");
+	static final List<String> SHEET_COLUMNS = List.of("02", "01", "03", "04");
 	private static final int MIN_ITEM_ROWS = 8;
 	/** 옵션 8종 선택 칸 이름 (QUOTE_OPTION 01~08 순서) */
-	private static final List<String[]> OPTION_CHOICES = List.of(new String[] { "일반", "그랜드" },
+	static final List<String[]> OPTION_CHOICES = List.of(new String[] { "일반", "그랜드" },
 			new String[] { "분해", "조립" }, new String[] { "분해", "조립" }, new String[] { "탈착", "설치" },
 			new String[] { "분리", "설치" }, new String[] { "계단", "승강기" }, new String[] { "분리", "설치" },
 			new String[] { "탈착", "설치" });
@@ -73,6 +75,7 @@ public class QuoteService {
 	private final CodeService codeService;
 	private final ItemCatalog catalog;
 	private final PriceCalculator priceCalculator;
+	private final QuoteFileStore fileStore;
 
 	/** 견적 관리 목록 행: 분류 · 이름 · 견적일(YY.MM.DD) */
 	public record ListRow(Long id, String status, String name, String date, boolean deletable) {
@@ -315,6 +318,28 @@ public class QuoteService {
 		if (CONFIRMED.equals(q.getStatus())) {
 			throw new IllegalStateException("확정된 견적은 수정할 수 없어요. 변경은 채팅 상담으로 처리해 주세요.");
 		}
+		Parsed parsed = applySheet(q, f);
+		if (APPROVED.equals(q.getStatus())) {
+			q.setExpiresAt(expiresAtFor(q));
+		}
+		if (quoteMapper.updateSheet(q) == 0) {
+			throw new IllegalStateException("확정된 견적은 수정할 수 없어요. 변경은 채팅 상담으로 처리해 주세요.");
+		}
+
+		quoteMapper.deleteItems(quoteId);
+		insertLines(quoteId, parsed);
+		// 알림 단계에서 추가: 견적 승인 상태에서 고치면 고객에게 "견적이 변경되었어요"
+	}
+
+	/** 문서 칸에서 읽은 품목 · 옵션 (견적서에 저장하기 전) */
+	record Parsed(List<QuoteItem> items, List<QuoteOption> options) {
+	}
+
+	/**
+	 * 문서 칸 값을 해석해 견적서 본문에 옮기고 총 비용·계약금·잔금을 다시 계산한다 (견적서 저장 · 사진 등록 공용).
+	 * 품목·옵션은 저장하지 않고 돌려준다. 잘못된 값이면 IllegalArgumentException
+	 */
+	Parsed applySheet(Quote q, SheetForm f) {
 		q.setCompanyName(required(f.companyName(), 50, "업체명"));
 		q.setContactName(required(f.customer(), 50, "담당자"));
 		q.setContactPhone(optional(f.phone(), 20, "연락처"));
@@ -339,29 +364,34 @@ public class QuoteService {
 		q.setToLadderFloor(parseFloor(f.toLadderFloor()));
 		q.setToLadderCost(parseMoney(f.destinationLadder()));
 
-		List<QuoteOption> options = parseOptions(quoteId, f.options());
+		List<QuoteOption> options = parseOptions(q.getQuoteId(), f.options());
 		long optionCost = options.stream().mapToLong(QuoteOption::getOptionCost).sum();
 		long total = q.getMovingCost() + q.getFromLadderCost() + q.getToLadderCost() + optionCost;
+		setAmounts(q, total);
+		return new Parsed(parseItems(q.getQuoteId(), f.items()), options);
+	}
+
+	/** 총 비용과 계약금(설정 비율)·잔금 */
+	void setAmounts(Quote q, long total) {
 		long deposit = priceCalculator.deposit(total);
 		q.setTotalAmount(total);
 		q.setDepositAmount(deposit);
 		q.setBalanceAmount(total - deposit);
-		if (APPROVED.equals(q.getStatus())) {
-			q.setExpiresAt(expiresAt(q.getWorkDate()));
-		}
-		if (quoteMapper.updateSheet(q) == 0) {
-			throw new IllegalStateException("확정된 견적은 수정할 수 없어요. 변경은 채팅 상담으로 처리해 주세요.");
-		}
+	}
 
-		quoteMapper.deleteItems(quoteId);
+	/** 품목은 문서 순서대로, 옵션은 기존 것을 지우고 다시 넣는다 (품목은 호출 쪽에서 지움) */
+	void insertLines(Long quoteId, Parsed parsed) {
 		int order = 1;
-		for (QuoteItem item : parseItems(quoteId, f.items())) {
+		for (QuoteItem item : parsed.items()) {
+			item.setQuoteId(quoteId);
 			item.setSortOrder(order++);
 			quoteMapper.insertQuoteItem(item);
 		}
 		quoteMapper.deleteOptions(quoteId);
-		options.forEach(quoteMapper::insertOption);
-		// 알림 단계에서 추가: 견적 승인 상태에서 고치면 고객에게 "견적이 변경되었어요"
+		for (QuoteOption option : parsed.options()) {
+			option.setQuoteId(quoteId);
+			quoteMapper.insertOption(option);
+		}
 	}
 
 	/** 견적 승인 · 다시 승인. 작업일이 없으면 승인할 수 없다 (ERD 2단계 Q6) */
@@ -375,7 +405,7 @@ public class QuoteService {
 			throw new IllegalStateException("작업일을 입력해야 승인할 수 있어요.");
 		}
 		q.setAdminId(adminId);
-		q.setExpiresAt(expiresAt(q.getWorkDate()));
+		q.setExpiresAt(expiresAtFor(q));
 		if (quoteMapper.approve(q) == 0) {
 			throw new IllegalStateException("이미 승인했거나 확정된 견적이에요.");
 		}
@@ -398,7 +428,36 @@ public class QuoteService {
 		quoteMapper.deleteItems(quoteId);
 		quoteMapper.deleteOptions(quoteId);
 		quoteMapper.deleteQuote(quoteId);
+		// 원본 파일은 삭제가 확정된 뒤 지운다 (롤백되면 그대로 둠)
+		String document = q.getDocumentPath();
+		if (document != null) {
+			if (TransactionSynchronizationManager.isSynchronizationActive()) {
+				TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+					@Override
+					public void afterCommit() {
+						fileStore.delete(document);
+					}
+				});
+			} else {
+				fileStore.delete(document);
+			}
+		}
 		return q.getContactName();
+	}
+
+	/** 원본 파일 (사진·PDF 등록). 없거나 파일이 사라졌으면 null */
+	public java.nio.file.Path documentFile(Long quoteId) {
+		Quote q = quoteMapper.selectById(quoteId);
+		if (q == null || q.getDocumentPath() == null) {
+			return null;
+		}
+		java.nio.file.Path p = java.nio.file.Path.of(q.getDocumentPath());
+		return java.nio.file.Files.isRegularFile(p) ? p : null;
+	}
+
+	/** 만료 규칙은 견적 요청(01)에만 (ERD Q3). 사진·PDF 등록 견적은 만료 시각 없음 */
+	static LocalDateTime expiresAtFor(Quote q) {
+		return SOURCE_REQUEST.equals(q.getSourceType()) ? expiresAt(q.getWorkDate()) : null;
 	}
 
 	/** 목록에서 삭제 버튼을 보여줄지 (사진·PDF 등록만) */
@@ -495,7 +554,7 @@ public class QuoteService {
 		return options;
 	}
 
-	private static long parseMoney(String text) {
+	static long parseMoney(String text) {
 		String digits = text == null ? "" : text.replaceAll("\\D", "");
 		if (digits.length() > 10) {
 			throw new IllegalArgumentException("금액이 너무 커요.");
@@ -527,7 +586,7 @@ public class QuoteService {
 		}
 	}
 
-	private static LocalDate requiredDate(String text, String label) {
+	static LocalDate requiredDate(String text, String label) {
 		LocalDate date = optionalDate(text, label);
 		if (date == null) {
 			throw new IllegalArgumentException(label + josa(label, "을", "를") + " 입력해 주세요.");
@@ -550,7 +609,7 @@ public class QuoteService {
 		}
 	}
 
-	private static String required(String text, int max, String label) {
+	static String required(String text, int max, String label) {
 		String v = optional(text, max, label);
 		if (v == null) {
 			throw new IllegalArgumentException(label + josa(label, "을", "를") + " 입력해 주세요.");
@@ -558,7 +617,7 @@ public class QuoteService {
 		return v;
 	}
 
-	private static String optional(String text, int max, String label) {
+	static String optional(String text, int max, String label) {
 		if (blank(text)) {
 			return null;
 		}
@@ -578,7 +637,7 @@ public class QuoteService {
 
 	/* ---------- 표시 형식 ---------- */
 
-	private static String money(long n) {
+	static String money(long n) {
 		return NumberFormat.getNumberInstance(Locale.KOREA).format(n);
 	}
 
@@ -607,7 +666,7 @@ public class QuoteService {
 		return "Y".equals(yn);
 	}
 
-	private static boolean blank(String s) {
+	static boolean blank(String s) {
 		return s == null || s.isBlank();
 	}
 

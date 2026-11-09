@@ -3,6 +3,7 @@ package com.codemove.member;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,6 +88,28 @@ public class MemberService {
 	public void withdraw(Long memberId) {
 		memberMapper.deleteSocials(memberId);
 		memberMapper.withdrawMember(memberId);
+	}
+
+	/**
+	 * 휴대폰 번호 변경 (본인인증을 마친 새 번호, 010-0000-0000 형식).
+	 * 다른 회원이 쓰는 번호면 IllegalStateException(화면 문구), 탈퇴 등으로 회원이 없으면 null. 바뀐 회원
+	 */
+	@Transactional
+	public Member changePhone(Long memberId, String phone) {
+		Member owner = memberMapper.selectByPhone(phone);
+		if (owner != null && !owner.getMemberId().equals(memberId)) {
+			throw new IllegalStateException("이미 가입된 번호예요. 다른 번호를 입력해 주세요.");
+		}
+		try {
+			if (memberMapper.updatePhone(memberId, phone) == 0) {
+				return null;
+			}
+		} catch (DuplicateKeyException e) {
+			// 확인과 변경 사이에 같은 번호로 가입된 경우
+			throw new IllegalStateException("이미 가입된 번호예요. 다른 번호를 입력해 주세요.");
+		}
+		// 알림 단계에서 추가: 이전 번호로 '휴대폰 번호가 변경되었어요' 안내
+		return findActiveById(memberId);
 	}
 
 	private static Member activeOnly(Member member) {
