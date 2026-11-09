@@ -153,4 +153,33 @@
 		DELETE FROM TBL_QUOTE WHERE QUOTE_ID = #{quoteId}
 	</delete>
 
+	<insert id="insertRegistered" parameterType="Quote">
+		<selectKey keyProperty="quoteId" resultType="long" order="BEFORE">
+			SELECT SEQ_QUOTE.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TBL_QUOTE (
+			QUOTE_ID, QUOTE_NO, MEMBER_ID, ADMIN_ID, SOURCE_TYPE, STATUS, COMPANY_NAME, CONTACT_NAME, CONTACT_PHONE, ESTIMATE_DATE,
+			FROM_ADDRESS, TO_ADDRESS, WORK_DATE, WORK_TIME, TRANSPORT_DATE, WORK_TYPE,
+			FROM_LADDER_USE, TO_LADDER_USE, FROM_ELEVATOR_USE, TO_ELEVATOR_USE, FROM_STAIRS_USE, TO_STAIRS_USE,
+			VOLUME_TON, NOTE, MOVING_COST, FROM_LADDER_FLOOR, FROM_LADDER_COST, TO_LADDER_FLOOR, TO_LADDER_COST,
+			TOTAL_AMOUNT, DEPOSIT_AMOUNT, BALANCE_AMOUNT, DOCUMENT_PATH, APPROVED_AT, UPDATED_AT
+		) VALUES (
+			#{quoteId}, 'QT-' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(#{quoteId}, 10000), 4, '0'), #{memberId}, #{adminId},
+			#{sourceType}, #{status}, NVL(#{companyName}, '명품익스프레스'), #{contactName}, #{contactPhone}, #{estimateDate},
+			#{fromAddress}, #{toAddress}, #{workDate}, #{workTime}, #{transportDate}, #{workType},
+			NVL(#{fromLadderUse}, 'N'), NVL(#{toLadderUse}, 'N'), NVL(#{fromElevatorUse}, 'N'), NVL(#{toElevatorUse}, 'N'),
+			NVL(#{fromStairsUse}, 'N'), NVL(#{toStairsUse}, 'N'),
+			#{volumeTon}, #{note}, #{movingCost}, #{fromLadderFloor}, NVL(#{fromLadderCost}, 0), #{toLadderFloor}, NVL(#{toLadderCost}, 0),
+			#{totalAmount}, #{depositAmount}, #{balanceAmount}, #{documentPath},
+			CASE WHEN #{status} IN ('02', '03') THEN SYSDATE END, SYSDATE
+		)
+	</insert>
+
+	<select id="selectActiveMembers" resultType="Member">
+		SELECT MEMBER_ID, MEMBER_NAME, PHONE, JOINED_AT
+		  FROM TBL_MEMBER
+		 WHERE IS_ACTIVE = 'Y'
+		 ORDER BY JOINED_AT DESC, MEMBER_ID DESC
+	</select>
+
 </mapper>

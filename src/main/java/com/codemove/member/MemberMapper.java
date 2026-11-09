@@ -31,4 +31,7 @@ public interface MemberMapper {
 	int insertSocial(Social social);
 
 	int deleteSocials(Long memberId);
+
+	/** 휴대폰 번호 변경 (탈퇴 회원 제외). PHONE 은 UNIQUE 라 이미 쓰는 번호면 DuplicateKeyException */
+	int updatePhone(@Param("memberId") Long memberId, @Param("phone") String phone);
 }

@@ -53,4 +53,13 @@ public interface QuoteMapper {
 	int confirm(@Param("quoteId") Long quoteId, @Param("updatedAt") java.time.LocalDateTime updatedAt);
 
 	int deleteQuote(Long quoteId);
+
+	/**
+	 * 관리자 견적서 등록 (사진 02 · PDF 03): 견적서 본문 · 원본 경로 · 회원 연결(선택) · 상태를 한 번에 넣는다.
+	 * QUOTE_ID 는 SEQ_QUOTE, QUOTE_NO 는 QT-등록일-QUOTE_ID 끝 4자리. 승인·확정으로 등록하면 APPROVED_AT 은 등록 시각
+	 */
+	int insertRegistered(Quote quote);
+
+	/** 견적서 등록 회원 연결 목록: 탈퇴하지 않은 회원 (가입 최근 순) */
+	List<com.codemove.domain.Member> selectActiveMembers();
 }

@@ -7,7 +7,8 @@
         ?state=pdf-review PDF 이름·연락처·견적일·총 비용 입력
         ?state=register 등록 (&source=pdf 이면 PDF 등록) | &picker=open 회원 연결 시트 | ?state=full-view 원본 사진 크게 보기 (&full=open 은 등록 단계 문서)
   ERD: SOURCE_TYPE(사진/PDF 등록) · MEMBER_ID(선택) · CONTACT_NAME/PHONE · ESTIMATE_DATE · STATUS · TBL_QUOTE 본문 · TBL_QUOTE_ITEM(4그룹 고정, 수량+단위) · TBL_QUOTE_OPTION 8종
-  첨부 · 미인식 확인 · 금액 계산 · 회원 연결 · 등록(목록에 추가 + 알림)은 estimate.js (더미 데이터) */-->
+  model: reg (RegisterView — 세션의 등록 중인 내용, 첨부 단계·미리보기에서는 없음 → 예시 RegisterView.SAMPLE) · members (회원 연결 목록) · sheetView (사진 등록 단계 문서)
+  첨부 · 읽기 · 미인식 확인 · 금액 계산 · 회원 연결 · 등록은 estimate.js 가 AdminEstimateController 로 보낸다 (미리보기에서는 모의 동작) */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="ko"
       th:replace="~{fragments/admin-layout :: layout(title='견적서 등록', active='estimate', fixed=false, content=~{::content}, scripts=~{::scripts})}">
 <body>
@@ -31,12 +32,16 @@
 
   <div id="regFlow" class="flex min-h-full flex-col"
        th:with="state=${param.state != null ? param.state[0] : ''},
-                pdf=${param.source != null and param.source[0] == 'pdf'},
+                live=${reg != null},
+                r=${reg ?: T(com.codemove.quote.RegisterView).SAMPLE},
+                pdf=${live} ? ${reg.source == 'pdf'} : ${param.source != null and param.source[0] == 'pdf'},
+                fname=${live} ? ${reg.fileName} : (${pdf or #strings.startsWith(state, 'pdf')} ? '견적서_정도현_230914.pdf' : 'photo.jpg'),
+                pdfSrc=${live} ? ${reg.fileUrl + '#toolbar=0&navpanes=0&view=FitH'} : null,
                 step=${state == 'review' or state == 'unrecognized' or state == 'pdf-review' or state == 'analyzing' or state == 'full-view'} ? 2 : (${state == 'register'} ? 3 : 1),
                 missing=${state == 'unrecognized'},
                 isReview=${state == 'review' or state == 'unrecognized' or state == 'full-view'},
                 inp='reg-input tabular-nums'"
-       th:attr="data-state=${state}, data-source=${pdf} ? 'pdf' : 'photo'">
+       th:attr="data-state=${state}, data-source=${pdf} ? 'pdf' : 'photo', data-live=${live} ? 'true' : null, data-next=${r.next}, data-file-name=${fname}">
 
     <!--/* 흐름 머리: 뒤로 · 단계 막대 · n/3 (사용자 앱 .flow-head 와 같은 구성) */-->
     <div class="sticky top-0 z-10 grid grid-cols-[auto_1fr_auto] items-center gap-3 bg-[#f7f8f6]/95 px-3 py-2.5 backdrop-blur">
@@ -82,10 +87,11 @@
       <th:block th:if="${state == 'photo-preview'}">
         <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">사진을 확인해 주세요</h2>
         <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-6 block w-full overflow-hidden rounded-[20px] bg-white text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
-          <span class="lined-paper block aspect-[4/3] w-full"></span>
+          <img th:if="${live}" th:src="${r.fileUrl}" alt="첨부한 견적서 사진" class="block aspect-[4/3] w-full object-cover">
+          <span th:unless="${live}" class="lined-paper block aspect-[4/3] w-full"></span>
           <span class="flex items-center justify-between gap-2 px-4 py-3.5">
             <span class="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-[#292929]">
-              <svg class="icon shrink-0 text-[#346538]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-camera'"/></svg><span class="truncate">photo.jpg</span>
+              <svg class="icon shrink-0 text-[#346538]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-camera'"/></svg><span class="truncate" th:text="${fname}">photo.jpg</span>
             </span>
             <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
           </span>
@@ -97,11 +103,11 @@
         <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">파일을 확인해 주세요</h2>
         <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-6 block w-full overflow-hidden rounded-[20px] bg-white text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
           <span class="block bg-[#eef0ee] px-10 py-6">
-            <span class="mx-auto block w-[70%] shadow-[0_6px_18px_rgba(26,26,26,.12)]"><span inert class="pointer-events-none block"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></span></span>
+            <span class="mx-auto block w-[70%] shadow-[0_6px_18px_rgba(26,26,26,.12)]"><span inert class="pointer-events-none block"><iframe th:if="${live}" th:src="${pdfSrc}" title="첨부한 PDF" tabindex="-1" class="block aspect-[3/4] w-full bg-white"></iframe><th:block th:unless="${live}"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></th:block></span></span>
           </span>
           <span class="flex items-center justify-between gap-2 px-4 py-3.5">
             <span class="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-[#292929]">
-              <svg class="icon shrink-0 text-[#346538]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-document'"/></svg><span class="truncate">견적서_정도현_230914.pdf</span>
+              <svg class="icon shrink-0 text-[#346538]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-document'"/></svg><span class="truncate" th:text="${fname}">견적서_정도현_230914.pdf</span>
             </span>
             <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
           </span>
@@ -134,8 +140,9 @@
 
         <!--/* 원본 사진 */-->
         <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-5 flex w-full items-center gap-3 rounded-[16px] bg-white p-3 text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
-          <span class="lined-paper h-14 w-11 shrink-0 rounded-[8px]"></span>
-          <span class="min-w-0 flex-1"><span class="block text-[15px] font-semibold text-[#292929]">원본 사진</span><span class="block truncate text-[13px] text-[#888]">photo.jpg</span></span>
+          <img th:if="${live}" th:src="${r.fileUrl}" alt="" class="h-14 w-11 shrink-0 rounded-[8px] object-cover">
+          <span th:unless="${live}" class="lined-paper h-14 w-11 shrink-0 rounded-[8px]"></span>
+          <span class="min-w-0 flex-1"><span class="block text-[15px] font-semibold text-[#292929]">원본 사진</span><span class="block truncate text-[13px] text-[#888]" th:text="${fname}">photo.jpg</span></span>
           <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
         </div>
 
@@ -154,12 +161,12 @@
         <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
           <h3 class="text-[17px] font-bold text-[#1a1a1a]">고객·주소</h3>
           <div class="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-3.5">
-            <label th:each="f : ${ {'업체명|companyName|명품익스프레스|2', '담당자|customer|김민준|1', '연락처|phone|010-4821-7735|1',
-                                    '출발지|fromAddress|광주 북구 용봉로 77, 3층|2', '도착지|toAddress|광주 서구 상무중앙로 110, 12층|2'} }"
-                   th:with="t=${#strings.arraySplit(f, '|')}, miss=${missing and (t[1] == 'customer' or t[1] == 'toAddress')}"
-                   class="block" th:classappend="${t[3] == '2'} ? 'col-span-2'">
+            <label th:each="f : ${ {'업체명|companyName|2', '담당자|customer|1', '연락처|phone|1', '출발지|fromAddress|2', '도착지|toAddress|2'} }"
+                   th:with="t=${#strings.arraySplit(f, '|')}, val=${r.values[t[1]]},
+                            miss=${missing and (t[1] == 'customer' or t[1] == 'toAddress') and (!live or #strings.isEmpty(val))}"
+                   class="block" th:classappend="${t[2] == '2'} ? 'col-span-2'">
               <span class="mb-1.5 block px-0.5 text-[13px] text-[#888]" th:text="${t[0]}">담당자</span>
-              <input th:class="${inp}" th:attr="data-field=${t[1]}, data-missing=${miss} ? 'true' : null, data-required=${t[1] == 'customer' or t[1] == 'toAddress'} ? 'true' : null" th:value="${miss} ? '' : ${t[2]}">
+              <input th:class="${inp}" th:attr="data-field=${t[1]}, data-missing=${miss} ? 'true' : null, data-required=${t[1] == 'customer' or t[1] == 'toAddress'} ? 'true' : null" th:value="${miss} ? '' : ${val}">
               <span class="reg-missing mt-1 px-0.5 text-[12px] font-medium text-[#d9701a]">확인 필요</span>
             </label>
           </div>
@@ -169,55 +176,53 @@
         <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
           <h3 class="text-[17px] font-bold text-[#1a1a1a]">일정·작업</h3>
           <div class="mt-4 grid grid-cols-3 gap-x-2 gap-y-3.5">
-            <label th:each="f : ${ {'견적일|estimateDate|26.09.04', '작업일|workDate|26.09.20', '운송일|transportDate|26.09.20'} }"
-                   th:with="t=${#strings.arraySplit(f, '|')}, miss=${missing and t[1] == 'estimateDate'}" class="block">
+            <label th:each="f : ${ {'견적일|estimateDate', '작업일|workDate', '운송일|transportDate'} }"
+                   th:with="t=${#strings.arraySplit(f, '|')}, val=${r.values[t[1]]}, miss=${missing and t[1] == 'estimateDate' and (!live or #strings.isEmpty(val))}" class="block">
               <span class="mb-1.5 block px-0.5 text-[13px] text-[#888]" th:text="${t[0]}">견적일</span>
               <input th:class="${inp} + ' px-2.5 text-center'" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD"
-                     th:attr="data-field=${t[1]}, data-missing=${miss} ? 'true' : null, data-required=${t[1] == 'estimateDate'} ? 'true' : null" th:value="${miss} ? '' : ${t[2]}">
+                     th:attr="data-field=${t[1]}, data-missing=${miss} ? 'true' : null, data-required=${t[1] == 'estimateDate'} ? 'true' : null" th:value="${miss} ? '' : ${val}">
               <span class="reg-missing mt-1 px-0.5 text-[12px] font-medium text-[#d9701a]">확인 필요</span>
             </label>
           </div>
           <p class="mb-1.5 mt-4 px-0.5 text-[13px] text-[#888]">작업 형태</p>
           <div class="grid grid-cols-4 gap-1.5" data-radio>
-            <button th:each="w : ${ {'포장', '반포장', '일반', '보관'} }" type="button" class="reg-toggle px-0" th:attr="aria-pressed=${w == '포장'}" th:text="${w}">포장</button>
+            <button th:each="w : ${ {'포장', '반포장', '일반', '보관'} }" type="button" class="reg-toggle px-0" th:attr="aria-pressed=${w == r.values['workMethod']}" th:text="${w}">포장</button>
           </div>
           <p class="mb-1.5 mt-4 px-0.5 text-[13px] text-[#888]">운반 방법</p>
           <div class="overflow-hidden rounded-[12px] ring-1 ring-inset ring-[#eef0ee]">
             <div class="grid grid-cols-[1fr_72px_72px] items-center gap-2 bg-[#f7f8f6] px-3 py-2 text-[12px] font-semibold text-[#888]"><span>방법</span><span class="text-center">출발지</span><span class="text-center">도착지</span></div>
-            <div th:each="c : ${ {'사다리차|Y|Y', '엘리베이터|N|N', '계단|N|N'} }" th:with="t=${#strings.arraySplit(c, '|')}"
+            <div th:each="c : ${r.transports}" data-transport
                  class="grid grid-cols-[1fr_72px_72px] items-center gap-2 border-t border-[#eef0ee] px-3 py-2">
-              <span class="text-[15px] font-semibold text-[#292929]" th:text="${t[0]}">사다리차</span>
-              <button type="button" class="reg-toggle h-8 px-0" th:attr="aria-pressed=${t[1] == 'Y'}, aria-label=|${t[0]} 출발지|">사용</button>
-              <button type="button" class="reg-toggle h-8 px-0" th:attr="aria-pressed=${t[2] == 'Y'}, aria-label=|${t[0]} 도착지|">사용</button>
+              <span class="text-[15px] font-semibold text-[#292929]" th:text="${c.name}">사다리차</span>
+              <button type="button" class="reg-toggle h-8 px-0" th:attr="aria-pressed=${c.from}, aria-label=|${c.name} 출발지|">사용</button>
+              <button type="button" class="reg-toggle h-8 px-0" th:attr="aria-pressed=${c.to}, aria-label=|${c.name} 도착지|">사용</button>
             </div>
           </div>
           <div class="mt-4 grid grid-cols-[1fr_2fr] gap-2.5">
             <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">이사물량</span>
-              <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="decimal" value="3.5"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">톤</span></span></label>
+              <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="decimal" data-field="volume" th:value="${r.values['volume']}"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">톤</span></span></label>
             <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">비고</span>
-              <input th:class="${inp}" maxlength="500" value="파손 주의 물품 별도 포장"></label>
+              <input th:class="${inp}" maxlength="500" data-field="note" th:value="${r.values['note']}"></label>
           </div>
         </section>
 
         <!--/* 품목 — 그룹 4개 고정 (ERD Q14), 수량 + 단위 */-->
         <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
           <h3 class="text-[17px] font-bold text-[#1a1a1a]">품목</h3>
-          <div th:each="g : ${ {'전자기기=모니터:6:대,컴퓨터:3:대,공기청정기:1:대,소형 냉장고:1:대,전자레인지:1:대,프린터/복합기:1:대,TV:1:대',
-                                '가구=의자:6:개,테이블:2:개,원형 테이블:1:개,파티션:3:개,대형 캐비넷:2:개,책상:2:개,데스크 수납함:3:개,보조 서랍장:3:개',
-                                '생활용품=', '기타='} }"
-               th:with="grp=${#strings.arraySplit(g + ' ', '=')}, items=${#strings.isEmpty(#strings.trim(grp[1])) ? null : #strings.arraySplit(#strings.trim(grp[1]), ',')}"
+          <!--/* data-group: 문서 품목 칸 순서(전자기기 0 · 가구 1 · 생활용품 2 · 기타 3), [추가] 는 estimate.js 가 빈 줄을 붙인다 */-->
+          <div th:each="g, gi : ${r.groups}" th:attr="data-group=${gi.index}"
                class="mt-4 border-t border-[#eef0ee] pt-3 first-of-type:mt-3">
             <div class="flex items-center justify-between">
-              <p class="text-[14px] font-bold text-[#555]"><span th:text="${grp[0]}">전자기기</span> <span class="ml-0.5 font-semibold text-[#888]" th:text="${items != null} ? ${#arrays.length(items)} : 0">7</span></p>
-              <button type="button" class="flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold text-[#346538] hover:bg-[#eef4f0]">
+              <p class="text-[14px] font-bold text-[#555]"><span th:text="${g.name}">전자기기</span> <span class="ml-0.5 font-semibold text-[#888]" data-item-count th:text="${#lists.size(g.items)}">7</span></p>
+              <button type="button" data-add-item class="flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold text-[#346538] hover:bg-[#eef4f0]">
                 <svg class="icon" width="15" height="15"><use th:href="@{/images/admin/icons-v2.svg} + '#i-plus'"/></svg>추가
               </button>
             </div>
-            <div th:if="${items != null}" class="mt-2 space-y-1.5">
-              <div th:each="it : ${items}" th:with="t=${#strings.arraySplit(it, ':')}" class="grid grid-cols-[1fr_56px_48px] gap-1.5">
-                <input class="reg-input h-11" th:value="${t[0]}" aria-label="품목">
-                <input class="reg-input h-11 px-2 text-right tabular-nums" inputmode="numeric" maxlength="3" th:value="${t[1]}" aria-label="수량">
-                <input class="reg-input h-11 px-1 text-center" maxlength="5" th:value="${t[2]}" aria-label="단위">
+            <div data-items th:hidden="${#lists.isEmpty(g.items)}" class="mt-2 space-y-1.5">
+              <div th:each="it : ${g.items}" data-item-row class="grid grid-cols-[1fr_56px_48px] gap-1.5">
+                <input class="reg-input h-11" maxlength="50" th:value="${it.name}" aria-label="품목">
+                <input class="reg-input h-11 px-2 text-right tabular-nums" inputmode="numeric" maxlength="3" th:value="${it.quantity}" aria-label="수량">
+                <input class="reg-input h-11 px-1 text-center" maxlength="5" th:value="${it.unit}" aria-label="단위">
               </div>
             </div>
           </div>
@@ -227,15 +232,13 @@
         <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
           <h3 class="text-[17px] font-bold text-[#1a1a1a]">옵션</h3>
           <div class="mt-2 divide-y divide-[#eef0ee]">
-            <div th:each="o : ${ {'피아노|일반|그랜드|N|N|', '돌침대|분해|조립|N|N|', '조립장|분해|조립|N|N|', '벽걸이TV|탈착|설치|Y|Y|50,000',
-                                  '홈씨어터|분리|설치|N|N|', '수작업|계단|승강기|N|N|', '안마의자|분리|설치|N|N|', '에어컨|탈착|설치|N|N|'} }"
-                 th:with="t=${#strings.arraySplit(o + ' ', '|')}" class="grid grid-cols-[68px_1fr_100px] items-center gap-2 py-2">
-              <span class="text-[15px] font-semibold text-[#292929]" th:text="${t[0]}">피아노</span>
+            <div th:each="o : ${r.options}" data-option-row class="grid grid-cols-[68px_1fr_100px] items-center gap-2 py-2">
+              <span class="text-[15px] font-semibold text-[#292929]" th:text="${o.name}">피아노</span>
               <span class="flex gap-1">
-                <button type="button" class="reg-toggle h-8 px-2.5 text-[13px]" th:attr="aria-pressed=${t[3] == 'Y'}" th:text="${t[1]}">일반</button>
-                <button type="button" class="reg-toggle h-8 px-2.5 text-[13px]" th:attr="aria-pressed=${t[4] == 'Y'}" th:text="${t[2]}">그랜드</button>
+                <button type="button" class="reg-toggle h-8 px-2.5 text-[13px]" th:attr="aria-pressed=${o.on1}" th:text="${o.choice1}">일반</button>
+                <button type="button" class="reg-toggle h-8 px-2.5 text-[13px]" th:attr="aria-pressed=${o.on2}" th:text="${o.choice2}">그랜드</button>
               </span>
-              <span class="relative block"><input class="reg-input h-10 pr-7 text-right text-[14px] tabular-nums" inputmode="numeric" data-money data-option th:value="${#strings.trim(t[5])}" th:attr="aria-label=|${t[0]} 비용|"><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[13px] text-[#888]">원</span></span>
+              <span class="relative block"><input class="reg-input h-10 pr-7 text-right text-[14px] tabular-nums" inputmode="numeric" data-money data-option th:value="${o.cost}" th:attr="aria-label=|${o.name} 비용|"><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[13px] text-[#888]">원</span></span>
             </div>
           </div>
         </section>
@@ -244,19 +247,19 @@
         <section class="mt-3 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
           <h3 class="text-[17px] font-bold text-[#1a1a1a]">금액</h3>
           <label class="mt-4 block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">이사비용</span>
-            <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money data-field="movingCost" value="1,100,000"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
-          <div th:each="l : ${ {'출발지 사다리|fromLadderFloor|3|fromLadderCost|120,000', '도착지 사다리|toLadderFloor|12|toLadderCost|150,000'} }" th:with="t=${#strings.arraySplit(l, '|')}"
+            <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money data-field="movingCost" th:value="${r.values['movingCost']}"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
+          <div th:each="l : ${ {'출발지 사다리|fromLadderFloor|fromLadderCost', '도착지 사다리|toLadderFloor|toLadderCost'} }" th:with="t=${#strings.arraySplit(l, '|')}"
                class="mt-3 grid grid-cols-[88px_1fr] gap-2">
             <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]" th:text="${t[0]}">출발지 사다리</span>
-              <span class="relative block"><input th:class="${inp} + ' pr-8 text-right'" inputmode="numeric" maxlength="3" th:attr="data-field=${t[1]}" th:value="${t[2]}"><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">층</span></span></label>
+              <span class="relative block"><input th:class="${inp} + ' pr-8 text-right'" inputmode="numeric" maxlength="3" th:attr="data-field=${t[1]}" th:value="${r.values[t[1]]}"><span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">층</span></span></label>
             <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-transparent">비용</span>
-              <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money th:attr="data-field=${t[3]}, aria-label=|${t[0]} 비용|" th:value="${t[4]}"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
+              <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money th:attr="data-field=${t[2]}, aria-label=|${t[0]} 비용|" th:value="${r.values[t[2]]}"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
           </div>
           <dl class="mt-4 space-y-2 rounded-[14px] bg-[#f7f8f6] px-4 py-3.5 text-[14px] tabular-nums">
-            <div class="flex justify-between"><dt class="text-[#888]">옵션 합계</dt><dd class="text-[#555]"><span data-sum="option">50,000</span>원</dd></div>
-            <div class="flex justify-between"><dt class="font-semibold text-[#292929]">총 비용</dt><dd class="text-[17px] font-bold text-[#1a1a1a]"><span data-sum="total">1,420,000</span>원</dd></div>
-            <div class="flex justify-between"><dt class="text-[#888]">계약금 10%</dt><dd class="text-[#555]"><span data-sum="deposit">142,000</span>원</dd></div>
-            <div class="flex justify-between"><dt class="text-[#888]">잔금</dt><dd class="text-[#555]"><span data-sum="balance">1,278,000</span>원</dd></div>
+            <div class="flex justify-between"><dt class="text-[#888]">옵션 합계</dt><dd class="text-[#555]"><span data-sum="option" th:text="${r.values['optionSum']}">50,000</span>원</dd></div>
+            <div class="flex justify-between"><dt class="font-semibold text-[#292929]">총 비용</dt><dd class="text-[17px] font-bold text-[#1a1a1a]"><span data-sum="total" th:text="${r.values['total']}">1,420,000</span>원</dd></div>
+            <div class="flex justify-between"><dt class="text-[#888]">계약금 10%</dt><dd class="text-[#555]"><span data-sum="deposit" th:text="${r.values['deposit']}">142,000</span>원</dd></div>
+            <div class="flex justify-between"><dt class="text-[#888]">잔금</dt><dd class="text-[#555]"><span data-sum="balance" th:text="${r.values['balance']}">1,278,000</span>원</dd></div>
           </dl>
         </section>
       </th:block>
@@ -266,19 +269,19 @@
         <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">견적 정보를 입력해 주세요</h2>
         <p class="mt-2 px-1 text-[14px] text-[#888]">PDF는 이름과 견적일만 있으면 등록돼요.</p>
         <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-5 flex w-full items-center gap-3 rounded-[16px] bg-white p-3 text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
-          <span class="relative block h-[68px] w-11 shrink-0 overflow-hidden rounded-[6px] bg-white shadow-[0_2px_6px_rgba(26,26,26,.15)]"><span inert class="pointer-events-none absolute left-0 top-0 block w-[360px] origin-top-left scale-[0.1222]"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></span></span>
-          <span class="min-w-0 flex-1"><span class="block text-[15px] font-semibold text-[#292929]">원본 PDF</span><span class="block truncate text-[13px] text-[#888]">견적서_정도현_230914.pdf</span></span>
+          <span class="relative block h-[68px] w-11 shrink-0 overflow-hidden rounded-[6px] bg-white shadow-[0_2px_6px_rgba(26,26,26,.15)]"><span inert class="pointer-events-none absolute left-0 top-0 block w-[360px] origin-top-left scale-[0.1222]"><iframe th:if="${live}" th:src="${pdfSrc}" title="첨부한 PDF" tabindex="-1" class="block h-[556px] w-[360px] bg-white"></iframe><th:block th:unless="${live}"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></th:block></span></span>
+          <span class="min-w-0 flex-1"><span class="block text-[15px] font-semibold text-[#292929]">원본 PDF</span><span class="block truncate text-[13px] text-[#888]" th:text="${fname}">견적서_정도현_230914.pdf</span></span>
           <span class="flex shrink-0 items-center text-[13px] text-[#888]">크게 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
         </div>
         <section class="mt-3 space-y-3.5 rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
           <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">이름</span>
-            <input th:class="${inp}" maxlength="20" data-pdf-required></label>
+            <input th:class="${inp}" maxlength="20" data-pdf-required data-field="pdfName" th:value="${r.values['pdfName']}"></label>
           <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">연락처</span>
-            <input th:class="${inp}" type="tel" inputmode="numeric" maxlength="13" placeholder="010-0000-0000"></label>
+            <input th:class="${inp}" type="tel" inputmode="numeric" maxlength="13" placeholder="010-0000-0000" data-field="pdfPhone" th:value="${r.values['pdfPhone']}"></label>
           <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">견적일</span>
-            <input th:class="${inp}" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD" data-pdf-required data-date></label>
+            <input th:class="${inp}" inputmode="numeric" maxlength="8" placeholder="YY.MM.DD" data-pdf-required data-date data-field="pdfEstimateDate" th:value="${r.values['pdfEstimateDate']}"></label>
           <label class="block"><span class="mb-1.5 block px-0.5 text-[13px] text-[#888]">총 비용</span>
-            <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
+            <span class="relative block"><input th:class="${inp} + ' pr-9 text-right'" inputmode="numeric" data-money data-field="pdfTotal" th:value="${r.values['pdfTotal']}"><span class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[#888]">원</span></span></label>
         </section>
       </th:block>
 
@@ -287,10 +290,10 @@
         <h2 class="mt-2 px-1 text-[22px] font-extrabold tracking-[-0.03em] text-[#1a1a1a]">등록 정보를 입력해 주세요</h2>
         <!--/* 견적서 미리보기 → 크게 보기 */-->
         <div role="button" tabindex="0" data-open="#fullView" class="cursor-pointer mt-5 flex w-full items-center gap-4 rounded-[20px] bg-white p-4 text-left shadow-[0_2px_12px_rgba(26,26,26,.05)]">
-          <span class="relative block h-[111px] w-[72px] shrink-0 overflow-hidden rounded-[6px] bg-white shadow-[0_3px_10px_rgba(26,26,26,.15)]"><span inert class="pointer-events-none absolute left-0 top-0 block w-[360px] origin-top-left scale-[0.2]"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></span></span>
+          <span class="relative block h-[111px] w-[72px] shrink-0 overflow-hidden rounded-[6px] bg-white shadow-[0_3px_10px_rgba(26,26,26,.15)]"><span inert class="pointer-events-none absolute left-0 top-0 block w-[360px] origin-top-left scale-[0.2]"><iframe th:if="${live and pdf}" th:src="${pdfSrc}" title="첨부한 PDF" tabindex="-1" class="block h-[555px] w-[360px] bg-white"></iframe><th:block th:unless="${live and pdf}"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></th:block></span></span>
           <span class="min-w-0 flex-1">
-            <span class="block text-[17px] font-bold text-[#1a1a1a]" th:text="${pdf} ? '정도현' : '김민준'">김민준</span>
-            <span class="mt-1 block text-[13px] tabular-nums text-[#888]" th:text="${pdf} ? '견적일 23.09.14' : '견적일 26.09.04 · 1,420,000원'">견적일 26.09.04</span>
+            <span class="block text-[17px] font-bold text-[#1a1a1a]" th:text="${live} ? ${r.values['registerName']} : (${pdf} ? '정도현' : '김민준')">김민준</span>
+            <span class="mt-1 block text-[13px] tabular-nums text-[#888]" th:text="${live} ? ${r.values['registerLine']} : (${pdf} ? '견적일 23.09.14' : '견적일 26.09.04 · 1,420,000원')">견적일 26.09.04</span>
             <span class="mt-2 flex items-center text-[13px] font-semibold text-[#346538]">견적서 보기<svg class="icon" width="16" height="16"><use th:href="@{/images/admin/icons-v2.svg} + '#i-chevronRight'"/></svg></span>
           </span>
         </div>
@@ -340,7 +343,8 @@
   </div>
 
   <!--/* 크게 보기 레이어 — 사진: 원본 사진 / PDF·등록: 견적서 문서 */-->
-  <div id="fullView" data-layer hidden class="absolute inset-x-0 bottom-0 top-[var(--hdr)] z-[60] flex flex-col bg-[#1a1a1a]">
+  <div id="fullView" data-layer hidden class="absolute inset-x-0 bottom-0 top-[var(--hdr)] z-[60] flex flex-col bg-[#1a1a1a]"
+       th:with="live=${reg != null}, pdf=${reg != null and reg.source == 'pdf'}, r=${reg ?: T(com.codemove.quote.RegisterView).SAMPLE}">
     <div class="flex h-14 shrink-0 items-center justify-between pl-5 pr-2 text-white">
       <p class="truncate text-[15px] font-semibold" data-full-title>photo.jpg</p>
       <button type="button" data-close aria-label="크게 보기 닫기" class="grid h-11 w-11 place-items-center rounded-full hover:bg-white/10">
@@ -348,8 +352,9 @@
       </button>
     </div>
     <div class="min-h-0 flex-1 overflow-auto px-4 pb-8">
-      <div data-full="photo" class="lined-paper mx-auto aspect-[3/4] w-full rounded-[6px]"></div>
-      <div data-full="doc" hidden class="mx-auto w-full bg-white"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></div>
+      <img th:if="${live and !pdf}" data-full="photo" th:src="${r.fileUrl}" alt="첨부한 견적서 사진" class="mx-auto block w-full rounded-[6px]">
+      <div th:unless="${live and !pdf}" data-full="photo" class="lined-paper mx-auto aspect-[3/4] w-full rounded-[6px]"></div>
+      <div data-full="doc" hidden class="mx-auto w-full bg-white"><iframe th:if="${live and pdf}" th:src="${r.fileUrl + '#view=FitH'}" title="첨부한 PDF" class="block aspect-[3/4] w-full bg-white"></iframe><th:block th:unless="${live and pdf}"><th:block th:replace="~{admin/estimate/sheet :: sheet}"/></th:block></div>
     </div>
   </div>
 
@@ -364,15 +369,16 @@
       </div>
       <div class="relative">
         <svg class="icon pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#888]" width="19" height="19"><use th:href="@{/images/admin/icons-v2.svg} + '#i-search'"/></svg>
-        <input type="search" value="김민" aria-label="이름 또는 휴대폰 번호 검색" class="h-12 w-full rounded-[14px] bg-white pl-11 pr-4 text-[15px] text-[#1a1a1a] outline-none ring-1 ring-[#e5e7eb] focus:ring-2 focus:ring-[#346538]">
+        <input type="search" data-member-search th:value="${members == null} ? '김민' : ''" aria-label="이름 또는 휴대폰 번호 검색" class="h-12 w-full rounded-[14px] bg-white pl-11 pr-4 text-[15px] text-[#1a1a1a] outline-none ring-1 ring-[#e5e7eb] focus:ring-2 focus:ring-[#346538]">
       </div>
-      <div class="mt-3 divide-y divide-[#eef0ee]">
-        <button th:each="m : ${ {'김민준|010-4821-7735|24.05.12', '김민서|010-3302-1184|25.01.07'} }" th:with="t=${#strings.arraySplit(m, '|')}"
-                type="button" data-member th:attr="data-name=${t[0]}, data-phone=${t[1]}"
+      <!--/* 탈퇴하지 않은 회원 (members). 검색어에 맞는 회원을 estimate.js 가 5명까지 보여 준다 */-->
+      <div class="mt-3 divide-y divide-[#eef0ee]" data-member-list>
+        <button th:each="m : ${members ?: T(com.codemove.quote.RegisterView).SAMPLE_MEMBERS}"
+                type="button" data-member th:attr="data-id=${m.id}, data-name=${m.name}, data-phone=${m.phone}"
                 class="flex w-full items-center justify-between px-1 py-3 text-left hover:bg-[#f7f8f6]">
-          <span><span class="block text-[15px] font-semibold text-[#292929]" th:text="${t[0]}">김민준</span>
-            <span class="mt-0.5 block text-[13px] tabular-nums text-[#888]" th:text="${t[1]}">010-4821-7735</span></span>
-          <span class="text-[13px] tabular-nums text-[#888]" th:text="|${t[2]} 가입|">24.05.12 가입</span>
+          <span><span class="block text-[15px] font-semibold text-[#292929]" th:text="${m.name}">김민준</span>
+            <span class="mt-0.5 block text-[13px] tabular-nums text-[#888]" th:text="${m.phone}">010-4821-7735</span></span>
+          <span class="text-[13px] tabular-nums text-[#888]" th:text="|${m.joined} 가입|">24.05.12 가입</span>
         </button>
       </div>
       <button type="button" data-member data-name="" class="mt-2 h-12 w-full rounded-[14px] bg-[#f0f1ef] text-[15px] font-semibold text-[#555]">연결 안 함</button>

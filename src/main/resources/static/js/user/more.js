@@ -1,6 +1,6 @@
 /*
  * 더보기 화면 그룹 (G-H01~H14) — 백엔드 없이 동작만 시뮬레이션
- *  내 정보 수정: 휴대폰 번호 입력 → 인증번호 발송(3분 타이머) → 6자리 입력 → 변경
+ *  내 정보 수정: 휴대폰 번호 입력 → 인증번호 발송(3분 타이머) → 6자리 입력 → 변경 (POST /more/profile/phone/send · /more/profile/phone, 미리보기는 시뮬레이션)
  *  견적내역·예약내역: [data-filter-toggle] / [data-filter] 로 목록 필터
  *  후기 작성: 별점, 사진 첨부(최대 5장), 등록 → 후기 목록(?state=done)
  *  알림: 탭(전체·내 이사), 행 클릭 시 읽음, 모두 읽음
@@ -146,11 +146,13 @@
       code.value = '';
       codeGroup.hidden = true;
       sendBtn.textContent = '인증하기';
+      showError('');
       update();
     };
 
     nextPhone.addEventListener('input', () => {
       nextPhone.value = formatPhone(nextPhone.value);
+      showError('');
       codeGroup.hidden = true;
       sendBtn.textContent = '인증하기';
       code.value = '';
@@ -162,19 +164,57 @@
       code.value = code.value.replace(/\D/g, '').slice(0, 6);
       update();
     });
-    sendBtn.addEventListener('click', () => {
-      if (!phoneReady()) return;
+    // 서버 연동 (로그인 화면): 발송 · 확인 주소가 있을 때. 미리보기(/dev)는 시뮬레이션
+    const sendUrl = phoneSheet.dataset.sendUrl;
+    const changeUrl = phoneSheet.dataset.changeUrl;
+    const errorEl = $('#phoneError');
+    const showError = (message) => {
+      if (!errorEl) return;
+      errorEl.textContent = message || '';
+      errorEl.hidden = !message;
+    };
+    async function post(url, data) {
+      try {
+        const res = await fetch(url, { method: 'POST', body: new URLSearchParams(data) });
+        return Object.assign({ ok: res.ok }, await res.json().catch(() => ({})));
+      } catch (_) {
+        return { ok: false, message: '잠시 후 다시 시도해 주세요.' };
+      }
+    }
+    let busy = false;
+
+    sendBtn.addEventListener('click', async () => {
+      if (!phoneReady() || busy) return;
+      let from = 180;
+      if (sendUrl) {
+        busy = true;
+        const res = await post(sendUrl, { phone: nextPhone.value });
+        busy = false;
+        if (!res.ok) { showError(res.message); return; }
+        from = res.seconds || 180;
+      }
+      showError('');
       codeGroup.hidden = false;
       sendBtn.textContent = '재인증';
       hintPhone.textContent = nextPhone.value;
       code.value = '';
-      startTimer(180);
+      startTimer(from);
       update();
       code.focus();
     });
-    confirm.addEventListener('click', () => {
-      if (confirm.classList.contains('is-disabled')) return;
-      $('#currentPhone').textContent = nextPhone.value;
+    confirm.addEventListener('click', async () => {
+      if (confirm.classList.contains('is-disabled') || busy) return;
+      let phone = nextPhone.value;
+      if (changeUrl) {
+        busy = true;
+        const res = await post(changeUrl, { phone: nextPhone.value, code: code.value });
+        busy = false;
+        if (res.redirect) { location.href = res.redirect; return; }
+        if (!res.ok) { showError(res.message); return; }
+        phone = res.phone;
+      }
+      // 알림 단계에서 추가: 번호 변경 완료 안내
+      $('#currentPhone').textContent = phone;
       phoneSheet.hidden = true;
       reset();
     });

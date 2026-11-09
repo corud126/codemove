@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <!--/* SCR-U-08x 내 정보 수정 (G-H02~H04 / E-H02~H04)
   state: (없음) 내 정보 수정 H02 | phone 휴대폰 번호 변경 H03 | verify 휴대폰 번호 변경_인증 H04
-  번호 입력·인증번호 발송·타이머는 more.js 에서 시뮬레이션
+  번호 변경: 인증번호 발송 POST /more/profile/phone/send → 확인·변경 POST /more/profile/phone (more.js, 미리보기는 시뮬레이션)
   model: member (TBL_MEMBER), loginTypes (연결된 LOGIN_TYPE 목록). 미리보기(/dev)에서는 기본 문구 표시
   회원 탈퇴 → 확인 바텀시트(예약 취소 확인과 같은 모양) → POST /more/withdraw
 */-->
@@ -11,6 +11,8 @@
   <link rel="stylesheet" th:href="@{/css/user/move.css}">
 </head>
 <body>
+<!--/* css/user/auth.css 의 .auth-error 와 같은 값 (auth.css 전체를 넣으면 입력칸 모양이 바뀌어 이 규칙만) */-->
+<style>.auth-error { margin-top: 12px; color: #ef5f3c; font-size: 12px; line-height: 1.5; } .auth-error[hidden] { display: none; }</style>
 <div class="app-shell" th:with="state=${param.state != null ? param.state[0] : ''},
                                name=${member?.memberName ?: '김무브'},
                                types=${loginTypes ?: {'02'}}">
@@ -63,7 +65,10 @@
   </div>
 
   <!--/* 휴대폰 번호 변경 바텀시트 (H03, H04) */-->
-  <div id="phoneSheet" data-layer th:hidden="${state != 'phone' and state != 'verify'}" th:attr="data-step=${state == 'verify' ? 'verify' : 'input'}">
+  <div id="phoneSheet" data-layer th:hidden="${state != 'phone' and state != 'verify'}"
+       th:attr="data-step=${state == 'verify' ? 'verify' : 'input'},
+                data-send-url=${member != null} ? @{/more/profile/phone/send} : null,
+                data-change-url=${member != null} ? @{/more/profile/phone} : null">
     <div class="personal-modal-scrim" data-close></div>
     <div aria-labelledby="phone-change-title" aria-modal="true" class="personal-modal" role="dialog">
       <div class="sheet-grabber personal-sheet-grabber" data-close><div class="sheet-handle"></div></div>
@@ -95,6 +100,8 @@
         </div>
         <div class="phone-code-hint"><span id="codeHintPhone">010-9876-5432</span> 으로 인증번호가 발송되었어요.</div>
       </div>
+      <!--/* 서버 확인 결과 안내 (가입된 번호 · 인증번호 불일치 등) — 로그인 화면 .auth-error 와 같은 모양 */-->
+      <p class="auth-error" id="phoneError" hidden></p>
       <div class="action form-submit next-button phone-change-confirm" role="button" tabindex="0" id="confirmPhone"
            aria-label="인증하고 휴대폰 번호 변경" th:classappend="${state != 'verify'} ? 'is-disabled'">인증하고 변경</div>
     </div>
