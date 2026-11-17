@@ -20,9 +20,9 @@ codemove:
         client-id: <NAVER_CLIENT_ID>
         client-secret: <NAVER_CLIENT_SECRET>
 
-  # 도로명주소 검색 API 승인키 (business.juso.go.kr > API 신청 > 검색API)
-  juso:
-    confm-key: <JUSO_CONFM_KEY>
+  # 카카오 로컬 API(주소 검색) REST API 키. 카카오 로그인과 같은 앱이면 생략 가능 (카카오 디벨로퍼스 > 앱 > 카카오맵 사용 설정 ON)
+  kakao:
+    rest-api-key: <KAKAO_REST_API_KEY>
 
   # 공공데이터포털 특일 정보 (한국천문연구원 SpcdeInfoService) 키
   holiday:

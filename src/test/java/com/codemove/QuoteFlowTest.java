@@ -29,7 +29,9 @@ import com.codemove.request.PriceCalculator;
 import com.codemove.web.user.HomeController;
 
 /** 이사 견적 요청: 영상 → 분석 → 예상 금액 → 제출(요청 + 견적서 초안). 팀 DB 사용, 테스트마다 롤백 */
-@SpringBootTest(properties = "codemove.quote.upload-dir=build/test-uploads")
+// 주소 검색은 외부(카카오) 호출 없이 예시 주소로: 로컬 설정의 카카오 키를 비운다
+@SpringBootTest(properties = { "codemove.quote.upload-dir=build/test-uploads", "codemove.kakao.rest-api-key=",
+		"codemove.oauth.providers.kakao.client-id=" })
 @AutoConfigureMockMvc
 @Transactional
 class QuoteFlowTest {
