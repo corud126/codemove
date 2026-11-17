@@ -347,7 +347,7 @@ public class QuoteService {
 	 */
 	Parsed applySheet(Quote q, SheetForm f) {
 		q.setCompanyName(required(f.companyName(), 50, "업체명"));
-		q.setContactName(required(f.customer(), 50, "담당자"));
+		q.setContactName(required(f.customer(), 50, "고객명"));
 		q.setContactPhone(optional(f.phone(), 20, "연락처"));
 		q.setEstimateDate(requiredDate(f.estimateDate(), "견적일"));
 		q.setFromAddress(optional(f.origin(), 300, "출발지"));

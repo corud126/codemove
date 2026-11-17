@@ -89,7 +89,7 @@ public class QuoteRegisterService {
 		return draft.withSheet(f, true, false);
 	}
 
-	/** 읽은 뒤 갈 단계: 꼭 필요한 칸(담당자·견적일·도착지)이 비면 '확인이 필요한 항목' 화면 */
+	/** 읽은 뒤 갈 단계: 꼭 필요한 칸(고객명·견적일·도착지)이 비면 '확인이 필요한 항목' 화면 */
 	public static String nextAfterRead(RegisterDraft draft) {
 		SheetForm f = draft.sheet();
 		boolean missing = f == null || QuoteService.blank(f.customer()) || QuoteService.blank(f.estimateDate())

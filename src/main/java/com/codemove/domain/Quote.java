@@ -23,7 +23,7 @@ public class Quote {
 	/** QUOTE_STATUS: 01 견적 검토 · 02 견적 승인 · 03 견적 확정 · 04 만료 */
 	private String status;
 	private String companyName;
-	/** 고객 이름·연락처 (견적서 '담당자 / TEL') */
+	/** 고객 이름·연락처 (견적서 '고객명 / TEL') */
 	private String contactName;
 	private String contactPhone;
 	private LocalDate estimateDate;

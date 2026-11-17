@@ -168,7 +168,7 @@ class AdminHomeRegisterFlowTest {
 
 		// 확인·수정: 잘못된 값은 안내, 맞으면 보관
 		mvc.perform(post("/admin/estimates/new/sheet").session(admin).contentType(MediaType.APPLICATION_JSON).content(sheet("")))
-				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("담당자를 입력해 주세요."));
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("고객명을 입력해 주세요."));
 		mvc.perform(post("/admin/estimates/new/sheet").session(admin).contentType(MediaType.APPLICATION_JSON).content(sheet("김등록")))
 				.andExpect(status().isOk());
 		mvc.perform(get("/admin/estimates/new").param("state", "review").session(admin)).andExpect(status().isOk())

@@ -148,7 +148,7 @@
           <div class="vendor-customer-grid"
                th:with="est=${s.estimateDate}, work=${#strings.length(s.moveDate) >= 8 ? #strings.substring(s.moveDate, 0, 8) : ''}">
             <b>업체명</b><span th:text="${s.companyName}">명품 익스프레스</span>
-            <b>담당자</b><span th:text="${s.customer} + ' (님)'">김무브 (님)</span>
+            <b>고객명</b><span th:text="${s.customer} + ' (님)'">김무브 (님)</span>
             <b>TEL</b><span th:text="${s.phone}">010-1234-5678</span>
             <b>견적일</b><span th:text="${est != ''} ? '20' + ${#strings.replace(est, '.', '. ')} + '.' : ''">2026. 03. 10.</span>
             <b>출발지</b><span th:text="${s.origin}">서울 강남구 테헤란로 123, 301호</span>
