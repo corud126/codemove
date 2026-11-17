@@ -47,8 +47,10 @@ public class MoreController {
 	private final PhoneVerifier phoneVerifier;
 	private final NotificationService notificationService;
 
+	/** 더보기: 위 카드에 로그인 회원 이름 · 번호 */
 	@GetMapping("/more")
-	public String more() {
+	public String more(HttpSession session, Model model) {
+		model.addAttribute("login", session.getAttribute(HomeController.LOGIN_KEY));
 		return "user/more/index";
 	}
 

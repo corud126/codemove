@@ -793,7 +793,10 @@ img { display: block; }
 .linked-login-card { min-height: 72px; margin-top: 22px; padding: 15px 16px 15px 18px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .linked-login-card > strong { color: var(--ink); font-family: "Pretendard:Bold"; font-size: 15px; }
 .linked-login-provider { display: flex; align-items: center; gap: 8px; }
-.linked-login-provider .linked-login-logo { width: 20px; height: 20px; filter: brightness(0) saturate(100%) invert(61%) sepia(85%) saturate(2359%) hue-rotate(103deg) brightness(88%) contrast(101%); }
+.linked-login-provider .linked-login-logo { width: 20px; height: 20px; }
+.linked-login-provider .linked-login-logo.is-naver { filter: brightness(0) saturate(100%) invert(61%) sepia(85%) saturate(2359%) hue-rotate(103deg) brightness(88%) contrast(101%); }
+/* 카카오: 로그인 버튼(.kakao)과 같은 노란 바탕 + 검은 말풍선 */
+.linked-login-provider .linked-login-logo.is-kakao { padding: 4px; box-sizing: border-box; border-radius: 50%; background: #fee500; }
 .linked-login-provider .chevron { width: 16px; height: 16px; opacity: .72; }
 .personal-modal-scrim { position: fixed; z-index: 60; inset: 0; background: rgb(0 0 0 / .42); }
 .personal-modal { position: fixed; z-index: 61; left: 50%; bottom: 0; width: min(100%, 520px); max-height: 92cqh; overflow-y: auto; padding: 0 max(36px, calc(var(--safe-right) + 22px)) max(32px, calc(var(--safe-bottom) + 22px)) max(36px, calc(var(--safe-left) + 22px)); box-sizing: border-box; border-radius: 27px 27px 0 0; background: var(--white); transform: translateX(-50%); box-shadow: 0 -12px 40px rgb(0 0 0 / .16); transition: transform .22s ease; pointer-events: auto; }

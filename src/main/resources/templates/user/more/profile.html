@@ -51,8 +51,8 @@
       <a class="action linked-login-card" href="#" aria-label="간편 로그인">
         <strong>간편 로그인</strong>
         <div class="linked-login-provider">
-          <img th:if="${#lists.contains(types, '01')}" alt="카카오" class="linked-login-logo" th:src="@{/images/user/2a814.svg}">
-          <img th:if="${#lists.contains(types, '02')}" alt="네이버" class="linked-login-logo" th:src="@{/images/user/4a055.svg}">
+          <img th:if="${#lists.contains(types, '01')}" alt="카카오" class="linked-login-logo is-kakao"th:src="@{/images/user/2a814.svg}">
+          <img th:if="${#lists.contains(types, '02')}" alt="네이버" class="linked-login-logo is-naver"th:src="@{/images/user/4a055.svg}">
           <img alt="" class="chevron" th:src="@{/images/user/ce2ac.svg}">
         </div>
       </a>

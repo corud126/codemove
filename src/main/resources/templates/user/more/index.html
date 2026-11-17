@@ -14,10 +14,10 @@
     <main class="sub-content profile-content">
       <div class="page-title">더보기</div>
       <a class="action profile-card" th:href="@{/more/profile}" aria-label="내 정보 수정">
-        <div class="avatar">김</div>
+        <div class="avatar" th:with="n=${login?.name ?: '김무브'}" th:text="${#strings.substring(n, 0, 1)}">김</div>
         <div>
-          <strong>김무브님</strong>
-          <span>010-1234-5678</span>
+          <strong th:text="${login?.name ?: '김무브'} + '님'">김무브님</strong>
+          <span th:text="${login?.phone ?: '010-1234-5678'}">010-1234-5678</span>
         </div>
         <img alt="" class="chevron chevron-light" th:src="@{/images/user/ce2ac.svg}">
       </a>
