@@ -405,6 +405,14 @@
     renderOptions();
     renderChrome();
   });
+  /* 포장 방식 안내: 회색 버튼으로 설명 펼치기 · 접기 */
+  const packHelp = $('[data-q-pack-help]', root);
+  if (packHelp) packHelp.addEventListener('click', () => {
+    const body = document.getElementById(packHelp.getAttribute('aria-controls'));
+    const open = packHelp.getAttribute('aria-expanded') !== 'true';
+    packHelp.setAttribute('aria-expanded', String(open));
+    body.hidden = !open;
+  });
 
   /* ── 4. 주소 ── */
   const addrBlocks = $$('[data-q-addr]', root);
