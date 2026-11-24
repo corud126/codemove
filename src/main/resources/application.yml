@@ -104,11 +104,12 @@ codemove:
       thinking-level: low
       timeout-sec: 300
       max-retries: 2
+    # 100만 토큰당 단가: 팀(CodeMove-AI)과 같은 값 (gemini-4-hydrogen · 3.5-flash 공통, 출시 블로그 기준) — Google 공식 가격 페이지와 대조 필요
     price:
-      input-per-million:
-      output-per-million:
+      input-per-million: 1.50
+      output-per-million: 7.50
       currency: USD
-      as-of:
+      as-of: 2026-11-23
 
 ---
 # 로컬 개발: 템플릿·정적 파일을 src에서 직접 읽어 수정 즉시 반영 (재시작 불필요)
