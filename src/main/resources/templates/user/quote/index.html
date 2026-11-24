@@ -448,6 +448,8 @@
 </div>
 <th:block th:replace="~{fragments/user-layout :: scripts}"></th:block>
 <script th:inline="javascript">window.QUOTE_CATALOG = /*[[${catalog}]]*/ null;</script>
+<!--/* 관리자 영상 분석 테스트의 '고객 화면으로 보기'(/admin/video-analysis/runs/{id}/customer)에서만 채워짐: 그 실행 결과로 2단계를 미리보기 */-->
+<script th:if="${aiPreviewItems != null}" th:inline="javascript">window.QUOTE_AI_PREVIEW = /*[[${aiPreviewItems}]]*/ null;</script>
 <script th:src="@{/js/user/quote.js}"></script>
 </body>
 </html>

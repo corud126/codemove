@@ -33,6 +33,12 @@
     }
   }
 
+  /* 실험 조건: 비우면 서버 설정값 */
+  function options() {
+    const fps = $('[data-opt-fps]').value;
+    return { model: $('[data-opt-model]').value, fps: fps ? Number(fps) : null, prompt: $('[data-opt-prompt]').value };
+  }
+
   /* ---------- 영상 선택 · 길이 확인 ---------- */
   const fileInput = $('[data-video]');
   const info = $('[data-video-info]');
@@ -82,6 +88,10 @@
     const form = new FormData();
     form.append('video', file);
     if (duration != null) form.append('durationSec', duration);
+    const opt = options();
+    if (opt.model) form.append('model', opt.model);
+    if (opt.fps) form.append('fps', opt.fps);
+    if (opt.prompt) form.append('prompt', opt.prompt);
     form.append('uploadStartedAt', Date.now());
     analyzeBtn.disabled = true;
     const xhr = new XMLHttpRequest();
@@ -128,7 +138,7 @@
       if (res.ok) showResult(await res.json());
     } else if (e.target.closest('[data-run-rerun]')) {
       e.target.textContent = '분석 중…';
-      const res = await post(`${BASE}/runs/${id}/rerun`);
+      const res = await post(`${BASE}/runs/${id}/rerun`, options());
       if (!res.ok) { alert(res.message || '다시 분석하지 못했어요.'); e.target.textContent = '다시 분석'; return; }
       location.reload();
     } else if (e.target.closest('[data-run-delete]')) {
@@ -201,7 +211,7 @@
     const meta = `
       <dl class="mt-4 space-y-1.5 border-t border-[#eef0ee] pt-3 text-[12px]">
         ${run.video ? `<div class="flex justify-between gap-3"><dt class="text-[#888]">영상</dt><dd class="text-right">${esc(run.video.fileName)} · ${(run.video.sizeBytes / 1048576).toFixed(1)}MB · ${num(run.video.durationSec, '초')}${run.video.transfer ? ' · ' + esc(run.video.transfer) : ''}</dd></div>` : ''}
-        <div class="flex justify-between gap-3"><dt class="text-[#888]">모델</dt><dd class="text-right">${esc(run.model || '—')} ${run.modelVersion ? '(' + esc(run.modelVersion) + ')' : ''}${run.thinkingLevel ? ' · 생각 ' + esc(run.thinkingLevel) : ''} · 프롬프트 ${esc(run.promptVersion)}</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-[#888]">모델</dt><dd class="text-right">${esc(run.model || '—')} ${run.modelVersion ? '(' + esc(run.modelVersion) + ')' : ''}${run.thinkingLevel ? ' · 생각 ' + esc(run.thinkingLevel) : ''}${run.fps ? ' · 초당 ' + run.fps + '프레임' : ''} · 프롬프트 ${esc(run.promptVersion)}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-[#888]">토큰</dt><dd class="text-right">${tokens}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-[#888]">비용</dt><dd class="text-right">${cost}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-[#888]">시간</dt><dd class="text-right">업로드 ${ms(t.uploadMs)} · 저장 ${ms(t.saveMs)}${t.aiFileMs ? ' · AI 파일 전송 ' + ms(t.aiFileMs) : ''} · API ${ms(t.apiMs)} · 매핑 ${ms(t.mappingMs)} · 전체 ${ms(t.totalMs)}${run.retries ? ' · 재시도 ' + run.retries : ''}</dd></div>
@@ -213,7 +223,15 @@
         <button type="button" data-edit-raw class="mt-2 text-[13px] font-semibold text-[#4a6741]">이 JSON 을 고쳐서 다시 계산</button>
       </details>` : '';
 
-    box.innerHTML = head + totals + scoreBox + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
+    const customerBox = r && lines.length ? `
+      <div class="mt-4 rounded-[12px] border border-[#eef0ee] p-3">
+        <div class="flex items-center justify-between gap-2 text-[13px]">
+          <b>고객 · 관리자에게 전달될 값</b>
+          <a href="${BASE}/runs/${esc(run.id)}/customer" target="_blank" class="shrink-0 text-[12px] font-semibold text-[#4a6741]">고객 화면으로 보기 ↗</a>
+        </div>
+        <div data-customer class="mt-2 text-[12px]"></div>
+      </div>` : '';
+    box.innerHTML = head + totals + scoreBox + customerBox + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
     box.hidden = false;
     const edit = $('[data-edit-raw]', box);
     if (edit) edit.addEventListener('click', () => {
@@ -221,6 +239,8 @@
       $('[data-base-run]').value = run.id;
       $('[data-manual]').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
+    const customer = $('[data-customer]', box);
+    if (customer) showCustomer(run.id, customer);
     const select = $('[data-score-set]', box);
     if (select) {
       select.addEventListener('change', () => showScore(run.id, select.value, $('[data-score]', box)));
@@ -230,13 +250,31 @@
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  /* 지금 앱에 붙이면 고객 · 관리자에게 보이는 값: 고객 앱은 품목명 · 크기 · 개수만 받아 부피를 자기 품목표(ItemCatalog)로 다시 계산한다 */
+  async function showCustomer(id, el) {
+    const res = await fetch(`${BASE}/runs/${id}/customer-items`);
+    if (!res.ok) { el.textContent = '불러오지 못했어요.'; return; }
+    const c = await res.json();
+    const rows = c.items.map((it) => `<tr style="${Number(it.appCbm) !== Number(it.standardCbm || 0) ? 'color:#d9701a' : ''}">
+        <td class="py-0.5">${esc(it.name)}${it.review ? ' <span style="color:#d9701a">확인 필요</span>' : ''}${it.inAppCatalog ? '' : ' <span style="color:#ef5f3c">(앱 목록에 없음)</span>'}</td>
+        <td>${esc(it.size)}</td><td class="text-right">${it.count}</td><td class="text-right">${esc(it.appCbm)}</td><td class="text-right">${it.standardCbm == null ? '—' : esc(it.standardCbm)}</td></tr>`).join('');
+    el.innerHTML = `
+      <p class="text-[11px] text-[#888]">고객 앱 합계 <b style="color:#292929">${esc(c.appTotalCbm)}㎥</b> (지금 앱 품목표 기준) · 우리 기준표 합계 <b style="color:#292929">${esc(c.standardTotalCbm)}㎥</b>. 주황색 줄은 두 값이 달라요.</p>
+      <details class="mt-1"><summary class="cursor-pointer text-[12px] font-semibold">품목별 (고객 확인 화면 · 관리자 요청 품목에 들어갈 값)</summary>
+        <table class="mt-1 w-full text-[11px]"><thead><tr class="text-[#888]"><th class="text-left">품목</th><th class="text-left">크기</th><th class="text-right">개수</th><th class="text-right">앱㎥</th><th class="text-right">기준표㎥</th></tr></thead><tbody>${rows}</tbody></table>
+      </details>`;
+  }
+
   /* 정답 목록 대비: 정밀도 · 재현율 · F1 · CBM 오차, 품목별 정답/AI 개수 */
   async function showScore(id, set, el) {
     el.innerHTML = '';
     if (!set) return;
     const res = await fetch(`${BASE}/runs/${id}/score?set=${encodeURIComponent(set)}`);
     if (!res.ok) { el.textContent = '비교하지 못했어요.'; return; }
-    const s = await res.json();
+    const body = await res.json();
+    const s = body.score;
+    const exp = body.expectedLoad;
+    const det = body.detectedLoad;
     const rows = s.rows.map((r) => `<tr style="${r.expected !== r.detected ? 'color:#d9701a' : ''}"><td class="py-0.5">${esc(r.name)}</td><td class="text-right">${r.expected}</td><td class="text-right">${r.detected}</td><td class="text-right">${esc(r.expectedCbm)}</td><td class="text-right">${esc(r.detectedCbm)}</td></tr>`).join('');
     el.innerHTML = `
       <div class="grid grid-cols-4 gap-1.5 text-center">
@@ -245,6 +283,7 @@
         <div class="rounded-[8px] bg-[#f6f7f6] py-1.5"><b class="block">${pct(s.f1)}</b><span class="text-[11px] text-[#888]">F1</span></div>
         <div class="rounded-[8px] bg-[#f6f7f6] py-1.5"><b class="block">${s.cbmErrorPct > 0 ? '+' : ''}${esc(s.cbmErrorPct)}%</b><span class="text-[11px] text-[#888]">CBM 오차</span></div>
       </div>
+      <p class="mt-2 text-[12px]" style="color:${exp && det && Number(exp.ton) === Number(det.ton) ? '#4a6741' : '#d9701a'}">톤: 정답 기준 <b>${exp ? esc(exp.ton) + '톤' : '—'}</b>${exp ? ' (' + esc(exp.label) + ', 적재 ' + esc(exp.loadCbm) + '㎥)' : ''} · AI <b>${det ? esc(det.ton) + '톤' : '—'}</b>${det ? ' (' + esc(det.label) + ', 적재 ' + esc(det.loadCbm) + '㎥)' : ''}</p>
       <p class="mt-2 text-[11px] text-[#888]">품목표 품목: 정답 ${s.expectedPieces}개 · AI ${s.detectedPieces}개 · 일치 ${s.matchedPieces}개 / CBM 정답 ${esc(s.expectedCbm)} · AI ${esc(s.detectedCbm)} / 표에 없는 물건: 정답 ${s.expectedOther} · AI 미매핑 ${s.detectedOther}</p>
       <details class="mt-1"><summary class="cursor-pointer text-[12px] font-semibold">품목별 비교</summary>
         <table class="mt-1 w-full text-[11px]"><thead><tr class="text-[#888]"><th class="text-left">품목</th><th class="text-right">정답</th><th class="text-right">AI</th><th class="text-right">정답㎥</th><th class="text-right">AI㎥</th></tr></thead><tbody>${rows}</tbody></table>

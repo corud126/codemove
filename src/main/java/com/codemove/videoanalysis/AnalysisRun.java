@@ -12,10 +12,10 @@ import com.codemove.videoanalysis.GeminiVideoClient.Usage;
  * mode: GEMINI(영상 분석) · MANUAL(JSON 직접 입력, 수정 후 재계산) · baseRunId: 다시 분석 · 재계산의 원래 실행
  * errorCode: 공통코드 ANALYSIS_ERROR (01 형식 · 02 용량/길이 · 03 품질 · 04 집 아님/품목 없음 · 05 시간 초과 · 06 한도
  * · 07 응답 형식 · 08 호출 실패 · 09 키 없음 · 10 서버 혼잡) · rawResponse: AI 원본 글 (정규화 결과 result 와 따로)
- * model: 실제로 쓴 모델(예비 모델로 넘어가면 그 모델) · thinkingLevel: 보낸 생각 수준
+ * model: 실제로 쓴 모델(예비 모델로 넘어가면 그 모델) · thinkingLevel: 보낸 생각 수준 · fps: 영상 초당 프레임(null 이면 Gemini 기본 1)
  */
 public record AnalysisRun(String id, String baseRunId, LocalDateTime createdAt, String mode, boolean success,
-		String errorCode, String errorMessage, Video video, String model, String modelVersion, String thinkingLevel,
+		String errorCode, String errorMessage, Video video, String model, String modelVersion, String thinkingLevel, Double fps,
 		String promptVersion, Usage usage, Cost cost, Timings timings, int retries, String rawResponse, Ai ai,
 		List<String> parseErrors, List<String> parseWarnings, VolumeWeightService.Result result, TruckLoadService.Load load,
 		Catalog catalog) {

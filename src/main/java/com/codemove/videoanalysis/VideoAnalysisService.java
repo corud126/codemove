@@ -73,8 +73,22 @@ public class VideoAnalysisService {
 		}
 	}
 
-	/** 업로드한 영상을 분석한다. 형식 · 크기 · 길이가 맞지 않으면 RejectedUpload(화면 문구) */
+	/** 실행마다 고르는 실험 조건 (비우면 설정값): 주 모델 · 영상 초당 프레임 · 프롬프트 버전 */
+	public record RunOptions(String model, Double fps, String promptVersion) {
+
+		public static final RunOptions DEFAULT = new RunOptions(null, null, null);
+
+		public String prompt() {
+			return promptVersion != null && AnalysisPrompt.VERSIONS.contains(promptVersion) ? promptVersion : AnalysisPrompt.VERSION;
+		}
+	}
+
 	public AnalysisRun analyzeUpload(MultipartFile file, Double durationSec, Long uploadMs) {
+		return analyzeUpload(file, durationSec, uploadMs, RunOptions.DEFAULT);
+	}
+
+	/** 업로드한 영상을 분석한다. 형식 · 크기 · 길이가 맞지 않으면 RejectedUpload(화면 문구) */
+	public AnalysisRun analyzeUpload(MultipartFile file, Double durationSec, Long uploadMs, RunOptions options) {
 		long started = System.currentTimeMillis();
 		if (file == null || file.isEmpty()) {
 			throw new RejectedUpload("01", "영상을 선택해 주세요.");
@@ -100,11 +114,16 @@ public class VideoAnalysisService {
 		}
 		long saveMs = System.currentTimeMillis() - started;
 		AnalysisRun.Video video = new AnalysisRun.Video(name, file.getSize(), durationSec, MIME.get(ext), stored, null);
-		return runGemini(id, null, video, uploadMs, saveMs, started);
+		return runGemini(id, null, video, uploadMs, saveMs, started, options);
 	}
 
 	/** 저장된 영상으로 다시 분석 (같은 영상 반복 테스트). 영상은 새 실행 ID 로 복사한다. 원래 실행이 없으면 null */
 	public AnalysisRun rerun(String baseId) {
+		return rerun(baseId, RunOptions.DEFAULT);
+	}
+
+	/** 같은 영상을 조건(모델 · 프레임 · 프롬프트)을 바꿔 다시 분석 */
+	public AnalysisRun rerun(String baseId, RunOptions options) {
 		long started = System.currentTimeMillis();
 		AnalysisRun base = store.find(baseId);
 		if (base == null || base.video() == null || base.video().storedName() == null) {
@@ -123,14 +142,14 @@ public class VideoAnalysisService {
 		}
 		AnalysisRun.Video v = base.video();
 		AnalysisRun.Video video = new AnalysisRun.Video(v.fileName(), v.sizeBytes(), v.durationSec(), v.mimeType(), stored, null);
-		return runGemini(id, baseId, video, null, System.currentTimeMillis() - started, started);
+		return runGemini(id, baseId, video, null, System.currentTimeMillis() - started, started, options);
 	}
 
 	/** AI 응답 JSON 을 직접 넣어 매핑 · 계산만 (키 없이 시험, 결과를 고친 뒤 재계산) */
 	public AnalysisRun analyzeManual(String raw, String baseRunId) {
 		long started = System.currentTimeMillis();
 		String base = AnalysisRunStore.safe(baseRunId) ? baseRunId : null;
-		AnalysisRun run = finish(newId(), base, "MANUAL", null, "", "", "", null, 0, raw,
+		AnalysisRun run = finish(newId(), base, "MANUAL", null, "", "", "", "-", null, null, 0, raw,
 				new AnalysisRun.Timings(null, null, null, null, null, null), started, null, null);
 		store.save(run);
 		return run;
@@ -164,19 +183,29 @@ public class VideoAnalysisService {
 		return AnalysisPrompt.build(catalog.snapshot().list());
 	}
 
-	private AnalysisRun runGemini(String id, String baseId, AnalysisRun.Video video, Long uploadMs, long saveMs, long started) {
+	private AnalysisRun runGemini(String id, String baseId, AnalysisRun.Video video, Long uploadMs, long saveMs, long started,
+			RunOptions options) {
+		RunOptions opt = options == null ? RunOptions.DEFAULT : options;
 		AnalysisRun run;
 		String thinking = properties.gemini().thinkingLevel();
 		try {
-			GeminiVideoClient.Response res = gemini.analyze(store.videoPath(video.storedName()), video.mimeType(), prompt());
+			GeminiVideoClient.Response res = gemini.analyze(store.videoPath(video.storedName()), video.mimeType(),
+					AnalysisPrompt.build(opt.prompt(), catalog.snapshot().list()), opt.model(), opt.fps());
 			AnalysisRun.Video sent = new AnalysisRun.Video(video.fileName(), video.sizeBytes(), video.durationSec(),
 					video.mimeType(), video.storedName(), res.transfer());
-			run = finish(id, baseId, "GEMINI", sent, res.model(), res.modelVersion(), thinking, res.usage(), res.retries(),
+			run = finish(id, baseId, "GEMINI", sent, res.model(), res.modelVersion(), thinking, opt.prompt(), opt.fps(), res.usage(), res.retries(),
 					res.text(), new AnalysisRun.Timings(uploadMs, saveMs, res.fileUploadMs(), res.apiMs(), null, null), started,
 					null, null);
+			// 주 모델이 혼잡해 예비 모델로 넘어간 결과는 정확도가 크게 떨어진다 (house-01: 재현율 0.85 → 0.40) → 경고를 맨 앞에
+			String primary = opt.model() == null || opt.model().isBlank() ? gemini.model() : opt.model().trim();
+			if (!primary.equals(res.model())) {
+				run = withWarning(run, "주 모델(" + primary + ")이 혼잡해 예비 모델(" + res.model()
+						+ ")로 분석했어요. 개수를 적게 세는 경향이 있어 다시 분석을 권장해요.");
+			}
 		} catch (GeminiException e) {
 			log.warn("영상 분석 실패 {}: {}", id, e.getMessage());
-			run = finish(id, baseId, "GEMINI", video, gemini.model(), "", thinking, null, e.retries(), null,
+			run = finish(id, baseId, "GEMINI", video, opt.model() == null || opt.model().isBlank() ? gemini.model() : opt.model(), "", thinking,
+					opt.prompt(), opt.fps(), null, e.retries(), null,
 					new AnalysisRun.Timings(uploadMs, saveMs, null, null, null, null), started,
 					ERROR_CODE.getOrDefault(e.code(), "08"), e.getMessage());
 		}
@@ -186,7 +215,8 @@ public class VideoAnalysisService {
 
 	/** 응답 글을 검증 · 매핑 · 계산해서 기록을 만든다. errorCode 가 있으면 계산 없이 실패 기록 */
 	private AnalysisRun finish(String id, String baseId, String mode, AnalysisRun.Video video, String model, String modelVersion,
-			String thinking, Usage usage, int retries, String raw, AnalysisRun.Timings t, long started, String errorCode,
+			String thinking, String promptVersion, Double fps, Usage usage, int retries, String raw, AnalysisRun.Timings t, long started,
+			String errorCode,
 			String errorMessage) {
 		ItemStandardCatalog.Snapshot table = catalog.snapshot();
 		AnalysisRun.Catalog used = new AnalysisRun.Catalog(table.source(), table.loadedAt(), table.list().size(),
@@ -194,7 +224,7 @@ public class VideoAnalysisService {
 		AnalysisRun.Cost cost = cost(usage);
 		if (errorCode != null) {
 			return new AnalysisRun(id, baseId, LocalDateTime.now(), mode, false, errorCode, errorMessage, video, model,
-					modelVersion, thinking, AnalysisPrompt.VERSION, usage, cost, total(t, null, started), retries, raw, null,
+					modelVersion, thinking, fps, promptVersion, usage, cost, total(t, null, started), retries, raw, null,
 					List.of(), List.of(), null, null, used);
 		}
 		long mapStart = System.currentTimeMillis();
@@ -216,8 +246,17 @@ public class VideoAnalysisService {
 			message = "찾은 품목이 없어요.";
 		}
 		return new AnalysisRun(id, baseId, LocalDateTime.now(), mode, code == null, code, message, video, model, modelVersion,
-				thinking, AnalysisPrompt.VERSION, usage, cost, total(t, mappingMs, started), retries, raw, ai, parsed.errors(),
+				thinking, fps, promptVersion, usage, cost, total(t, mappingMs, started), retries, raw, ai, parsed.errors(),
 				parsed.warnings(), result, load, used);
+	}
+
+	private static AnalysisRun withWarning(AnalysisRun r, String warning) {
+		List<String> warnings = new java.util.ArrayList<>(List.of(warning));
+		warnings.addAll(r.parseWarnings());
+		return new AnalysisRun(r.id(), r.baseRunId(), r.createdAt(), r.mode(), r.success(), r.errorCode(), r.errorMessage(),
+				r.video(), r.model(), r.modelVersion(), r.thinkingLevel(), r.fps(), r.promptVersion(), r.usage(), r.cost(),
+				r.timings(), r.retries(), r.rawResponse(), r.ai(), r.parseErrors(), List.copyOf(warnings), r.result(), r.load(),
+				r.catalog());
 	}
 
 	private static AnalysisRun.Timings total(AnalysisRun.Timings t, Long mappingMs, long started) {

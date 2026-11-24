@@ -15,16 +15,25 @@ import java.util.Map;
  */
 public final class AnalysisPrompt {
 
-	/** v2: 대표님 견적 방식(방 순서 · 바구니 환산 · 서랍 속 짐 · 렌탈 · 고가품 · 벽걸이 TV 인치) */
+	/**
+	 * 기본 버전. v2: 대표님 견적 방식(방 순서 · 바구니 환산 · 서랍 속 짐 · 렌탈 · 고가품 · 벽걸이 TV 인치, 팀과 같은 문구)
+	 * v3: v2 + house-01 1회차에서 덜 센 것(의자 · 플라스틱 서랍 · 행거 · 선반 잔짐)을 한 개씩 세도록 보강 (우리 실험)
+	 */
 	public static final String VERSION = "v2";
+	public static final List<String> VERSIONS = List.of("v2", "v3");
 
-	private static volatile String template;
+	private static final Map<String, String> TEMPLATES = new java.util.concurrent.ConcurrentHashMap<>();
 
 	private AnalysisPrompt() {
 	}
 
 	public static String build(List<ItemStandard> table) {
-		return template().replace("{{CATALOG}}", catalogTable(table));
+		return build(VERSION, table);
+	}
+
+	/** 없는 버전이면 기본 버전 */
+	public static String build(String version, List<ItemStandard> table) {
+		return template(VERSIONS.contains(version) ? version : VERSION).replace("{{CATALOG}}", catalogTable(table));
 	}
 
 	/** 품목명 | 분류 | 01 | 02 | 03 (크기명: 판정기준) */
@@ -75,18 +84,17 @@ public final class AnalysisPrompt {
 		return Map.of("type", "STRING", "description", description);
 	}
 
-	private static String template() {
-		if (template == null) {
-			try (InputStream in = AnalysisPrompt.class.getResourceAsStream("/video-analysis/prompt-" + VERSION + ".txt")) {
+	private static String template(String version) {
+		return TEMPLATES.computeIfAbsent(version, v -> {
+			try (InputStream in = AnalysisPrompt.class.getResourceAsStream("/video-analysis/prompt-" + v + ".txt")) {
 				if (in == null) {
-					throw new IllegalStateException("video-analysis/prompt-" + VERSION + ".txt 가 없어요");
+					throw new IllegalStateException("video-analysis/prompt-" + v + ".txt 가 없어요");
 				}
 				String t = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-				template = t.startsWith("﻿") ? t.substring(1) : t;
+				return t.startsWith("\uFEFF") ? t.substring(1) : t;
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
-		}
-		return template;
+		});
 	}
 }

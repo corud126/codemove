@@ -23,6 +23,7 @@ import com.codemove.videoanalysis.AnalysisRun;
 import com.codemove.videoanalysis.AnalysisRunStore;
 import com.codemove.videoanalysis.GroundTruthScorer;
 import com.codemove.videoanalysis.ItemStandardCatalog;
+import com.codemove.videoanalysis.TruckLoadService;
 import com.codemove.videoanalysis.VideoAnalysisService;
 
 /**
@@ -38,11 +39,18 @@ public class AdminVideoAnalysisController {
 	private final VideoAnalysisService service;
 	private final AnalysisRunStore store;
 	private final GroundTruthScorer scorer;
+	private final TruckLoadService trucks;
+	private final com.codemove.request.ItemCatalog itemCatalog;
+	private final com.codemove.common.code.CodeService codeService;
 
-	public AdminVideoAnalysisController(VideoAnalysisService service, AnalysisRunStore store, GroundTruthScorer scorer) {
+	public AdminVideoAnalysisController(VideoAnalysisService service, AnalysisRunStore store, GroundTruthScorer scorer,
+			TruckLoadService trucks, com.codemove.request.ItemCatalog itemCatalog, com.codemove.common.code.CodeService codeService) {
 		this.service = service;
 		this.store = store;
 		this.scorer = scorer;
+		this.trucks = trucks;
+		this.itemCatalog = itemCatalog;
+		this.codeService = codeService;
 	}
 
 	@GetMapping
@@ -55,18 +63,21 @@ public class AdminVideoAnalysisController {
 		model.addAttribute("runs", store.recent(RECENT));
 		model.addAttribute("testsets", scorer.sets());
 		model.addAttribute("loadFactor", service.loadFactor());
+		model.addAttribute("promptVersions", AnalysisPrompt.VERSIONS);
 		return "admin/video-analysis/index";
 	}
 
 	@PostMapping("/videos")
 	@ResponseBody
 	public ResponseEntity<Object> upload(@RequestParam("video") MultipartFile video,
-			@RequestParam(required = false) Double durationSec, @RequestParam(required = false) Long uploadStartedAt) {
+			@RequestParam(required = false) Double durationSec, @RequestParam(required = false) Long uploadStartedAt,
+			@RequestParam(required = false) String model, @RequestParam(required = false) Double fps,
+			@RequestParam(required = false) String prompt) {
 		// 업로드 시간: 브라우저가 보내기 시작한 시각 ~ 서버가 다 받은 시각 (같은 PC 시계 기준 근사값, 이상하면 기록하지 않음)
 		long elapsed = uploadStartedAt == null ? -1 : System.currentTimeMillis() - uploadStartedAt;
 		Long uploadMs = elapsed >= 0 && elapsed < 3_600_000 ? elapsed : null;
 		try {
-			return ResponseEntity.ok(service.analyzeUpload(video, durationSec, uploadMs));
+			return ResponseEntity.ok(service.analyzeUpload(video, durationSec, uploadMs, new VideoAnalysisService.RunOptions(model, fps, prompt)));
 		} catch (VideoAnalysisService.RejectedUpload e) {
 			return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "errorCode", e.code()));
 		}
@@ -92,19 +103,85 @@ public class AdminVideoAnalysisController {
 	/** 실행 결과를 정답 목록과 비교 (정밀도 · 재현율 · F1 · CBM 오차). 없는 기록 · 테스트셋이면 404 */
 	@GetMapping("/runs/{id}/score")
 	@ResponseBody
-	public ResponseEntity<GroundTruthScorer.Score> score(@PathVariable String id, @RequestParam String set) {
+	public ResponseEntity<Map<String, Object>> score(@PathVariable String id, @RequestParam String set) {
 		AnalysisRun run = store.find(id);
 		if (run == null || run.result() == null) {
 			return ResponseEntity.notFound().build();
 		}
 		GroundTruthScorer.Score s = scorer.score(set, run.result().lines().stream().map(l -> l.item()).toList(), service.catalog());
-		return s == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(s);
+		if (s == null) {
+			return ResponseEntity.notFound().build();
+		}
+		// 톤 비교: 정답 목록 부피로 낸 톤(대표님 기준) vs AI 결과 톤
+		Map<String, Object> out = new java.util.LinkedHashMap<>();
+		out.put("score", s);
+		out.put("expectedLoad", trucks.estimate(s.expectedCbm(), service.catalog().trucks()));
+		out.put("detectedLoad", run.load());
+		return ResponseEntity.ok(out);
+	}
+
+	/**
+	 * 분석 결과가 고객 · 관리자에게 어떻게 전달되는지 (흐름에 연결하지 않고 값만 계산).
+	 * 지금 앱은 품목명 · 크기 · 개수 · 확인 필요만 받아 부피를 고객 앱 품목표(ItemCatalog: 중형 기준 × 크기 계수)로 다시 계산한다.
+	 * 미매핑 품목은 AI 가 본 이름 그대로 넘어가 '기타 0.5㎥'로 계산된다. 우리 기준표 부피를 옆에 둬서 차이를 본다.
+	 */
+	@GetMapping("/runs/{id}/customer-items")
+	@ResponseBody
+	public ResponseEntity<Map<String, Object>> customerItems(@PathVariable String id) {
+		AnalysisRun run = store.find(id);
+		if (run == null || run.result() == null) {
+			return ResponseEntity.notFound().build();
+		}
+		java.util.List<Map<String, Object>> items = new java.util.ArrayList<>();
+		java.math.BigDecimal appTotal = java.math.BigDecimal.ZERO;
+		int i = 0;
+		for (var line : run.result().lines()) {
+			var m = line.item();
+			String name = m.standardName().isEmpty() ? m.ai().detectedName() : m.standardName();
+			name = name == null || name.isBlank() ? "기타" : name.length() > 50 ? name.substring(0, 50) : name;
+			int count = m.ai().quantity();
+			java.math.BigDecimal appCbm = itemCatalog.volume(name, m.sizeCode(), count);
+			appTotal = appTotal.add(appCbm);
+			Map<String, Object> it = new java.util.LinkedHashMap<>();
+			it.put("name", name);
+			it.put("size", codeService.userName("ITEM_SIZE", m.sizeCode()));
+			it.put("count", count);
+			it.put("review", m.needsReview());
+			it.put("aiIndex", i++);
+			it.put("category", codeService.userName("ITEM_CATEGORY", itemCatalog.find(name).category()));
+			it.put("appCbm", appCbm);
+			it.put("standardCbm", line.totalCbm());
+			it.put("inAppCatalog", itemCatalog.find(name).pickable());
+			items.add(it);
+		}
+		Map<String, Object> out = new java.util.LinkedHashMap<>();
+		out.put("items", items);
+		out.put("appTotalCbm", appTotal);
+		out.put("standardTotalCbm", run.result().totalCbm());
+		return ResponseEntity.ok(out);
+	}
+
+	/** 고객 견적 화면(2단계 품목 확인)을 미리보기로 열고 이 실행 결과를 넣는다. 제출 · 저장은 되지 않는다 (today 가 없으면 화면이 미리보기 모드) */
+	@GetMapping("/runs/{id}/customer")
+	public String customerPreview(@PathVariable String id, Model model) {
+		ResponseEntity<Map<String, Object>> items = customerItems(id);
+		if (!items.getStatusCode().is2xxSuccessful() || items.getBody() == null) {
+			return "redirect:/admin/video-analysis";
+		}
+		model.addAttribute("pickable", itemCatalog.pickable());
+		model.addAttribute("catalog", itemCatalog.forScript());
+		model.addAttribute("aiPreviewItems", items.getBody().get("items"));
+		return "user/quote/index";
 	}
 
 	@PostMapping("/runs/{id}/rerun")
 	@ResponseBody
-	public ResponseEntity<Object> rerun(@PathVariable String id) {
-		AnalysisRun run = service.rerun(id);
+	public ResponseEntity<Object> rerun(@PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
+		Map<String, Object> b = body == null ? Map.of() : body;
+		Object fps = b.get("fps");
+		VideoAnalysisService.RunOptions options = new VideoAnalysisService.RunOptions(text(b.get("model")),
+				fps instanceof Number n && n.doubleValue() > 0 ? n.doubleValue() : null, text(b.get("prompt")));
+		AnalysisRun run = service.rerun(id, options);
 		return run == null ? ResponseEntity.badRequest().body(Map.of("message", "다시 분석할 영상이 없어요."))
 				: ResponseEntity.ok(run);
 	}
@@ -154,6 +231,10 @@ public class AdminVideoAnalysisController {
 		}
 		return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"video-analysis-runs.csv\"")
 				.contentType(new MediaType("text", "csv", StandardCharsets.UTF_8)).body(sb.toString().getBytes(StandardCharsets.UTF_8));
+	}
+
+	private static String text(Object value) {
+		return value == null || String.valueOf(value).isBlank() ? null : String.valueOf(value).trim();
 	}
 
 	private static String s(Object value) {

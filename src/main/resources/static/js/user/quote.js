@@ -749,7 +749,11 @@
 
   state.voice = params.get('voice') === 'on';
   renderVoice();
-  if (PREVIEW) {
+  if (PREVIEW && Array.isArray(window.QUOTE_AI_PREVIEW)) {
+    // 관리자 영상 분석 테스트의 미리보기: 그 실행의 분석 결과로 2단계(품목 확인)를 보여 준다 (제출 · 저장 없음)
+    state.items = window.QUOTE_AI_PREVIEW.map((it) => newItem(it.name, it.size, it.count, it.review, it.aiIndex));
+    preset(2, '');
+  } else if (PREVIEW) {
     preset(Math.min(TOTAL, Math.max(1, parseInt(params.get('step'), 10) || 1)), params.get('state') || '');
   } else {
     render(); // 실제 요청은 항상 1단계 영상 올리기부터

@@ -91,10 +91,11 @@ class VideoAnalysisFlowTest {
 		// 정답 비교: 정답 냉장고 1 + 박스 12, AI 냉장고 1 + 박스 10 → 정밀도 1, 재현율 11/13
 		mvc.perform(get("/admin/video-analysis/runs/" + id + "/score").param("set", "house-test").session(admin))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.precision").value(1.0))
-				.andExpect(jsonPath("$.recall").value(0.846))
-				.andExpect(jsonPath("$.expectedOther").value(1))
-				.andExpect(jsonPath("$.detectedOther").value(1));
+				.andExpect(jsonPath("$.score.precision").value(1.0))
+				.andExpect(jsonPath("$.score.recall").value(0.846))
+				.andExpect(jsonPath("$.expectedLoad.label").value("1톤"))
+				.andExpect(jsonPath("$.score.expectedOther").value(1))
+				.andExpect(jsonPath("$.score.detectedOther").value(1));
 		mvc.perform(get("/admin/video-analysis/runs/" + id + "/score").param("set", "../없음").session(admin))
 				.andExpect(status().isNotFound());
 
