@@ -269,6 +269,25 @@ class VideoAnalysisUnitTest {
 	}
 
 	@Test
+	void dailyQuotaIsNotRetried() {
+		// 실제 응답(11/24): 무료 등급 하루 20회 초과
+		assertThat(GeminiVideoClient.dailyQuota("Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, "
+				+ "limit: 20 … Generate content requests per day limit exceeded on Free Tier.")).isTrue();
+		assertThat(GeminiVideoClient.dailyQuota("quotaId: GenerateRequestsPerDayPerProjectPerModel")).isTrue();
+		assertThat(GeminiVideoClient.dailyQuota("Resource has been exhausted (e.g. check quota). requests per minute")).isFalse();
+	}
+
+	@Test
+	void comparisonStats() {
+		var s = RunComparison.stat(List.of(new BigDecimal("0.4"), new BigDecimal("0.88"), new BigDecimal("0.68")), 3);
+		assertThat(s.avg()).isEqualByComparingTo("0.653");
+		assertThat(s.min()).isEqualByComparingTo("0.400");
+		assertThat(s.max()).isEqualByComparingTo("0.880");
+		assertThat(RunComparison.stat(List.of(), 1).avg()).isNull();
+		assertThat(RunComparison.stem("house-01-noperson.mp4")).isEqualTo("house-01-noperson");
+	}
+
+	@Test
 	void runIdIsPathSafe() {
 		assertThat(AnalysisRunStore.safe("20261124-101500-123")).isTrue();
 		assertThat(AnalysisRunStore.safe("../../etc")).isFalse();

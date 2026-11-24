@@ -40,6 +40,9 @@ public class VideoAnalysisService {
 	private static final Map<String, String> ERROR_CODE = Map.of("NO_KEY", "09", "HTTP_429", "06", "HTTP_5xx", "10",
 			"NETWORK", "05");
 	private static final AtomicLong LAST_ID = new AtomicLong();
+	/** 분석 작업 (동시에 2개까지, 나머지는 줄을 섬) · 분석 중인 실행 ID → 시작 시각 */
+	private final java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+	private final java.util.Map<String, Long> running = new java.util.concurrent.ConcurrentHashMap<>();
 
 	private final VideoAnalysisProperties properties;
 	private final ItemStandardCatalog catalog;
@@ -87,8 +90,67 @@ public class VideoAnalysisService {
 		return analyzeUpload(file, durationSec, uploadMs, RunOptions.DEFAULT);
 	}
 
-	/** 업로드한 영상을 분석한다. 형식 · 크기 · 길이가 맞지 않으면 RejectedUpload(화면 문구) */
+	/** 업로드한 영상을 분석한다 (끝날 때까지 기다림). 형식 · 크기 · 길이가 맞지 않으면 RejectedUpload(화면 문구) */
 	public AnalysisRun analyzeUpload(MultipartFile file, Double durationSec, Long uploadMs, RunOptions options) {
+		Prepared p = prepareUpload(file, durationSec);
+		return runGemini(p.id(), null, p.video(), uploadMs, p.saveMs(), p.started(), options);
+	}
+
+	/**
+	 * 비동기: 영상 검증 · 저장만 하고 실행 ID 를 바로 돌려준다. 분석은 뒤에서 돌고, 상태는 status(id) 로 본다.
+	 * (분석이 1~2분 걸려 요청을 붙잡고 있으면 고객 화면이 멈춘 것처럼 보이므로)
+	 */
+	public String startUpload(MultipartFile file, Double durationSec, Long uploadMs, RunOptions options) {
+		Prepared p = prepareUpload(file, durationSec);
+		submit(p.id(), () -> runGemini(p.id(), null, p.video(), uploadMs, p.saveMs(), p.started(), options));
+		return p.id();
+	}
+
+	/** 비동기 다시 분석. 원래 실행 · 영상이 없으면 null */
+	public String startRerun(String baseId, RunOptions options) {
+		Prepared p = prepareRerun(baseId);
+		if (p == null) {
+			return null;
+		}
+		submit(p.id(), () -> runGemini(p.id(), baseId, p.video(), null, p.saveMs(), p.started(), options));
+		return p.id();
+	}
+
+	/** RUNNING: 분석 중(elapsedSec) · DONE: 끝남(run) · 없으면 null */
+	public record Status(String state, Long elapsedSec, AnalysisRun run) {
+	}
+
+	public Status status(String id) {
+		AnalysisRun run = store.find(id);
+		if (run != null) {
+			return new Status("DONE", null, run);
+		}
+		Long since = running.get(id);
+		return since == null ? null : new Status("RUNNING", (System.currentTimeMillis() - since) / 1000, null);
+	}
+
+	private void submit(String id, Runnable job) {
+		running.put(id, System.currentTimeMillis());
+		executor.submit(() -> {
+			try {
+				job.run();
+			} catch (RuntimeException e) {
+				log.error("영상 분석 작업 실패 {}", id, e);
+			} finally {
+				running.remove(id);
+			}
+		});
+	}
+
+	@jakarta.annotation.PreDestroy
+	void shutdown() {
+		executor.shutdownNow();
+	}
+
+	private record Prepared(String id, AnalysisRun.Video video, long saveMs, long started) {
+	}
+
+	private Prepared prepareUpload(MultipartFile file, Double durationSec) {
 		long started = System.currentTimeMillis();
 		if (file == null || file.isEmpty()) {
 			throw new RejectedUpload("01", "영상을 선택해 주세요.");
@@ -114,7 +176,7 @@ public class VideoAnalysisService {
 		}
 		long saveMs = System.currentTimeMillis() - started;
 		AnalysisRun.Video video = new AnalysisRun.Video(name, file.getSize(), durationSec, MIME.get(ext), stored, null);
-		return runGemini(id, null, video, uploadMs, saveMs, started, options);
+		return new Prepared(id, video, saveMs, started);
 	}
 
 	/** 저장된 영상으로 다시 분석 (같은 영상 반복 테스트). 영상은 새 실행 ID 로 복사한다. 원래 실행이 없으면 null */
@@ -122,8 +184,14 @@ public class VideoAnalysisService {
 		return rerun(baseId, RunOptions.DEFAULT);
 	}
 
-	/** 같은 영상을 조건(모델 · 프레임 · 프롬프트)을 바꿔 다시 분석 */
+	/** 같은 영상을 조건(모델 · 프레임 · 프롬프트)을 바꿔 다시 분석 (끝날 때까지 기다림) */
 	public AnalysisRun rerun(String baseId, RunOptions options) {
+		Prepared p = prepareRerun(baseId);
+		return p == null ? null : runGemini(p.id(), baseId, p.video(), null, p.saveMs(), p.started(), options);
+	}
+
+	/** 원래 실행의 영상을 새 실행 ID 로 복사. 없으면 null */
+	private Prepared prepareRerun(String baseId) {
 		long started = System.currentTimeMillis();
 		AnalysisRun base = store.find(baseId);
 		if (base == null || base.video() == null || base.video().storedName() == null) {
@@ -142,7 +210,7 @@ public class VideoAnalysisService {
 		}
 		AnalysisRun.Video v = base.video();
 		AnalysisRun.Video video = new AnalysisRun.Video(v.fileName(), v.sizeBytes(), v.durationSec(), v.mimeType(), stored, null);
-		return runGemini(id, baseId, video, null, System.currentTimeMillis() - started, started, options);
+		return new Prepared(id, video, System.currentTimeMillis() - started, started);
 	}
 
 	/** AI 응답 JSON 을 직접 넣어 매핑 · 계산만 (키 없이 시험, 결과를 고친 뒤 재계산) */

@@ -237,6 +237,11 @@ public class GeminiVideoClient {
 				return call.get();
 			} catch (HttpStatusCodeException e) {
 				int status = e.getStatusCode().value();
+				String body = e.getResponseBodyAsString();
+				// 하루 · 무료 등급 한도 초과는 기다려도 풀리지 않는다 → 같은 모델로 다시 시도하지 않음 (남은 요청을 깎지 않게)
+				if (status == 429 && dailyQuota(body)) {
+					throw new GeminiException("HTTP_429", "하루 사용량 한도를 넘었어요 (내일 다시, 또는 유료 등급): " + shorten(body), retries[0]);
+				}
 				boolean retryable = status == 429 || status >= 500;
 				if (!retryable || retries[0] >= config.maxRetries()) {
 					String code = status == 429 ? "HTTP_429" : status >= 500 ? "HTTP_5xx" : "HTTP_4xx";
@@ -251,6 +256,12 @@ public class GeminiVideoClient {
 			log.info("Gemini 다시 시도 {}회", retries[0]);
 			sleep(1000L << (retries[0] - 1));
 		}
+	}
+
+	/** 429 응답이 하루 한도 · 무료 등급 한도인지 (분당 한도처럼 잠깐 기다리면 풀리는 것과 구분) */
+	static boolean dailyQuota(String body) {
+		String b = body == null ? "" : body;
+		return b.contains("PerDay") || b.contains("per day") || b.contains("free_tier_requests");
 	}
 
 	private static void sleep(long ms) {

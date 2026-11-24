@@ -82,6 +82,24 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
     video.src = url;
   });
 
+  /* 비동기 분석 기다리기: 3초마다 GET /runs/{id}/status, 끝나면 onDone(run). 15분이 넘으면 멈춤 */
+  function pollRun(id, onProgress, onDone) {
+    const started = Date.now();
+    const tick = async () => {
+      let s = null;
+      try {
+        const res = await fetch(`${BASE}/runs/${id}/status`);
+        s = res.ok ? await res.json() : null;
+      } catch (_) { /* 잠깐 끊김: 다음에 다시 */ }
+      if (s && s.state === 'DONE') { onDone(s.run); return; }
+      if (!s && Date.now() - started > 10000) { onProgress('분석 상태를 찾지 못했어요.'); return; }
+      if (Date.now() - started > 15 * 60 * 1000) { onProgress('너무 오래 걸려 확인을 멈췄어요. 실행 기록에서 확인해 주세요.'); return; }
+      onProgress(`AI 분석 중… ${s ? s.elapsedSec : Math.round((Date.now() - started) / 1000)}초`);
+      setTimeout(tick, 3000);
+    };
+    tick();
+  }
+
   /* ---------- 업로드 분석 (진행률 표시를 위해 XHR) ---------- */
   analyzeBtn.addEventListener('click', () => {
     const file = fileInput.files[0];
@@ -95,17 +113,27 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
     if (opt.prompt) form.append('prompt', opt.prompt);
     if (opt.noFallback) form.append('noFallback', 'true');
     form.append('uploadStartedAt', Date.now());
+    form.append('async', 'true');
     analyzeBtn.disabled = true;
     const xhr = new XMLHttpRequest();
     xhr.open('POST', BASE + '/videos');
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setStatus(`업로드 중 ${Math.round((e.loaded / e.total) * 100)}%`);
     };
-    xhr.upload.onload = () => setStatus('AI 분석 중… (1분 영상이면 1~2분 걸릴 수 있어요)');
+    xhr.upload.onload = () => setStatus('영상 저장 중…');
     xhr.onload = () => {
-      analyzeBtn.disabled = false;
       let body = {};
       try { body = JSON.parse(xhr.responseText); } catch (_) { /* 빈 응답 */ }
+      if (xhr.status === 202) {
+        // 비동기: 실행 ID 를 받고 상태를 확인하며 기다림
+        pollRun(body.id, setStatus, (run) => {
+          analyzeBtn.disabled = false;
+          setStatus(run.success ? '분석 완료' : `분석 실패: ${run.errorCode} ${ERRORS[run.errorCode] || ''} — ${run.errorMessage || ''}`, !run.success);
+          showResult(run);
+        });
+        return;
+      }
+      analyzeBtn.disabled = false;
       if (xhr.status !== 200) {
         setStatus((body.errorCode ? body.errorCode + ' ' : '') + (body.message || `실패 (${xhr.status})`), true);
         if (body.outcome) { const box = $('[data-result]'); box.innerHTML = '<h3 class="text-[15px] font-bold">고객에게 보일 안내 (업로드에서 막힘)</h3><div class="mt-2">' + outcomeHtml(body.outcome) + '</div>'; box.hidden = false; }
@@ -143,10 +171,17 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
       const res = await fetch(`${BASE}/runs/${id}`);
       if (res.ok) showResult(await res.json());
     } else if (e.target.closest('[data-run-rerun]')) {
-      e.target.textContent = '분석 중…';
-      const res = await post(`${BASE}/runs/${id}/rerun`, options());
-      if (!res.ok) { alert(res.message || '다시 분석하지 못했어요.'); e.target.textContent = '다시 분석'; return; }
-      location.reload();
+      const btn = e.target.closest('[data-run-rerun]');
+      btn.textContent = '분석 중…';
+      btn.disabled = true;
+      const res = await post(`${BASE}/runs/${id}/rerun`, Object.assign(options(), { async: true }));
+      if (!res.ok) { alert(res.message || '다시 분석하지 못했어요.'); btn.textContent = '다시 분석'; btn.disabled = false; return; }
+      pollRun(res.id, (text) => { btn.textContent = text; }, (run) => {
+        btn.textContent = '다시 분석';
+        btn.disabled = false;
+        showResult(run);
+        refreshCompare();
+      });
     } else if (e.target.closest('[data-run-delete]')) {
       if (!confirm('이 기록과 영상을 지울까요?')) return;
       const res = await post(`${BASE}/runs/${id}/delete`);
@@ -267,6 +302,44 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
     }
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  /* 조건별 비교표 (GET /compare?set=) */
+  const compareSel = $('[data-compare-set]');
+  const fmtStat = (s, unit, pctMode) => {
+    if (!s || s.avg == null) return '—';
+    const f = (v) => (pctMode ? (Number(v) * 100).toFixed(0) + '%' : v + (unit || ''));
+    return s.min === s.max ? f(s.avg) : `${f(s.avg)}<br><span style="color:#999">${f(s.min)}~${f(s.max)}</span>`;
+  };
+  async function showCompare(set) {
+    const el = $('[data-compare]');
+    el.innerHTML = '';
+    if (!set) return;
+    const res = await fetch(`${BASE}/compare?set=${encodeURIComponent(set)}`);
+    if (!res.ok) { el.textContent = '비교하지 못했어요.'; return; }
+    const t = await res.json();
+    if (!t.rows.length) { el.textContent = '이 영상으로 분석한 기록이 없어요.'; return; }
+    const errs = (e) => Object.entries(e).map(([k, v]) => `${k}×${v}`).join(' ') || '';
+    el.innerHTML = `
+      <p class="mb-2 text-[12px]">목표(정답 기준) 톤: <b>${t.expectedTon == null ? '—' : esc(t.expectedTon) + '톤'}</b> ${esc(t.expectedLabel || '')}</p>
+      <table class="w-full min-w-[640px] border-collapse">
+        <thead><tr class="text-left text-[#888]"><th class="py-1 pr-2">모델 · 프롬프트 · 프레임</th><th class="pr-2">성공/시도</th><th class="pr-2">재현율</th><th class="pr-2">정밀도</th><th class="pr-2">CBM 오차</th><th class="pr-2">톤 (일치)</th><th class="pr-2">API 시간</th><th class="pr-2">입력 토큰</th><th>1회 비용</th></tr></thead>
+        <tbody>${t.rows.map((r) => `
+          <tr class="border-t border-[#eef0ee] align-top">
+            <td class="py-1.5 pr-2"><b>${esc(r.model)}</b><br>${esc(r.promptVersion)} · ${esc(r.fps)}</td>
+            <td class="pr-2">${r.successes}/${r.attempts}${r.attempts > r.successes ? `<br><span style="color:#ef5f3c">${esc(errs(r.errors))}</span>` : ''}</td>
+            <td class="pr-2">${fmtStat(r.recall, '', true)}</td>
+            <td class="pr-2">${fmtStat(r.precision, '', true)}</td>
+            <td class="pr-2">${fmtStat(r.cbmErrorPct, '%')}</td>
+            <td class="pr-2">${fmtStat(r.ton, '톤')}<br><span style="color:${r.tonMatch ? '#4a6741' : '#999'}">일치 ${r.tonMatch}/${r.successes}</span></td>
+            <td class="pr-2">${fmtStat(r.apiSec, '초')}</td>
+            <td class="pr-2">${fmtStat(r.inputTokens, '')}</td>
+            <td>${fmtStat(r.cost, '$')}</td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+  }
+  const refreshCompare = () => { if (compareSel.value) showCompare(compareSel.value); };
+  compareSel.addEventListener('change', () => showCompare(compareSel.value));
+  if (testsets.length) { compareSel.value = testsets.find((s) => s.includes('noperson')) || testsets[0]; showCompare(compareSel.value); }
 
   /* 고객에게 보일 안내 (AnalysisOutcomePolicy): 제목 · 설명 · 촬영 요령 · 버튼 · 관리자 표시 · 남은 횟수 */
   const OUTCOME_COLOR = { OK: '#4a6741', PARTIAL: '#d9701a', RETAKE: '#ef5f3c', RETRY_LATER: '#ef5f3c' };

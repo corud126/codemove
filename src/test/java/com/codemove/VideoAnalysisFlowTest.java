@@ -141,6 +141,34 @@ class VideoAnalysisFlowTest {
 	}
 
 	@Test
+	void asyncUploadStatusAndCompare() throws Exception {
+		// 비동기: 저장만 하고 202 + 실행 ID → 상태가 DONE 이 될 때까지 확인 (키가 없으니 곧 09 로 끝남)
+		String body = mvc.perform(multipart("/admin/video-analysis/videos")
+				.file(new MockMultipartFile("video", "house-test.mp4", "video/mp4", new byte[] { 1, 2 })).param("durationSec", "60")
+				.param("async", "true").session(admin))
+				.andExpect(status().isAccepted()).andExpect(jsonPath("$.state").value("RUNNING")).andReturn().getResponse()
+				.getContentAsString();
+		String id = JSON.readTree(body).get("id").asString();
+		String state = "";
+		for (int i = 0; i < 50 && !"DONE".equals(state); i++) {
+			Thread.sleep(100);
+			state = JSON.readTree(mvc.perform(get("/admin/video-analysis/runs/" + id + "/status").session(admin))
+					.andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("state").asString();
+		}
+		assertThat(state).isEqualTo("DONE");
+		mvc.perform(get("/admin/video-analysis/runs/" + id + "/status").session(admin))
+				.andExpect(jsonPath("$.run.errorCode").value("09"));
+		mvc.perform(get("/admin/video-analysis/runs/../x/status").session(admin)).andExpect(status().is4xxClientError());
+
+		// 조건별 비교: 영상 이름 = 정답 목록 이름(house-test) 인 기록만, 실패는 이유별로
+		mvc.perform(get("/admin/video-analysis/compare").param("set", "house-test").session(admin)).andExpect(status().isOk())
+				.andExpect(jsonPath("$.rows[0].attempts").value(1))
+				.andExpect(jsonPath("$.rows[0].successes").value(0))
+				.andExpect(jsonPath("$.rows[0].errors['09']").value(1));
+		mvc.perform(get("/admin/video-analysis/compare").param("set", "없음").session(admin)).andExpect(status().isNotFound());
+	}
+
+	@Test
 	void manualRejectsEmpty() throws Exception {
 		mvc.perform(post("/admin/video-analysis/manual").session(admin).contentType(MediaType.APPLICATION_JSON).content("{\"raw\":\" \"}"))
 				.andExpect(status().isBadRequest());

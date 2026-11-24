@@ -100,6 +100,19 @@
     <!--/* 결과 (JS 가 채움) */-->
     <section data-result hidden class="rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]"></section>
 
+    <!--/* 조건별 비교 (같은 영상의 기록을 모델 · 프롬프트 · 프레임으로 묶음) */-->
+    <section class="rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-[15px] font-bold">조건별 비교</h3>
+        <select data-compare-set class="h-8 rounded-[8px] border border-[#dfe3df] px-2 text-[12px]">
+          <option value="">정답 목록 선택</option>
+          <option th:each="s : ${testsets}" th:value="${s}" th:text="${s}">house-01-noperson</option>
+        </select>
+      </div>
+      <p class="mt-1 text-[11px] text-[#888]">영상 파일 이름이 정답 목록 이름과 같은 기록만 묶어요 (예: house-01-noperson.mp4).</p>
+      <div data-compare class="mt-3 overflow-x-auto text-[11px]"></div>
+    </section>
+
     <!--/* 실행 기록 */-->
     <section class="rounded-[20px] bg-white p-5 shadow-[0_2px_12px_rgba(26,26,26,.05)]">
       <div class="flex items-center justify-between">

@@ -106,7 +106,7 @@ public class AnalysisRunStore {
 	}
 
 	/** 경로 조작 방지: 실행 ID 는 숫자 · 하이픈만 */
-	static boolean safe(String id) {
+	public static boolean safe(String id) {
 		return id != null && id.matches("[0-9-]{10,40}");
 	}
 }

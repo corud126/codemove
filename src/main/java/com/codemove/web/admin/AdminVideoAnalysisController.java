@@ -24,6 +24,7 @@ import com.codemove.videoanalysis.AnalysisRun;
 import com.codemove.videoanalysis.AnalysisRunStore;
 import com.codemove.videoanalysis.GroundTruthScorer;
 import com.codemove.videoanalysis.ItemStandardCatalog;
+import com.codemove.videoanalysis.RunComparison;
 import com.codemove.videoanalysis.TruckLoadService;
 import com.codemove.videoanalysis.VideoAnalysisService;
 
@@ -41,17 +42,19 @@ public class AdminVideoAnalysisController {
 	private final AnalysisRunStore store;
 	private final GroundTruthScorer scorer;
 	private final TruckLoadService trucks;
+	private final RunComparison comparison;
 	private final com.codemove.videoanalysis.AnalysisOutcomePolicy outcomePolicy;
 	private final com.codemove.request.ItemCatalog itemCatalog;
 	private final com.codemove.common.code.CodeService codeService;
 
 	public AdminVideoAnalysisController(VideoAnalysisService service, AnalysisRunStore store, GroundTruthScorer scorer,
 			TruckLoadService trucks, com.codemove.request.ItemCatalog itemCatalog, com.codemove.common.code.CodeService codeService,
-			com.codemove.videoanalysis.AnalysisOutcomePolicy outcomePolicy) {
+			com.codemove.videoanalysis.AnalysisOutcomePolicy outcomePolicy, RunComparison comparison) {
 		this.service = service;
 		this.store = store;
 		this.scorer = scorer;
 		this.trucks = trucks;
+		this.comparison = comparison;
 		this.outcomePolicy = outcomePolicy;
 		this.itemCatalog = itemCatalog;
 		this.codeService = codeService;
@@ -76,12 +79,18 @@ public class AdminVideoAnalysisController {
 	public ResponseEntity<Object> upload(@RequestParam("video") MultipartFile video,
 			@RequestParam(required = false) Double durationSec, @RequestParam(required = false) Long uploadStartedAt,
 			@RequestParam(required = false) String model, @RequestParam(required = false) Double fps,
-			@RequestParam(required = false) String prompt, @RequestParam(required = false) Boolean noFallback) {
+			@RequestParam(required = false) String prompt, @RequestParam(required = false) Boolean noFallback,
+			@RequestParam(required = false) Boolean async) {
 		// 업로드 시간: 브라우저가 보내기 시작한 시각 ~ 서버가 다 받은 시각 (같은 PC 시계 기준 근사값, 이상하면 기록하지 않음)
 		long elapsed = uploadStartedAt == null ? -1 : System.currentTimeMillis() - uploadStartedAt;
 		Long uploadMs = elapsed >= 0 && elapsed < 3_600_000 ? elapsed : null;
 		try {
-			return ResponseEntity.ok(service.analyzeUpload(video, durationSec, uploadMs, new VideoAnalysisService.RunOptions(model, fps, prompt, Boolean.TRUE.equals(noFallback))));
+			VideoAnalysisService.RunOptions options = new VideoAnalysisService.RunOptions(model, fps, prompt, Boolean.TRUE.equals(noFallback));
+			if (Boolean.TRUE.equals(async)) {
+				// 비동기: 저장만 하고 실행 ID 를 바로 돌려줌 → 화면이 /runs/{id}/status 로 확인
+				return ResponseEntity.accepted().body(Map.of("id", service.startUpload(video, durationSec, uploadMs, options), "state", "RUNNING"));
+			}
+			return ResponseEntity.ok(service.analyzeUpload(video, durationSec, uploadMs, options));
 		} catch (VideoAnalysisService.RejectedUpload e) {
 			return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "errorCode", e.code(), "outcome",
 					outcomePolicy.forUploadReject(e.code(), e.getMessage(), 1)));
@@ -174,6 +183,22 @@ public class AdminVideoAnalysisController {
 		return "user/quote/index";
 	}
 
+	/** 비동기 분석 상태: RUNNING(elapsedSec) · DONE(run). 없는 ID 면 404 */
+	@GetMapping("/runs/{id}/status")
+	@ResponseBody
+	public ResponseEntity<VideoAnalysisService.Status> status(@PathVariable String id) {
+		VideoAnalysisService.Status s = AnalysisRunStore.safe(id) ? service.status(id) : null;
+		return s == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(s);
+	}
+
+	/** 조건별 비교표: 같은 영상(영상 파일 이름 = 정답 목록 이름)의 기록을 모델 · 프롬프트 · 프레임으로 묶어 정확도 · 톤 · 시간 · 비용 */
+	@GetMapping("/compare")
+	@ResponseBody
+	public ResponseEntity<RunComparison.Table> compare(@RequestParam String set) {
+		RunComparison.Table t = comparison.compare(set, store.recent(Integer.MAX_VALUE), service.catalog());
+		return t == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(t);
+	}
+
 	/**
 	 * 이 실행 결과를 고객에게 어떻게 안내할지 (분석이 어려운 영상 처리 규칙 미리보기).
 	 * 시도 횟수는 다시 분석 · 재계산으로 이어진 기록(baseRunId)을 따라가 센다. attempt 를 주면 그 값으로 (남은 횟수 시험용)
@@ -213,6 +238,11 @@ public class AdminVideoAnalysisController {
 		VideoAnalysisService.RunOptions options = new VideoAnalysisService.RunOptions(text(b.get("model")),
 				fps instanceof Number n && n.doubleValue() > 0 ? n.doubleValue() : null, text(b.get("prompt")),
 				Boolean.TRUE.equals(b.get("noFallback")));
+		if (Boolean.TRUE.equals(b.get("async"))) {
+			String started = service.startRerun(id, options);
+			return started == null ? ResponseEntity.badRequest().body(Map.of("message", "다시 분석할 영상이 없어요."))
+					: ResponseEntity.accepted().body(Map.of("id", started, "state", "RUNNING"));
+		}
 		AnalysisRun run = service.rerun(id, options);
 		return run == null ? ResponseEntity.badRequest().body(Map.of("message", "다시 분석할 영상이 없어요."))
 				: ResponseEntity.ok(run);
