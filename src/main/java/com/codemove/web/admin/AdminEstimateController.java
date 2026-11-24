@@ -191,16 +191,40 @@ public class AdminEstimateController {
 		return "admin/estimate/edit";
 	}
 
-	/** 고객 영상 (브라우저 video 태그가 구간 요청으로 이어 받는다) */
+	/**
+	 * 고객 영상 (브라우저 video 태그가 구간 요청으로 이어 받는다).
+	 * 팀 공용 DB 라 다른 앱이 저장한 경로도 온다: 인터넷 주소(시연 예시)는 그 주소로 보내고,
+	 * "/uploads/…" 처럼 앞에 / 가 붙은 웹 경로는 이 앱 폴더 기준(uploads/…)으로 찾는다. 이 PC 에 파일이 없으면 404.
+	 */
 	@GetMapping("/{id:\\d+}/video")
 	public ResponseEntity<Resource> video(@PathVariable Long id) {
 		QuoteService.Detail detail = quoteService.detail(id);
-		if (detail == null || detail.video() == null || !Files.exists(Path.of(detail.video().getFilePath()))) {
+		String stored = detail == null || detail.video() == null ? null : detail.video().getFilePath();
+		if (stored != null && stored.matches("(?i)^https?://.*")) {
+			return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, stored).build();
+		}
+		Path path = stored == null ? null : localVideo(stored);
+		if (path == null) {
 			return ResponseEntity.notFound().build();
 		}
-		Resource file = new FileSystemResource(detail.video().getFilePath());
+		Resource file = new FileSystemResource(path);
 		MediaType type = MediaTypeFactory.getMediaType(detail.video().getFileName()).orElse(MediaType.APPLICATION_OCTET_STREAM);
 		return ResponseEntity.ok().contentType(type).body(file);
+	}
+
+	/** 저장된 경로 그대로, 없으면 앞의 / · \ 를 뗀 앱 폴더 기준 경로. 둘 다 없으면 null */
+	static Path localVideo(String stored) {
+		try {
+			Path raw = Path.of(stored);
+			if (Files.isRegularFile(raw)) {
+				return raw;
+			}
+			String relative = stored.replaceFirst("^[/\\\\]+", "");
+			Path local = relative.isEmpty() ? null : Path.of(relative);
+			return local != null && Files.isRegularFile(local) ? local : null;
+		} catch (java.nio.file.InvalidPathException e) {
+			return null;
+		}
 	}
 
 	@PostMapping("/{id:\\d+}")
