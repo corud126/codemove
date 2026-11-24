@@ -157,7 +157,9 @@
 .q-note { margin-top: 16px !important; padding-left: 5px !important; display: flex; align-items: center; gap: 7px; color: #8a8a8a; font-size: 13px; }
 /* 포장 방식 안내 (3단계): 부제목 끝 회색 ⓘ (누르는 영역은 넉넉하게, 글줄 높이는 그대로) → 선택지 아래로 설명 펼침 */
 .q-pack-help { margin-top: 12px; }
-.q-pack-help-toggle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin: -6px -6px -6px 0; padding: 0; border: 0; background: none; color: #a0a0a0; vertical-align: middle; cursor: pointer; }
+/* 부제목 줄을 가로 정렬로: 아이콘을 글줄 높이 정중앙에 (vertical-align 은 한글 기준으로 아래로 처져 보임) */
+.quote-screen .flow-subtitle:has(.q-pack-help-toggle) { display: flex; align-items: center; flex-wrap: wrap; column-gap: 2px; }
+.q-pack-help-toggle { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; margin: -6px -6px -6px 0; padding: 0; border: 0; background: none; color: #a0a0a0; cursor: pointer; }
 .q-pack-help-toggle[aria-expanded="true"] { color: var(--ink); }
 .q-pack-help-body { margin-top: 10px; padding: 4px 16px; border-radius: 14px; background: #f6f7f6; }
 .q-pack-help-body[hidden] { display: none; }
