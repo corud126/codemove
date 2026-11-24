@@ -1,4 +1,4 @@
-/* 영상 분석 테스트 (templates/admin/video-analysis/index.html)
+const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admin/video-analysis/index.html)
  *  업로드 분석 POST /admin/video-analysis/videos (video, durationSec, uploadStartedAt)
  *  JSON 직접 입력 POST /admin/video-analysis/manual {raw, baseRunId}
  *  기록 보기 GET /runs/{id} · 정답 비교 GET /runs/{id}/score?set= · 다시 분석 POST /runs/{id}/rerun · 삭제 POST /runs/{id}/delete
@@ -250,18 +250,18 @@
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  /* 지금 앱에 붙이면 고객 · 관리자에게 보이는 값: 고객 앱은 품목명 · 크기 · 개수만 받아 부피를 자기 품목표(ItemCatalog)로 다시 계산한다 */
+  /* 흐름에 붙이면 고객 확인 화면 · 관리자 요청 품목으로 넘어갈 값 (부피는 기준표 기준) */
   async function showCustomer(id, el) {
     const res = await fetch(`${BASE}/runs/${id}/customer-items`);
     if (!res.ok) { el.textContent = '불러오지 못했어요.'; return; }
     const c = await res.json();
-    const rows = c.items.map((it) => `<tr style="${Number(it.appCbm) !== Number(it.standardCbm || 0) ? 'color:#d9701a' : ''}">
+    const rows = c.items.map((it) => `<tr>
         <td class="py-0.5">${esc(it.name)}${it.review ? ' <span style="color:#d9701a">확인 필요</span>' : ''}${it.inAppCatalog ? '' : ' <span style="color:#ef5f3c">(앱 목록에 없음)</span>'}</td>
-        <td>${esc(it.size)}</td><td class="text-right">${it.count}</td><td class="text-right">${esc(it.appCbm)}</td><td class="text-right">${it.standardCbm == null ? '—' : esc(it.standardCbm)}</td></tr>`).join('');
+        <td>${esc(it.size)}</td><td class="text-right">${it.count}</td><td class="text-right">${it.standardCbm == null ? '— (미매핑)' : esc(it.standardCbm)}</td></tr>`).join('');
     el.innerHTML = `
-      <p class="text-[11px] text-[#888]">고객 앱 합계 <b style="color:#292929">${esc(c.appTotalCbm)}㎥</b> (지금 앱 품목표 기준) · 우리 기준표 합계 <b style="color:#292929">${esc(c.standardTotalCbm)}㎥</b>. 주황색 줄은 두 값이 달라요.</p>
+      <p class="text-[11px] text-[#888]">품목 ${c.items.length}줄 · 기준표 부피 합계 <b style="color:#292929">${esc(c.standardTotalCbm)}㎥</b>. 확인 필요 줄은 고객이 확인 화면에서 고치게 돼요.</p>
       <details class="mt-1"><summary class="cursor-pointer text-[12px] font-semibold">품목별 (고객 확인 화면 · 관리자 요청 품목에 들어갈 값)</summary>
-        <table class="mt-1 w-full text-[11px]"><thead><tr class="text-[#888]"><th class="text-left">품목</th><th class="text-left">크기</th><th class="text-right">개수</th><th class="text-right">앱㎥</th><th class="text-right">기준표㎥</th></tr></thead><tbody>${rows}</tbody></table>
+        <table class="mt-1 w-full text-[11px]"><thead><tr class="text-[#888]"><th class="text-left">품목</th><th class="text-left">크기</th><th class="text-right">개수</th><th class="text-right">부피㎥</th></tr></thead><tbody>${rows}</tbody></table>
       </details>`;
   }
 

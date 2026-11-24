@@ -751,7 +751,12 @@
   renderVoice();
   if (PREVIEW && Array.isArray(window.QUOTE_AI_PREVIEW)) {
     // 관리자 영상 분석 테스트의 미리보기: 그 실행의 분석 결과로 2단계(품목 확인)를 보여 준다 (제출 · 저장 없음)
-    state.items = window.QUOTE_AI_PREVIEW.map((it) => newItem(it.name, it.size, it.count, it.review, it.aiIndex));
+    // 부피는 화면용 임시 품목표가 아니라 기준표 값(standardCbm, 품목 줄 합계)으로 보여 준다
+    state.items = window.QUOTE_AI_PREVIEW.map((it) => {
+      const item = newItem(it.name, it.size, it.count, it.review, it.aiIndex);
+      if (it.standardCbm != null && it.count > 0 && SIZE_FACTOR[item.size]) item.base = Number(it.standardCbm) / (SIZE_FACTOR[item.size] * it.count);
+      return item;
+    });
     preset(2, '');
   } else if (PREVIEW) {
     preset(Math.min(TOTAL, Math.max(1, parseInt(params.get('step'), 10) || 1)), params.get('state') || '');

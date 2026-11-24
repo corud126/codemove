@@ -121,9 +121,9 @@ public class AdminVideoAnalysisController {
 	}
 
 	/**
-	 * 분석 결과가 고객 · 관리자에게 어떻게 전달되는지 (흐름에 연결하지 않고 값만 계산).
-	 * 지금 앱은 품목명 · 크기 · 개수 · 확인 필요만 받아 부피를 고객 앱 품목표(ItemCatalog: 중형 기준 × 크기 계수)로 다시 계산한다.
-	 * 미매핑 품목은 AI 가 본 이름 그대로 넘어가 '기타 0.5㎥'로 계산된다. 우리 기준표 부피를 옆에 둬서 차이를 본다.
+	 * 분석 결과가 고객 확인 화면 · 관리자 요청 품목으로 넘어갈 값 (흐름에 연결하지 않고 값만 만든다).
+	 * 품목명 · 크기 · 개수 · 확인 필요 + 기준표 부피. 미매핑 품목은 AI 가 본 이름 그대로 넘어가고, 고객 앱 품목 목록에 없으면 표시한다.
+	 * (지금 앱 품목표의 부피는 화면 시안용 임시 값이라 쓰지 않는다)
 	 */
 	@GetMapping("/runs/{id}/customer-items")
 	@ResponseBody
@@ -133,15 +133,12 @@ public class AdminVideoAnalysisController {
 			return ResponseEntity.notFound().build();
 		}
 		java.util.List<Map<String, Object>> items = new java.util.ArrayList<>();
-		java.math.BigDecimal appTotal = java.math.BigDecimal.ZERO;
 		int i = 0;
 		for (var line : run.result().lines()) {
 			var m = line.item();
 			String name = m.standardName().isEmpty() ? m.ai().detectedName() : m.standardName();
 			name = name == null || name.isBlank() ? "기타" : name.length() > 50 ? name.substring(0, 50) : name;
 			int count = m.ai().quantity();
-			java.math.BigDecimal appCbm = itemCatalog.volume(name, m.sizeCode(), count);
-			appTotal = appTotal.add(appCbm);
 			Map<String, Object> it = new java.util.LinkedHashMap<>();
 			it.put("name", name);
 			it.put("size", codeService.userName("ITEM_SIZE", m.sizeCode()));
@@ -149,14 +146,12 @@ public class AdminVideoAnalysisController {
 			it.put("review", m.needsReview());
 			it.put("aiIndex", i++);
 			it.put("category", codeService.userName("ITEM_CATEGORY", itemCatalog.find(name).category()));
-			it.put("appCbm", appCbm);
 			it.put("standardCbm", line.totalCbm());
 			it.put("inAppCatalog", itemCatalog.find(name).pickable());
 			items.add(it);
 		}
 		Map<String, Object> out = new java.util.LinkedHashMap<>();
 		out.put("items", items);
-		out.put("appTotalCbm", appTotal);
 		out.put("standardTotalCbm", run.result().totalCbm());
 		return ResponseEntity.ok(out);
 	}
