@@ -36,7 +36,8 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
   /* 실험 조건: 비우면 서버 설정값 */
   function options() {
     const fps = $('[data-opt-fps]').value;
-    return { model: $('[data-opt-model]').value, fps: fps ? Number(fps) : null, prompt: $('[data-opt-prompt]').value };
+    return { model: $('[data-opt-model]').value, fps: fps ? Number(fps) : null, prompt: $('[data-opt-prompt]').value,
+      noFallback: $('[data-opt-nofallback]').checked };
   }
 
   /* ---------- 영상 선택 · 길이 확인 ---------- */
@@ -92,6 +93,7 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
     if (opt.model) form.append('model', opt.model);
     if (opt.fps) form.append('fps', opt.fps);
     if (opt.prompt) form.append('prompt', opt.prompt);
+    if (opt.noFallback) form.append('noFallback', 'true');
     form.append('uploadStartedAt', Date.now());
     analyzeBtn.disabled = true;
     const xhr = new XMLHttpRequest();

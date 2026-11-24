@@ -92,14 +92,14 @@ public class GeminiVideoClient {
 	}
 
 	public Response analyze(Path video, String mimeType, String prompt) {
-		return analyze(video, mimeType, prompt, null, null);
+		return analyze(video, mimeType, prompt, null, null, true);
 	}
 
 	/**
 	 * model: 이번에만 쓸 주 모델 (비우면 설정값, 예비 모델은 그대로 뒤에 붙음)
 	 * fps: 영상을 초당 몇 장으로 볼지 (비우면 Gemini 기본 1장, 높이면 빠르게 지나간 물건을 덜 놓치지만 영상 토큰이 늘어남)
 	 */
-	public Response analyze(Path video, String mimeType, String prompt, String model, Double fps) {
+	public Response analyze(Path video, String mimeType, String prompt, String model, Double fps, boolean useFallback) {
 		if (!config.enabled()) {
 			throw new GeminiException("NO_KEY", "Gemini API 키가 설정되지 않았어요.", 0);
 		}
@@ -144,7 +144,9 @@ public class GeminiVideoClient {
 					"generationConfig", generation);
 			// 주 모델이 혼잡(503) · 한도(429) · 연결 실패면 예비 모델로 (팀 기준과 같음). 실제로 쓴 모델을 기록한다
 			List<String> models = new java.util.ArrayList<>(List.of(model == null || model.isBlank() ? config.model() : model.trim()));
-			config.fallbackModels().stream().filter(m -> !models.contains(m)).forEach(models::add);
+			if (useFallback) {
+				config.fallbackModels().stream().filter(m -> !models.contains(m)).forEach(models::add);
+			}
 			long start = System.currentTimeMillis();
 			int[] retries = { 0 };
 			GeminiException last = null;

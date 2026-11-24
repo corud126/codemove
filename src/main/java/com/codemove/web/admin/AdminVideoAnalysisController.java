@@ -72,12 +72,12 @@ public class AdminVideoAnalysisController {
 	public ResponseEntity<Object> upload(@RequestParam("video") MultipartFile video,
 			@RequestParam(required = false) Double durationSec, @RequestParam(required = false) Long uploadStartedAt,
 			@RequestParam(required = false) String model, @RequestParam(required = false) Double fps,
-			@RequestParam(required = false) String prompt) {
+			@RequestParam(required = false) String prompt, @RequestParam(required = false) Boolean noFallback) {
 		// 업로드 시간: 브라우저가 보내기 시작한 시각 ~ 서버가 다 받은 시각 (같은 PC 시계 기준 근사값, 이상하면 기록하지 않음)
 		long elapsed = uploadStartedAt == null ? -1 : System.currentTimeMillis() - uploadStartedAt;
 		Long uploadMs = elapsed >= 0 && elapsed < 3_600_000 ? elapsed : null;
 		try {
-			return ResponseEntity.ok(service.analyzeUpload(video, durationSec, uploadMs, new VideoAnalysisService.RunOptions(model, fps, prompt)));
+			return ResponseEntity.ok(service.analyzeUpload(video, durationSec, uploadMs, new VideoAnalysisService.RunOptions(model, fps, prompt, Boolean.TRUE.equals(noFallback))));
 		} catch (VideoAnalysisService.RejectedUpload e) {
 			return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "errorCode", e.code()));
 		}
@@ -175,7 +175,8 @@ public class AdminVideoAnalysisController {
 		Map<String, Object> b = body == null ? Map.of() : body;
 		Object fps = b.get("fps");
 		VideoAnalysisService.RunOptions options = new VideoAnalysisService.RunOptions(text(b.get("model")),
-				fps instanceof Number n && n.doubleValue() > 0 ? n.doubleValue() : null, text(b.get("prompt")));
+				fps instanceof Number n && n.doubleValue() > 0 ? n.doubleValue() : null, text(b.get("prompt")),
+				Boolean.TRUE.equals(b.get("noFallback")));
 		AnalysisRun run = service.rerun(id, options);
 		return run == null ? ResponseEntity.badRequest().body(Map.of("message", "다시 분석할 영상이 없어요."))
 				: ResponseEntity.ok(run);

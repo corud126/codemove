@@ -73,10 +73,10 @@ public class VideoAnalysisService {
 		}
 	}
 
-	/** 실행마다 고르는 실험 조건 (비우면 설정값): 주 모델 · 영상 초당 프레임 · 프롬프트 버전 */
-	public record RunOptions(String model, Double fps, String promptVersion) {
+	/** 실행마다 고르는 실험 조건 (비우면 설정값): 주 모델 · 영상 초당 프레임 · 프롬프트 버전 · 예비 모델 쓰지 않기(그 모델 결과만 비교할 때) */
+	public record RunOptions(String model, Double fps, String promptVersion, boolean noFallback) {
 
-		public static final RunOptions DEFAULT = new RunOptions(null, null, null);
+		public static final RunOptions DEFAULT = new RunOptions(null, null, null, false);
 
 		public String prompt() {
 			return promptVersion != null && AnalysisPrompt.VERSIONS.contains(promptVersion) ? promptVersion : AnalysisPrompt.VERSION;
@@ -190,7 +190,7 @@ public class VideoAnalysisService {
 		String thinking = properties.gemini().thinkingLevel();
 		try {
 			GeminiVideoClient.Response res = gemini.analyze(store.videoPath(video.storedName()), video.mimeType(),
-					AnalysisPrompt.build(opt.prompt(), catalog.snapshot().list()), opt.model(), opt.fps());
+					AnalysisPrompt.build(opt.prompt(), catalog.snapshot().list()), opt.model(), opt.fps(), !opt.noFallback());
 			AnalysisRun.Video sent = new AnalysisRun.Video(video.fileName(), video.sizeBytes(), video.durationSec(),
 					video.mimeType(), video.storedName(), res.transfer());
 			run = finish(id, baseId, "GEMINI", sent, res.model(), res.modelVersion(), thinking, opt.prompt(), opt.fps(), res.usage(), res.retries(),
