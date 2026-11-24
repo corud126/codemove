@@ -2,6 +2,7 @@ package com.codemove.videoanalysis;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -23,7 +24,7 @@ public record VideoAnalysisProperties(String runDir, Integer maxVideoMb, Integer
 		allowedExtensions = allowedExtensions == null || allowedExtensions.isEmpty() ? List.of("mp4", "mov", "webm")
 				: allowedExtensions;
 		gemini = gemini == null ? new Gemini(null, null, null, null, null, null, null) : gemini;
-		price = price == null ? new Price(null, null, null, null) : price;
+		price = price == null ? new Price(null, null, null, null, null, null) : price;
 	}
 
 	/**
@@ -50,18 +51,35 @@ public record VideoAnalysisProperties(String runDir, Integer maxVideoMb, Integer
 	}
 
 	/**
-	 * 100만 토큰당 단가 (공식 요금표 기준, 설정하지 않으면 비용은 '단가 미설정'). asOf: 단가 기준일
-	 * 출력 단가는 생각(thinking) 토큰에도 적용한다.
+	 * 100만 토큰당 단가 (Google 공식 가격 페이지 Standard 등급, 출력 단가는 생각(thinking) 토큰 포함). asOf: 확인한 날 · source: 출처
+	 * models: 모델(또는 응답의 modelVersion)별 단가. 실제로 응답한 버전 → 요청 모델 순서로 찾고, 없으면 기본 단가(inputPerMillion ·
+	 * outputPerMillion), 그것도 없으면 '단가 미설정'.
 	 */
-	public record Price(BigDecimal inputPerMillion, BigDecimal outputPerMillion, String currency, String asOf) {
+	public record Price(BigDecimal inputPerMillion, BigDecimal outputPerMillion, Map<String, ModelPrice> models, String currency,
+			String asOf, String source) {
 
 		public Price {
+			models = models == null ? Map.of() : Map.copyOf(models);
 			currency = currency == null || currency.isBlank() ? "USD" : currency;
 			asOf = asOf == null ? "" : asOf;
+			source = source == null ? "" : source;
 		}
 
 		public boolean set() {
-			return inputPerMillion != null && outputPerMillion != null;
+			return !models.isEmpty() || (inputPerMillion != null && outputPerMillion != null);
 		}
+
+		/** 응답한 버전 → 요청 모델 → 기본 단가. 없으면 null */
+		public ModelPrice find(String model, String modelVersion) {
+			for (String key : new String[] { modelVersion, model }) {
+				if (key != null && models.containsKey(key)) {
+					return models.get(key);
+				}
+			}
+			return inputPerMillion != null && outputPerMillion != null ? new ModelPrice(inputPerMillion, outputPerMillion) : null;
+		}
+	}
+
+	public record ModelPrice(BigDecimal inputPerMillion, BigDecimal outputPerMillion) {
 	}
 }

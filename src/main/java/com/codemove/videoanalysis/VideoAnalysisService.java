@@ -221,7 +221,7 @@ public class VideoAnalysisService {
 		ItemStandardCatalog.Snapshot table = catalog.snapshot();
 		AnalysisRun.Catalog used = new AnalysisRun.Catalog(table.source(), table.loadedAt(), table.list().size(),
 				table.aliases().size(), trucks.loadFactor());
-		AnalysisRun.Cost cost = cost(usage);
+		AnalysisRun.Cost cost = cost(usage, model, modelVersion);
 		if (errorCode != null) {
 			return new AnalysisRun(id, baseId, LocalDateTime.now(), mode, false, errorCode, errorMessage, video, model,
 					modelVersion, thinking, fps, promptVersion, usage, cost, total(t, null, started), retries, raw, null,
@@ -264,19 +264,23 @@ public class VideoAnalysisService {
 				System.currentTimeMillis() - started);
 	}
 
-	/** 입력 토큰 × 입력 단가 + (출력 + 생각) 토큰 × 출력 단가. 단가가 없으면 amount null */
-	AnalysisRun.Cost cost(Usage usage) {
+	/**
+	 * 입력 토큰 × 입력 단가 + (출력 + 생각) 토큰 × 출력 단가. 단가는 실제로 응답한 모델 버전 → 요청 모델 순서로 찾는다
+	 * (예비 gemini-3.5-flash 는 응답 버전 3.6-flash 의 단가). 단가가 없으면 amount null
+	 */
+	AnalysisRun.Cost cost(Usage usage, String model, String modelVersion) {
 		VideoAnalysisProperties.Price p = properties.price();
 		if (usage == null) {
 			return null;
 		}
-		BigDecimal amount = null;
-		if (p.set()) {
-			amount = BigDecimal.valueOf(usage.promptTokens()).multiply(p.inputPerMillion())
-					.add(BigDecimal.valueOf((long) usage.outputTokens() + usage.thoughtsTokens()).multiply(p.outputPerMillion()))
-					.divide(BigDecimal.valueOf(1_000_000), 6, RoundingMode.HALF_UP);
+		VideoAnalysisProperties.ModelPrice m = p.find(model, modelVersion);
+		if (m == null) {
+			return new AnalysisRun.Cost(null, null, p.currency(), p.asOf(), null);
 		}
-		return new AnalysisRun.Cost(p.inputPerMillion(), p.outputPerMillion(), p.currency(), p.asOf(), amount);
+		BigDecimal amount = BigDecimal.valueOf(usage.promptTokens()).multiply(m.inputPerMillion())
+				.add(BigDecimal.valueOf((long) usage.outputTokens() + usage.thoughtsTokens()).multiply(m.outputPerMillion()))
+				.divide(BigDecimal.valueOf(1_000_000), 6, RoundingMode.HALF_UP);
+		return new AnalysisRun.Cost(m.inputPerMillion(), m.outputPerMillion(), p.currency(), p.asOf(), amount);
 	}
 
 	private static String extension(String name) {

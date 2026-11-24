@@ -202,6 +202,18 @@ class VideoAnalysisUnitTest {
 	}
 
 	@Test
+	void priceIsChosenByRespondingModelVersion() {
+		var hydrogen = new VideoAnalysisProperties.ModelPrice(new BigDecimal("1.50"), new BigDecimal("7.50"));
+		var flash = new VideoAnalysisProperties.ModelPrice(new BigDecimal("0.75"), new BigDecimal("3.75"));
+		var price = new VideoAnalysisProperties.Price(null, null,
+				Map.of("gemini-4-hydrogen", hydrogen, "gemini-3.6-flash", flash), null, "2026-11-24", null);
+		assertThat(price.find("gemini-3.5-flash", "gemini-3.6-flash")).isEqualTo(flash); // 응답 버전 우선
+		assertThat(price.find("gemini-4-hydrogen", "")).isEqualTo(hydrogen); // 버전이 없으면 요청 모델
+		assertThat(price.find("other", "other-1")).isNull(); // 모르면 단가 미설정
+		assertThat(new VideoAnalysisProperties.Price(null, null, null, null, null, null).set()).isFalse();
+	}
+
+	@Test
 	void runIdIsPathSafe() {
 		assertThat(AnalysisRunStore.safe("20261124-101500-123")).isTrue();
 		assertThat(AnalysisRunStore.safe("../../etc")).isFalse();

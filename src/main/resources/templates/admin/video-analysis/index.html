@@ -42,8 +42,14 @@
         </div>
         <div class="flex justify-between gap-3">
           <dt class="shrink-0 text-[#888]">단가</dt>
-          <dd class="text-right" th:with="p=${limits.price()}"
-              th:text="${p.set()} ? |입력 ${p.inputPerMillion()} · 출력 ${p.outputPerMillion()} ${p.currency()} / 100만 토큰 (${p.asOf()})| : '미설정 (비용 계산 안 함)'">미설정</dd>
+          <dd class="text-right" th:with="p=${limits.price()}">
+            <span th:unless="${p.set()}">미설정 (비용 계산 안 함)</span>
+            <th:block th:if="${p.set()}">
+              <span class="block" th:each="e : ${p.models()}"
+                    th:text="|${e.key} 입력 ${e.value.inputPerMillion()} · 출력 ${e.value.outputPerMillion()}|">gemini-4-hydrogen 입력 1.50 · 출력 7.50</span>
+              <span class="block text-[#888]" th:text="|${p.currency()} / 100만 토큰 · ${p.asOf()} 확인|">USD / 100만 토큰</span>
+            </th:block>
+          </dd>
         </div>
       </dl>
       <div class="mt-4 flex gap-2">
