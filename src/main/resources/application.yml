@@ -80,19 +80,29 @@ codemove:
       range-min-rate: 0.95
       range-max-rate: 1.15
       round-unit: 10000
-  # 영상 분석 테스트 (관리자 /admin/video-analysis, 견적 흐름에는 아직 연결하지 않음)
-  #  standard-csv: 품목 기준표 CSV 경로 · run-dir: 테스트 영상 · 실행 기록 폴더 · 영상 최대 크기(MB, 14MB 넘으면 Gemini Files API 로 올림) · 최대 길이(초)
+  # 영상 분석 테스트 (관리자 /admin/video-analysis, 견적 흐름 · DB 에는 아직 연결하지 않음. 기준은 팀 CodeMove-AI 와 같게)
+  #  standard-csv · alias-csv · truck-csv: 품목 기준표 · 별칭 · 트럭 적재 CSV 경로 · testset-dir: 정답 목록 폴더
+  #  load-factor: 물품 부피 × 적재계수 = 적재 부피 (대표님 통화 기준 2.0)
+  #  run-dir: 테스트 영상 · 실행 기록 폴더 · 영상 한도 200MB · 5초~5분 (14MB 넘으면 Gemini Files API 로 올림)
+  #  gemini: 주 모델 · 혼잡(503)/한도(429)일 때 예비 모델 · 생각 수준(low)
   #  gemini.api-key · price(100만 토큰당 단가)는 application-local.yml 에 작성 (비어 있으면 JSON 직접 입력만 · 비용 '단가 미설정')
   video-analysis:
     standard-csv:
+    alias-csv:
+    truck-csv:
+    testset-dir:
+    load-factor: 2.0
     run-dir: uploads/video-analysis
-    max-video-mb: 300
-    max-duration-sec: 120
-    allowed-extensions: [mp4, mov, webm, 3gp, avi]
+    max-video-mb: 200
+    min-duration-sec: 5
+    max-duration-sec: 300
+    allowed-extensions: [mp4, mov, webm]
     gemini:
       api-key:
-      model: gemini-3.5-flash
-      timeout-sec: 180
+      model: gemini-4-hydrogen
+      fallback-models: [gemini-3.5-flash]
+      thinking-level: low
+      timeout-sec: 300
       max-retries: 2
     price:
       input-per-million:

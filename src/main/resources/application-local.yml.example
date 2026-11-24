@@ -31,6 +31,9 @@ codemove:
   # 영상 분석 테스트: 품목 기준표 CSV 경로 · Gemini API 키(Google AI Studio > Get API key) · 100만 토큰당 단가(공식 요금표, 기준일)
   video-analysis:
     standard-csv: <품목기준표.csv 경로>
+    alias-csv: <별칭.csv 경로>
+    truck-csv: <트럭적재.csv 경로>
+    testset-dir: <정답 목록 폴더>
     gemini:
       api-key: <GEMINI_API_KEY>
     price:

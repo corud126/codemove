@@ -48,10 +48,10 @@ public class GeminiVideoClient {
 
 	/**
 	 * text: 모델이 돌려준 JSON 글 · retries: 다시 시도한 횟수 · apiMs: 분석 요청 시간(재시도 포함)
-	 * fileUploadMs: Files API 업로드 + 처리 대기 시간 (인라인이면 0) · transfer: INLINE | FILE_API
+	 * fileUploadMs: Files API 업로드 + 처리 대기 시간 (인라인이면 0) · transfer: INLINE | FILE_API · model: 실제로 쓴 모델
 	 */
 	public record Response(String text, String modelVersion, Usage usage, int retries, long apiMs, long fileUploadMs,
-			String transfer) {
+			String transfer, String model) {
 	}
 
 	/** code: NO_KEY · HTTP_4xx · HTTP_429 · HTTP_5xx · NETWORK · EMPTY · BLOCKED · IO · FILE */
@@ -119,20 +119,39 @@ public class GeminiVideoClient {
 		}
 		long fileUploadMs = remoteFile == null ? 0 : System.currentTimeMillis() - uploadStart;
 		try {
+			Map<String, Object> generation = new LinkedHashMap<>();
+			generation.put("temperature", 0);
+			generation.put("responseMimeType", "application/json");
+			generation.put("responseSchema", AnalysisPrompt.responseSchema());
+			if (!config.thinkingLevel().isEmpty()) {
+				generation.put("thinkingConfig", Map.of("thinkingLevel", config.thinkingLevel()));
+			}
 			Map<String, Object> body = Map.of(
 					"contents", List.of(Map.of("role", "user", "parts", List.of(videoPart, Map.of("text", prompt)))),
-					"generationConfig", Map.of(
-							"temperature", 0,
-							"responseMimeType", "application/json",
-							"responseSchema", AnalysisPrompt.responseSchema()));
-			String url = config.baseUrl() + "/models/" + config.model() + ":generateContent";
+					"generationConfig", generation);
+			// 주 모델이 혼잡(503) · 한도(429) · 연결 실패면 예비 모델로 (팀 기준과 같음). 실제로 쓴 모델을 기록한다
+			List<String> models = new java.util.ArrayList<>(List.of(config.model()));
+			config.fallbackModels().stream().filter(m -> !models.contains(m)).forEach(models::add);
 			long start = System.currentTimeMillis();
 			int[] retries = { 0 };
-			Map<String, Object> res = withRetry(retries, () -> restClient.post().uri(url).header("x-goog-api-key", config.apiKey())
-					.contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(JSON));
-			Response r = toResponse(res, retries[0], System.currentTimeMillis() - start);
-			return new Response(r.text(), r.modelVersion(), r.usage(), r.retries(), r.apiMs(), fileUploadMs,
-					remoteFile == null ? "INLINE" : "FILE_API");
+			GeminiException last = null;
+			for (String model : models) {
+				String url = config.baseUrl() + "/models/" + model + ":generateContent";
+				try {
+					Map<String, Object> res = withRetry(retries, () -> restClient.post().uri(url).header("x-goog-api-key", config.apiKey())
+							.contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(JSON));
+					Response r = toResponse(res, retries[0], System.currentTimeMillis() - start);
+					return new Response(r.text(), r.modelVersion(), r.usage(), r.retries(), r.apiMs(), fileUploadMs,
+							remoteFile == null ? "INLINE" : "FILE_API", model);
+				} catch (GeminiException e) {
+					last = e;
+					if (!List.of("HTTP_429", "HTTP_5xx", "NETWORK").contains(e.code())) {
+						throw e;
+					}
+					log.info("Gemini {} 실패({}), 다음 모델로", model, e.code());
+				}
+			}
+			throw last;
 		} finally {
 			if (remoteFile != null) {
 				deleteQuietly(remoteFile);
@@ -250,7 +269,7 @@ public class GeminiVideoClient {
 		if (text.isEmpty()) {
 			throw new GeminiException("EMPTY", "응답에 글이 없어요 (finishReason " + first.get("finishReason") + ").", retries);
 		}
-		return new Response(text.toString(), model, usage, retries, apiMs, 0, "");
+		return new Response(text.toString(), model, usage, retries, apiMs, 0, "", "");
 	}
 
 	private static Usage usage(Object meta) {

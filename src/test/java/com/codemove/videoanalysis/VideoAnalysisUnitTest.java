@@ -4,14 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import com.codemove.videoanalysis.AiResultParser.AiItem;
 import com.codemove.videoanalysis.ItemMappingService.MappedItem;
-import com.codemove.videoanalysis.ItemMappingService.Method;
+import com.codemove.videoanalysis.ItemMappingService.Type;
+import com.codemove.videoanalysis.ItemStandardCatalog.Alias;
+import com.codemove.videoanalysis.ItemStandardCatalog.Truck;
 
-/** 영상 분석의 AI 이후 단계(기준표 읽기 · JSON 검증 · 매핑 · 부피/무게 계산) 단위 테스트. 스프링 · DB · 외부 API 없이 */
+/** 영상 분석의 AI 이후 단계(기준 데이터 · JSON 검증 · 매핑 · 부피/무게 · 톤 · 정답 비교) 단위 테스트. 스프링 · DB · 외부 API 없이 */
 class VideoAnalysisUnitTest {
 
 	/** 판정기준에 쉼표가 든 따옴표 칸, BOM, 무게 빈칸, 크기 없는 행을 섞은 기준표 */
@@ -25,10 +28,21 @@ class VideoAnalysisUnitTest {
 			+ "이사박스,03,02,바구니,\"\",0.077,,,가정\r\n"
 			+ "잘못된행,01,09,?,\"\",1,,,\r\n";
 
-	static final ItemStandardCatalog.Snapshot TABLE = ItemStandardCatalog.parse(CSV, "test");
+	static final List<Alias> ALIASES = ItemStandardCatalog.parseAliases(
+			"별칭,품목명,크기코드,비고\n양문형 냉장고,냉장고,03,\n김치냉장고,김치냉장고,,\n냉장고,냉장고,,\n거실장,TV장,,\n식탁,식탁·테이블,,\n바구니,이사박스,02,\n박스,이사박스,,\n티비,TV,,\n");
 
-	static AiItem ai(String detected, String standard, int quantity, String grade) {
-		return new AiItem(detected, standard, "", quantity, grade, List.of(), false, "");
+	static final List<Truck> TRUCKS = ItemStandardCatalog.parseTrucks("톤,적재CBM\n5.0,35\n1.0,10\n2.5,20\n3.5,25\n");
+
+	static final ItemStandardCatalog.Snapshot BASE = ItemStandardCatalog.parse(CSV, "test");
+	static final ItemStandardCatalog.Snapshot TABLE = new ItemStandardCatalog.Snapshot(BASE.list(), BASE.byKey(), ALIASES, TRUCKS,
+			"test", BASE.loadedAt(), null);
+
+	static AiItem ai(String itemName, String size, int quantity, String detected) {
+		return new AiItem(itemName, size, quantity, detected, "", "", false, null, false);
+	}
+
+	static AiItem ai(String itemName, String size, int quantity, String detected, String room) {
+		return new AiItem(itemName, size, quantity, detected, room, "", false, null, false);
 	}
 
 	@Test
@@ -36,102 +50,155 @@ class VideoAnalysisUnitTest {
 		assertThat(TABLE.ready()).isTrue();
 		assertThat(TABLE.list()).hasSize(7); // 크기코드 09 행은 건너뜀
 		assertThat(TABLE.names()).containsExactly("냉장고", "김치냉장고", "식탁·테이블", "TV", "TV장", "이사박스");
-		ItemStandard fridge = TABLE.byKey().get("냉장고|02");
+		ItemStandard fridge = TABLE.find("냉장고", "02");
 		assertThat(fridge.guide()).isEqualTo("위아래 2도어, 300L 안팎");
-		assertThat(fridge.cbm()).isEqualByComparingTo("0.680");
 		assertThat(fridge.weightKg()).isEqualByComparingTo("60.5");
-		assertThat(TABLE.byKey().get("냉장고|03").weightKg()).isNull();
+		assertThat(TABLE.find("냉장고", "03").weightKg()).isNull();
+		assertThat(ALIASES).hasSize(8);
+		assertThat(ALIASES.get(0).sizeCode()).isEqualTo("03");
+		assertThat(TRUCKS).extracting(Truck::ton).containsExactly(new BigDecimal("1.0"), new BigDecimal("2.5"),
+				new BigDecimal("3.5"), new BigDecimal("5.0")); // 톤 순으로 정렬
 	}
 
 	@Test
-	void parserValidation() {
+	void parserTeamFormat() {
 		AiResultParser.Parsed p = AiResultParser.parse("""
 				```json
-				{"items":[
-				 {"detected_name":"냉장고","quantity":1,"size_grade":"대형"},
-				 {"detected_name":"","quantity":1,"size_grade":"소형"},
-				 {"detected_name":"소파","quantity":0,"size_grade":"중형"},
-				 {"detected_name":"의자","quantity":1.5,"size_grade":"중형"},
-				 {"detected_name":"책상","quantity":2.0,"size_grade":"특대"}
+				{"video_ok":true,"rooms":["주방","거실"],"memo":"정수기 렌탈 확인",
+				 "items":[
+				 {"item_name":"냉장고","size_code":"03","quantity":1,"detected_name":"4도어 냉장고","room":"주방","needs_review":false},
+				 {"item_name":"","size_code":"01","quantity":1,"detected_name":"","room":"거실","needs_review":false},
+				 {"item_name":"소파","size_code":"02","quantity":1.5,"room":"거실","needs_review":false},
+				 {"item_name":"이사박스","size_code":"02","quantity":250,"detected_name":"잔짐","room":"팬트리","needs_review":false},
+				 {"item_name":"TV","size_code":"특대","quantity":1,"detected_name":"벽걸이 TV","room":"거실","needs_review":false,"inch":65,"wall_mounted":true}
 				]}
 				```""");
-		assertThat(p.items()).extracting(AiItem::detectedName).containsExactly("냉장고", "책상");
-		assertThat(p.errors()).hasSize(3);
-		AiItem desk = p.items().get(1);
-		assertThat(desk.quantity()).isEqualTo(2);
-		assertThat(desk.sizeGrade()).isEmpty();
-		assertThat(desk.needsReview()).isTrue();
-		assertThat(p.warnings()).hasSize(1);
+		assertThat(p.videoOk()).isTrue();
+		assertThat(p.rooms()).containsExactly("주방", "거실");
+		assertThat(p.memo()).isEqualTo("정수기 렌탈 확인");
+		assertThat(p.items()).extracting(AiItem::itemName).containsExactly("냉장고", "이사박스", "TV");
+		assertThat(p.errors()).hasSize(2); // 이름 없음 · 수량 1.5
+		AiItem box = p.items().get(1);
+		assertThat(box.quantity()).isEqualTo(200); // 1~200 으로 잘라 냄 (팀 기준)
+		assertThat(box.needsReview()).isTrue();
+		AiItem tv = p.items().get(2);
+		assertThat(tv.sizeCode()).isEmpty();
+		assertThat(tv.inch()).isEqualTo(65);
+		assertThat(tv.wallMounted()).isTrue();
+		assertThat(p.warnings()).hasSize(2);
 
-		assertThat(AiResultParser.parse("이건 JSON 이 아님").ok()).isFalse();
+		AiResultParser.Parsed rejected = AiResultParser.parse("{\"video_ok\":false,\"reject_reason\":\"너무 어두움\",\"rooms\":[],\"items\":[]}");
+		assertThat(rejected.videoOk()).isFalse();
+		assertThat(rejected.rejectReason()).isEqualTo("너무 어두움");
+		assertThat(rejected.broken()).isFalse();
+		assertThat(AiResultParser.parse("이건 JSON 이 아님").broken()).isTrue();
 		assertThat(AiResultParser.parse("{\"list\":[]}").errors()).containsExactly("items 배열이 없어요.");
 	}
 
 	@Test
-	void mappingOrder() {
+	void mappingOrderFollowsTeam() {
 		List<MappedItem> m = ItemMappingService.map(List.of(
-				ai("양문형 냉장고", "냉장고", 1, "대형"), // AI 가 고른 기준표 이름
-				ai("TV", "", 1, "중형"), // 이름 일치
-				ai("스탠드 김치냉장고", "", 1, "중형"), // 별칭: 김치냉장고(더 긴 별칭)가 냉장고보다 우선
-				ai("거실장", "", 1, "중형"), // 별칭 → TV장
-				ai("원목 식탁", "", 1, "중형"), // 별칭 → 식탁·테이블
-				ai("러닝머신", "", 1, "대형"), // 기준표에 운동기구가 없으면 매핑 실패
-				ai("TV", "없는품목", 1, "소형")), TABLE); // 이름은 맞지만 소형 규격이 없음
+				ai("냉장고", "03", 1, "4도어 냉장고"), // 01 정확 일치
+				ai("냉장고", "", 1, "냉장고"), // 품목은 맞는데 크기 없음 → 03 AI 후보, 중형
+				ai("기타", "", 1, "양문형 냉장고"), // 본 이름이 별칭과 같음 → 02, 별칭 크기 03
+				ai("기타", "02", 1, "스탠드 김치냉장고"), // 포함된 가장 긴 별칭 김치냉장고(냉장고보다 우선)
+				ai("거실장", "02", 1, "원목 거실장"), // AI 이름이 별칭 → TV장
+				ai("기타", "02", 13, "플라스틱 바구니"), // 별칭 크기 02
+				ai("기타", "", 1, "빨래 건조대")), TABLE); // 04 미매핑
 
-		assertThat(m).extracting(MappedItem::method).containsExactly(Method.STANDARD, Method.EXACT, Method.ALIAS, Method.ALIAS,
-				Method.ALIAS, Method.UNMAPPED, Method.EXACT);
-		assertThat(m).extracting(MappedItem::standardName).containsExactly("냉장고", "TV", "김치냉장고", "TV장", "식탁·테이블", "",
-				"TV");
-		assertThat(m.get(0).standard().cbm()).isEqualByComparingTo("1.490");
-		assertThat(m.get(5).needsReview()).isTrue();
+		assertThat(m).extracting(MappedItem::type).containsExactly(Type.EXACT, Type.AI_GUESS, Type.ALIAS, Type.ALIAS, Type.ALIAS,
+				Type.ALIAS, Type.UNMAPPED);
+		assertThat(m).extracting(MappedItem::standardName).containsExactly("냉장고", "냉장고", "냉장고", "김치냉장고", "TV장", "이사박스", "");
+		assertThat(m).extracting(MappedItem::sizeCode).containsExactly("03", "02", "03", "02", "02", "02", "02");
+		assertThat(m.get(0).needsReview()).isFalse();
+		assertThat(m.get(1).needsReview()).isTrue();
 		assertThat(m.get(6).standard()).isNull();
-		assertThat(m.get(6).reasons()).anyMatch(r -> r.contains("소형 규격이 없어요"));
+		assertThat(m.get(6).reasons()).anyMatch(r -> r.contains("기타"));
+		assertThat(Type.EXACT.code()).isEqualTo("01");
+		assertThat(Type.UNMAPPED.code()).isEqualTo("04");
 	}
 
 	@Test
 	void ambiguousAliasIsNotForced() {
-		// '냉장고 옆 TV' 는 같은 길이(3글자)로 걸리는 별칭이 없어도, 서로 다른 품목 두 개가 같은 최장 길이면 복수 후보
-		List<String> candidates = ItemMappingService.aliasCandidates("냉장고 tv장",
-				java.util.Map.of("냉장고", "냉장고", "tv장", "TV장"));
-		assertThat(candidates).containsExactlyInAnyOrder("냉장고", "TV장");
-		MappedItem m = ItemMappingService.map(List.of(ai("냉장고 TV장", "", 1, "중형")), TABLE).get(0);
-		assertThat(m.method()).isEqualTo(Method.AMBIGUOUS);
-		assertThat(m.standard()).isNull();
+		// 같은 길이로 서로 다른 품목을 가리키면 고르지 않는다 (우리 쪽 추가 규칙)
+		List<String> c = ItemMappingService.aliasCandidates("티비 식탁", ALIASES,
+				Map.of("tv", "TV", "식탁테이블", "식탁·테이블"));
+		assertThat(c).containsExactlyInAnyOrder("TV|", "식탁·테이블|");
+		MappedItem m = ItemMappingService.map(List.of(ai("기타", "02", 1, "티비 식탁")), TABLE).get(0);
+		assertThat(m.type()).isEqualTo(Type.UNMAPPED);
+		assertThat(m.candidates()).containsExactlyInAnyOrder("TV", "식탁·테이블");
 	}
 
 	@Test
-	void missingSizeDefaultsToMediumWithReview() {
-		MappedItem m = ItemMappingService.map(List.of(ai("냉장고", "", 1, "")), TABLE).get(0);
-		assertThat(m.sizeCode()).isEqualTo("02");
-		assertThat(m.needsReview()).isTrue();
+	void duplicateOnlyWithinSameRoom() {
+		List<MappedItem> m = ItemMappingService.map(List.of(ai("냉장고", "02", 1, "", "주방"), ai("냉장고", "02", 1, "", "베란다"),
+				ai("냉장고", "02", 1, "", "주방")), TABLE);
+		assertThat(m.get(1).needsReview()).isFalse(); // 방이 다르면 따로 적는 게 규칙
+		assertThat(m.get(2).reasons()).anyMatch(x -> x.contains("같은 공간"));
 	}
 
 	@Test
 	void volumeAndWeight() {
 		List<MappedItem> m = ItemMappingService.map(List.of(
-				ai("냉장고", "", 2, "중형"), // 0.680 × 2 = 1.360 ㎥, 60.5 × 2 = 121.0 kg
-				ai("냉장고", "", 1, "대형"), // 1.490 ㎥, 무게 없음
-				ai("이사박스", "", 13, "중형"), // 0.077 × 13 = 1.001 ㎥, 무게 없음
-				ai("러닝머신", "", 1, "대형"), // 매핑 실패 → 계산 제외
-				ai("냉장고", "", 1, "중형")), TABLE); // 첫 줄과 같은 품목 · 크기 → 확인 필요(합치지 않음)
+				ai("냉장고", "02", 2, ""), // 0.680 × 2 = 1.360 ㎥, 60.5 × 2 = 121.0 kg
+				ai("냉장고", "03", 1, ""), // 1.490 ㎥, 무게 없음
+				ai("이사박스", "02", 13, ""), // 0.077 × 13 = 1.001 ㎥, 무게 없음
+				ai("기타", "", 1, "러닝머신")), TABLE); // 미매핑 → 계산 제외
 		VolumeWeightService.Result r = new VolumeWeightService().calculate(m);
-
 		assertThat(r.lines().get(0).totalCbm()).isEqualByComparingTo("1.360");
 		assertThat(r.lines().get(0).totalKg()).isEqualByComparingTo("121.0");
-		assertThat(r.lines().get(2).totalCbm()).isEqualByComparingTo("1.001");
 		assertThat(r.lines().get(3).totalCbm()).isNull();
-		// 합계 = 반올림된 줄 합계의 합: 1.360 + 1.490 + 1.001 + 0.680
-		assertThat(r.totalCbm()).isEqualByComparingTo("4.531");
-		assertThat(r.totalKg()).isEqualByComparingTo("181.5");
+		assertThat(r.totalCbm()).isEqualByComparingTo("3.851");
+		assertThat(r.totalKg()).isEqualByComparingTo("121.0");
 		assertThat(r.cbmMissing()).isEqualTo(1);
 		assertThat(r.kgMissing()).isEqualTo(2);
-		assertThat(m.get(4).reasons()).anyMatch(x -> x.contains("같은 품목"));
-		assertThat(r.reviewCount()).isEqualTo(2);
-		assertThat(r.totalCbm().scale()).isEqualTo(VolumeWeightService.CBM_SCALE);
+		assertThat(new VolumeWeightService().calculate(m)).isEqualTo(r); // 같은 입력 → 같은 결과
+	}
 
-		// 같은 입력이면 같은 결과
-		assertThat(new VolumeWeightService().calculate(m)).isEqualTo(r);
-		assertThat(new VolumeWeightService().calculate(List.of()).totalCbm()).isEqualByComparingTo(BigDecimal.ZERO);
+	@Test
+	void tonsFollowOwnerRule() {
+		BigDecimal f = new BigDecimal("2.0");
+		// 대표님 댁: 물품 27.5 × 2.0 = 55 → 5톤 + 1톤 + 1톤 = 7톤
+		TruckLoadService.Load home = TruckLoadService.estimate(new BigDecimal("27.5"), TRUCKS, f);
+		assertThat(home.loadCbm()).isEqualByComparingTo("55");
+		assertThat(home.ton()).isEqualByComparingTo("7");
+		assertThat(home.label()).isEqualTo("5톤 + 1톤 × 2");
+		// 적재 8 → 1톤, 15 → 1톤 2대(2톤) < 2.5톤, 22 → 3.5톤 (1톤 2대로 안 들어감), 70 → 5톤 2대
+		assertThat(TruckLoadService.estimate(new BigDecimal("4"), TRUCKS, f).ton()).isEqualByComparingTo("1");
+		assertThat(TruckLoadService.estimate(new BigDecimal("7.5"), TRUCKS, f).label()).isEqualTo("1톤 × 2");
+		assertThat(TruckLoadService.estimate(new BigDecimal("11"), TRUCKS, f).ton()).isEqualByComparingTo("3.5");
+		assertThat(TruckLoadService.estimate(new BigDecimal("35"), TRUCKS, f).label()).isEqualTo("5톤 × 2");
+		assertThat(TruckLoadService.estimate(BigDecimal.ONE, List.of(), f)).isNull();
+	}
+
+	@Test
+	void groundTruthScore() {
+		List<GroundTruthScorer.Line> truth = GroundTruthScorer.lines(
+				"공간,품목명,크기코드,수량,본 물건\n주방,냉장고,03,1,x\n팬트리,이사박스,02,12,x\n거실,기타,,1,건조대\n거실,TV,02,1,x\n");
+		List<MappedItem> ai = ItemMappingService.map(List.of(ai("냉장고", "03", 1, ""), ai("이사박스", "02", 10, ""),
+				ai("김치냉장고", "02", 1, ""), ai("기타", "", 2, "반려동물 하우스")), TABLE);
+		GroundTruthScorer.Score s = GroundTruthScorer.score("t", truth, ai, TABLE);
+		// 정답 14개(냉장고 1 + 박스 12 + TV 1), AI 12개(냉장고 1 + 박스 10 + 김치냉장고 1), 일치 11
+		assertThat(s.expectedPieces()).isEqualTo(14);
+		assertThat(s.detectedPieces()).isEqualTo(12);
+		assertThat(s.matchedPieces()).isEqualTo(11);
+		assertThat(s.precision()).isEqualByComparingTo("0.917");
+		assertThat(s.recall()).isEqualByComparingTo("0.786");
+		assertThat(s.f1()).isEqualByComparingTo("0.846");
+		assertThat(s.expectedOther()).isEqualTo(1);
+		assertThat(s.detectedOther()).isEqualTo(2);
+		// CBM: 정답 1.490 + 0.924 + 0.280 = 2.694, AI 1.490 + 0.770 + 0.840 = 3.100 → +15.1%
+		assertThat(s.expectedCbm()).isEqualByComparingTo("2.694");
+		assertThat(s.detectedCbm()).isEqualByComparingTo("3.100");
+		assertThat(s.cbmErrorPct()).isEqualByComparingTo("15.1");
+	}
+
+	@Test
+	void promptHasCatalogTable() {
+		String p = AnalysisPrompt.build(TABLE.list());
+		assertThat(p).contains("품목명 | 분류 | 01 | 02 | 03").contains("냉장고 | 가전 | 일반 2도어: 위아래 2도어, 300L 안팎 | 양문형: 좌우로 열림")
+				.doesNotContain("{{CATALOG}}");
+		assertThat(AnalysisPrompt.responseSchema().toString()).contains("video_ok", "item_name", "size_code", "wall_mounted");
 	}
 
 	@Test

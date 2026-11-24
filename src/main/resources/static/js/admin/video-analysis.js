@@ -1,21 +1,28 @@
 /* 영상 분석 테스트 (templates/admin/video-analysis/index.html)
  *  업로드 분석 POST /admin/video-analysis/videos (video, durationSec, uploadStartedAt)
  *  JSON 직접 입력 POST /admin/video-analysis/manual {raw, baseRunId}
- *  기록 보기 GET /runs/{id} · 다시 분석 POST /runs/{id}/rerun · 삭제 POST /runs/{id}/delete · 기준표 다시 읽기 POST /catalog/reload */
+ *  기록 보기 GET /runs/{id} · 정답 비교 GET /runs/{id}/score?set= · 다시 분석 POST /runs/{id}/rerun · 삭제 POST /runs/{id}/delete
+ *  기준 데이터 다시 읽기 POST /catalog/reload */
 (function () {
   const root = document.getElementById('videoAnalysis');
   if (!root) return;
   const BASE = '/admin/video-analysis';
   const $ = (s, el) => (el || root).querySelector(s);
   const maxMb = Number(root.dataset.maxMb);
+  const minSec = Number(root.dataset.minSec);
   const maxSec = Number(root.dataset.maxSec);
   const enabled = root.dataset.enabled === 'true';
-  const METHOD = { STANDARD: 'AI 기준표 선택', EXACT: '이름 일치', ALIAS: '별칭', AMBIGUOUS: '복수 후보', UNMAPPED: '매핑 실패' };
+  const testsets = (root.dataset.testsets || '').split(',').filter(Boolean);
+  /* 공통코드 MAPPING_TYPE */
+  const TYPE = { EXACT: '01 정확 일치', ALIAS: '02 별칭', AI_GUESS: '03 AI 후보', UNMAPPED: '04 미매핑' };
   const SIZE = { '01': '소형', '02': '중형', '03': '대형' };
+  const ERRORS = { '01': '파일 형식 오류', '02': '용량·길이 초과', '03': '영상 품질 불량', '04': '집 안 영상 아님(품목 없음)', '05': 'AI 시간 초과',
+    '06': 'AI 사용량 한도', '07': 'AI 응답 형식 오류', '08': 'AI 호출 실패', '09': 'AI 키 없음', '10': 'AI 서버 혼잡' };
 
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const num = (v, unit) => (v == null ? '—' : v + (unit || ''));
   const ms = (v) => (v == null ? '—' : v >= 1000 ? (v / 1000).toFixed(1) + '초' : v + 'ms');
+  const pct = (v) => (v == null ? '—' : (Number(v) * 100).toFixed(1) + '%');
 
   async function post(url, data) {
     try {
@@ -56,8 +63,9 @@
       duration = Number.isFinite(sec) ? Math.round(sec * 10) / 10 : null;
       const problems = [];
       if (mb > maxMb) problems.push(`${maxMb}MB 초과`);
-      if (duration != null && duration > maxSec) problems.push(`${maxSec}초 초과`);
-      info.textContent = `${file.name} · ${mb.toFixed(1)}MB · ${duration == null ? '길이 모름' : duration + '초'} · ${file.type || '형식 모름'}`;
+      if (duration != null && duration > maxSec) problems.push(`${maxSec / 60}분 초과`);
+      if (duration != null && duration < minSec) problems.push(`${minSec}초 미만`);
+      info.textContent = `${file.name} · ${mb.toFixed(1)}MB · ${duration == null ? '길이 모름' : duration + '초'} · ${file.type || '형식 모름'}${mb > 14 ? ' · Files API 로 전송' : ''}`;
       if (problems.length) setStatus('올릴 수 없어요: ' + problems.join(', '), true);
       else if (!enabled) setStatus('Gemini API 키가 없어 분석할 수 없어요. 아래 JSON 직접 입력은 쓸 수 있어요.', true);
       analyzeBtn.disabled = problems.length > 0 || !enabled;
@@ -81,13 +89,13 @@
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setStatus(`업로드 중 ${Math.round((e.loaded / e.total) * 100)}%`);
     };
-    xhr.upload.onload = () => setStatus('AI 분석 중… (영상 길이에 따라 수십 초 걸릴 수 있어요)');
+    xhr.upload.onload = () => setStatus('AI 분석 중… (1분 영상이면 1~2분 걸릴 수 있어요)');
     xhr.onload = () => {
       analyzeBtn.disabled = false;
       let body = {};
       try { body = JSON.parse(xhr.responseText); } catch (_) { /* 빈 응답 */ }
-      if (xhr.status !== 200) { setStatus(body.message || `실패 (${xhr.status})`, true); return; }
-      setStatus(body.success ? '분석 완료' : `분석 실패: ${body.errorMessage || body.errorCode}`, !body.success);
+      if (xhr.status !== 200) { setStatus((body.errorCode ? body.errorCode + ' ' : '') + (body.message || `실패 (${xhr.status})`), true); return; }
+      setStatus(body.success ? '분석 완료' : `분석 실패: ${body.errorCode} ${ERRORS[body.errorCode] || ''} — ${body.errorMessage || ''}`, !body.success);
       showResult(body);
     };
     xhr.onerror = () => { analyzeBtn.disabled = false; setStatus('서버에 연결하지 못했어요.', true); };
@@ -101,12 +109,13 @@
     showResult(res);
   });
 
-  /* ---------- 기준표 다시 읽기 ---------- */
+  /* ---------- 기준 데이터 다시 읽기 ---------- */
   $('[data-reload]').addEventListener('click', async () => {
     const res = await post(BASE + '/catalog/reload');
     const el = $('[data-catalog-status]');
     if (!res.ok) { alert('다시 읽지 못했어요.'); return; }
-    el.innerHTML = res.error ? `<span style="color:#ef5f3c">${esc(res.error)}</span>` : `품목 ${res.items}개 · 규격 ${res.rows}행 (다시 읽음)`;
+    el.innerHTML = `품목 ${res.items}개 · 규격 ${res.rows}행 · 별칭 ${res.aliases}개 · 트럭 ${res.trucks}종 (다시 읽음)`
+      + (res.error ? `<span class="block" style="color:#ef5f3c">${esc(res.error)}</span>` : '');
   });
 
   /* ---------- 실행 기록: 보기 · 다시 분석 · 삭제 ---------- */
@@ -136,39 +145,53 @@
     const u = run.usage;
     const c = run.cost;
     const t = run.timings || {};
+    const ai = run.ai;
+    const load = run.load;
     const lines = r ? r.lines : [];
     const head = `
       <div class="flex items-center justify-between">
         <h3 class="text-[15px] font-bold">결과 <span class="text-[12px] font-normal text-[#888]">${esc(run.id)}${run.baseRunId ? ' · 기준 ' + esc(run.baseRunId) : ''}</span></h3>
-        <span class="rounded-full px-2 py-0.5 text-[11px] font-semibold" style="background:${run.success ? '#eef4ec' : '#fdeee9'};color:${run.success ? '#4a6741' : '#ef5f3c'}">${run.success ? '성공' : '실패 ' + esc(run.errorCode)}</span>
+        <span class="rounded-full px-2 py-0.5 text-[11px] font-semibold" style="background:${run.success ? '#eef4ec' : '#fdeee9'};color:${run.success ? '#4a6741' : '#ef5f3c'}">${run.success ? '성공' : esc(run.errorCode) + ' ' + esc(ERRORS[run.errorCode] || '')}</span>
       </div>
       ${run.errorMessage ? `<p class="mt-2 text-[12px] text-[#ef5f3c]">${esc(run.errorMessage)}</p>` : ''}
       ${(run.parseErrors || []).map((m) => `<p class="mt-1 text-[12px] text-[#ef5f3c]">✕ ${esc(m)}</p>`).join('')}
-      ${(run.parseWarnings || []).map((m) => `<p class="mt-1 text-[12px] text-[#d9701a]">! ${esc(m)}</p>`).join('')}`;
+      ${(run.parseWarnings || []).map((m) => `<p class="mt-1 text-[12px] text-[#d9701a]">! ${esc(m)}</p>`).join('')}
+      ${ai && ai.rooms && ai.rooms.length ? `<p class="mt-2 text-[12px] text-[#555]">본 공간: ${ai.rooms.map(esc).join(' → ')}</p>` : ''}
+      ${ai && ai.memo ? `<p class="mt-1 whitespace-pre-wrap rounded-[12px] bg-[#fff8ee] p-2.5 text-[12px] text-[#8a5a14]">방문 견적 메모: ${esc(ai.memo)}</p>` : ''}`;
 
     const totals = r ? `
       <div class="mt-4 grid grid-cols-3 gap-2 text-center">
-        <div class="rounded-[12px] bg-[#f6f7f6] py-2"><b class="block text-[16px]">${esc(r.totalCbm)}</b><span class="text-[11px] text-[#888]">총 부피(㎥)</span></div>
-        <div class="rounded-[12px] bg-[#f6f7f6] py-2"><b class="block text-[16px]">${esc(r.totalKg)}</b><span class="text-[11px] text-[#888]">총 무게(kg)${r.kgMissing ? ' · ' + r.kgMissing + '줄 없음' : ''}</span></div>
+        <div class="rounded-[12px] bg-[#f6f7f6] py-2"><b class="block text-[16px]">${esc(r.totalCbm)}</b><span class="text-[11px] text-[#888]">물품 부피(㎥)</span></div>
+        <div class="rounded-[12px] bg-[#f6f7f6] py-2"><b class="block text-[16px]">${load ? esc(load.ton) + '톤' : '—'}</b><span class="text-[11px] text-[#888]">${load ? esc(load.label) : '트럭 기준 없음'}</span></div>
         <div class="rounded-[12px] bg-[#f6f7f6] py-2"><b class="block text-[16px]">${r.reviewCount}</b><span class="text-[11px] text-[#888]">확인 필요</span></div>
       </div>
-      <p class="mt-2 text-[11px] text-[#888]">표준 규격 기준 추정값이에요. 포장 · 분해 · 적재율은 견적 단계에서 따로 반영해요.</p>` : '';
+      <p class="mt-2 text-[11px] text-[#888]">${load ? `적재 부피 ${esc(load.loadCbm)}㎥ = 물품 ${esc(load.itemCbm)}㎥ × 적재계수 ${esc(load.loadFactor)} · ` : ''}무게 ${esc(r.totalKg)}kg${r.kgMissing ? ` (무게 기준 없는 ${r.kgMissing}줄 제외)` : ''}. 표준 규격 기준 추정값이에요.</p>` : '';
+
+    const scoreBox = r && testsets.length ? `
+      <div class="mt-4 rounded-[12px] border border-[#eef0ee] p-3">
+        <div class="flex items-center gap-2 text-[13px]">
+          <b class="shrink-0">정답 비교</b>
+          <select data-score-set class="h-8 min-w-0 flex-1 rounded-[8px] border border-[#dfe3df] px-2 text-[12px]">
+            <option value="">정답 목록 선택</option>${testsets.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
+          </select>
+        </div>
+        <div data-score class="mt-2 text-[12px]"></div>
+      </div>` : '';
 
     const items = lines.map((l) => {
       const m = l.item;
-      const ai = m.ai;
+      const a = m.ai;
       const std = m.standard;
+      const tv = a.inch ? ` · ${a.inch}인치${a.wallMounted ? ' 벽걸이' : ''}` : (a.wallMounted ? ' · 벽걸이' : '');
       return `
         <li class="py-3">
           <div class="flex items-start justify-between gap-2">
-            <div><b>${esc(ai.detectedName)}</b> <span class="text-[#888]">× ${ai.quantity} · ${esc(ai.sizeGrade || '크기 없음')}</span></div>
-            <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style="background:${m.needsReview ? '#fff4e8' : '#eef4ec'};color:${m.needsReview ? '#d9701a' : '#4a6741'}">${esc(METHOD[m.method] || m.method)}</span>
+            <div><b>${esc(a.detectedName || a.itemName)}</b> <span class="text-[#888]">× ${a.quantity}${a.room ? ' · ' + esc(a.room) : ''}${tv}</span></div>
+            <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style="background:${m.needsReview ? '#fff4e8' : '#eef4ec'};color:${m.needsReview ? '#d9701a' : '#4a6741'}">${esc(TYPE[m.type] || m.type)}</span>
           </div>
-          <p class="mt-1 text-[12px] text-[#555]">→ ${m.standardName ? esc(m.standardName) + ' ' + esc(SIZE[m.sizeCode]) + (std && std.sizeName ? ' (' + esc(std.sizeName) + ')' : '') : '<span style="color:#ef5f3c">미매핑</span>'}
-            ${ai.standardName && ai.standardName !== m.standardName ? ` · AI 선택 "${esc(ai.standardName)}"` : ''}</p>
-          <p class="mt-0.5 text-[12px] text-[#555]">부피 ${num(l.unitCbm)} × ${ai.quantity} = <b>${num(l.totalCbm, '㎥')}</b> · 무게 ${l.unitKg == null ? '기준 없음' : l.unitKg + 'kg × ' + ai.quantity + ' = <b>' + l.totalKg + 'kg</b>'}</p>
-          ${std && std.basis ? `<p class="mt-0.5 text-[11px] text-[#888]">근거: ${esc(std.basis)}</p>` : ''}
-          ${ai.evidence ? `<p class="mt-0.5 text-[11px] text-[#888]">단서: ${esc(ai.evidence)}</p>` : ''}
+          <p class="mt-1 text-[12px] text-[#555]">AI: ${esc(a.itemName || '—')} ${esc(a.sizeCode || '')} → ${m.standardName ? esc(m.standardName) + ' ' + esc(SIZE[m.sizeCode]) + (std && std.sizeName ? ' (' + esc(std.sizeName) + ')' : '') : '<span style="color:#ef5f3c">미매핑</span>'}</p>
+          <p class="mt-0.5 text-[12px] text-[#555]">부피 ${num(l.unitCbm)} × ${a.quantity} = <b>${num(l.totalCbm, '㎥')}</b> · 무게 ${l.unitKg == null ? '기준 없음' : l.unitKg + 'kg × ' + a.quantity + ' = <b>' + l.totalKg + 'kg</b>'}</p>
+          ${a.evidence ? `<p class="mt-0.5 text-[11px] text-[#888]">근거: ${esc(a.evidence)}</p>` : ''}
           ${(m.reasons || []).map((x) => `<p class="mt-0.5 text-[12px] text-[#d9701a]">! ${esc(x)}</p>`).join('')}
         </li>`;
     }).join('');
@@ -177,11 +200,11 @@
     const cost = c ? (c.amount == null ? '단가 미설정' : `${c.amount} ${esc(c.currency)} (단가 기준일 ${esc(c.asOf)})`) : '—';
     const meta = `
       <dl class="mt-4 space-y-1.5 border-t border-[#eef0ee] pt-3 text-[12px]">
-        ${run.video ? `<div class="flex justify-between gap-3"><dt class="text-[#888]">영상</dt><dd class="text-right">${esc(run.video.fileName)} · ${(run.video.sizeBytes / 1048576).toFixed(1)}MB · ${num(run.video.durationSec, '초')}</dd></div>` : ''}
-        <div class="flex justify-between gap-3"><dt class="text-[#888]">모델</dt><dd class="text-right">${esc(run.model || '—')} ${run.modelVersion ? '(' + esc(run.modelVersion) + ')' : ''} · 프롬프트 ${esc(run.promptVersion)}</dd></div>
+        ${run.video ? `<div class="flex justify-between gap-3"><dt class="text-[#888]">영상</dt><dd class="text-right">${esc(run.video.fileName)} · ${(run.video.sizeBytes / 1048576).toFixed(1)}MB · ${num(run.video.durationSec, '초')}${run.video.transfer ? ' · ' + esc(run.video.transfer) : ''}</dd></div>` : ''}
+        <div class="flex justify-between gap-3"><dt class="text-[#888]">모델</dt><dd class="text-right">${esc(run.model || '—')} ${run.modelVersion ? '(' + esc(run.modelVersion) + ')' : ''}${run.thinkingLevel ? ' · 생각 ' + esc(run.thinkingLevel) : ''} · 프롬프트 ${esc(run.promptVersion)}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-[#888]">토큰</dt><dd class="text-right">${tokens}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-[#888]">비용</dt><dd class="text-right">${cost}</dd></div>
-        <div class="flex justify-between gap-3"><dt class="text-[#888]">시간</dt><dd class="text-right">업로드 ${ms(t.uploadMs)} · 저장 ${ms(t.saveMs)}${t.aiFileMs ? " · AI 파일 전송 " + ms(t.aiFileMs) : ""} · API ${ms(t.apiMs)} · 매핑 ${ms(t.mappingMs)} · 전체 ${ms(t.totalMs)}${run.retries ? ' · 재시도 ' + run.retries : ''}</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-[#888]">시간</dt><dd class="text-right">업로드 ${ms(t.uploadMs)} · 저장 ${ms(t.saveMs)}${t.aiFileMs ? ' · AI 파일 전송 ' + ms(t.aiFileMs) : ''} · API ${ms(t.apiMs)} · 매핑 ${ms(t.mappingMs)} · 전체 ${ms(t.totalMs)}${run.retries ? ' · 재시도 ' + run.retries : ''}</dd></div>
       </dl>`;
 
     const raw = run.rawResponse ? `
@@ -190,7 +213,7 @@
         <button type="button" data-edit-raw class="mt-2 text-[13px] font-semibold text-[#4a6741]">이 JSON 을 고쳐서 다시 계산</button>
       </details>` : '';
 
-    box.innerHTML = head + totals + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
+    box.innerHTML = head + totals + scoreBox + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
     box.hidden = false;
     const edit = $('[data-edit-raw]', box);
     if (edit) edit.addEventListener('click', () => {
@@ -198,7 +221,34 @@
       $('[data-base-run]').value = run.id;
       $('[data-manual]').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
+    const select = $('[data-score-set]', box);
+    if (select) {
+      select.addEventListener('change', () => showScore(run.id, select.value, $('[data-score]', box)));
+      const guess = testsets.find((s) => s.includes('noperson')) || testsets[0];
+      if (run.video && guess) { select.value = guess; showScore(run.id, guess, $('[data-score]', box)); }
+    }
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* 정답 목록 대비: 정밀도 · 재현율 · F1 · CBM 오차, 품목별 정답/AI 개수 */
+  async function showScore(id, set, el) {
+    el.innerHTML = '';
+    if (!set) return;
+    const res = await fetch(`${BASE}/runs/${id}/score?set=${encodeURIComponent(set)}`);
+    if (!res.ok) { el.textContent = '비교하지 못했어요.'; return; }
+    const s = await res.json();
+    const rows = s.rows.map((r) => `<tr style="${r.expected !== r.detected ? 'color:#d9701a' : ''}"><td class="py-0.5">${esc(r.name)}</td><td class="text-right">${r.expected}</td><td class="text-right">${r.detected}</td><td class="text-right">${esc(r.expectedCbm)}</td><td class="text-right">${esc(r.detectedCbm)}</td></tr>`).join('');
+    el.innerHTML = `
+      <div class="grid grid-cols-4 gap-1.5 text-center">
+        <div class="rounded-[8px] bg-[#f6f7f6] py-1.5"><b class="block">${pct(s.precision)}</b><span class="text-[11px] text-[#888]">정밀도</span></div>
+        <div class="rounded-[8px] bg-[#f6f7f6] py-1.5"><b class="block">${pct(s.recall)}</b><span class="text-[11px] text-[#888]">재현율</span></div>
+        <div class="rounded-[8px] bg-[#f6f7f6] py-1.5"><b class="block">${pct(s.f1)}</b><span class="text-[11px] text-[#888]">F1</span></div>
+        <div class="rounded-[8px] bg-[#f6f7f6] py-1.5"><b class="block">${s.cbmErrorPct > 0 ? '+' : ''}${esc(s.cbmErrorPct)}%</b><span class="text-[11px] text-[#888]">CBM 오차</span></div>
+      </div>
+      <p class="mt-2 text-[11px] text-[#888]">품목표 품목: 정답 ${s.expectedPieces}개 · AI ${s.detectedPieces}개 · 일치 ${s.matchedPieces}개 / CBM 정답 ${esc(s.expectedCbm)} · AI ${esc(s.detectedCbm)} / 표에 없는 물건: 정답 ${s.expectedOther} · AI 미매핑 ${s.detectedOther}</p>
+      <details class="mt-1"><summary class="cursor-pointer text-[12px] font-semibold">품목별 비교</summary>
+        <table class="mt-1 w-full text-[11px]"><thead><tr class="text-[#888]"><th class="text-left">품목</th><th class="text-right">정답</th><th class="text-right">AI</th><th class="text-right">정답㎥</th><th class="text-right">AI㎥</th></tr></thead><tbody>${rows}</tbody></table>
+      </details>`;
   }
 
   function pretty(text) {
