@@ -181,7 +181,7 @@
         <div class="flex justify-between gap-3"><dt class="text-[#888]">모델</dt><dd class="text-right">${esc(run.model || '—')} ${run.modelVersion ? '(' + esc(run.modelVersion) + ')' : ''} · 프롬프트 ${esc(run.promptVersion)}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-[#888]">토큰</dt><dd class="text-right">${tokens}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-[#888]">비용</dt><dd class="text-right">${cost}</dd></div>
-        <div class="flex justify-between gap-3"><dt class="text-[#888]">시간</dt><dd class="text-right">업로드 ${ms(t.uploadMs)} · 저장 ${ms(t.saveMs)} · API ${ms(t.apiMs)} · 매핑 ${ms(t.mappingMs)} · 전체 ${ms(t.totalMs)}${run.retries ? ' · 재시도 ' + run.retries : ''}</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-[#888]">시간</dt><dd class="text-right">업로드 ${ms(t.uploadMs)} · 저장 ${ms(t.saveMs)}${t.aiFileMs ? " · AI 파일 전송 " + ms(t.aiFileMs) : ""} · API ${ms(t.apiMs)} · 매핑 ${ms(t.mappingMs)} · 전체 ${ms(t.totalMs)}${run.retries ? ' · 재시도 ' + run.retries : ''}</dd></div>
       </dl>`;
 
     const raw = run.rawResponse ? `

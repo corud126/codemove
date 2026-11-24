@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * 영상 분석 테스트 설정 (codemove.video-analysis). 키 · 단가는 application-local.yml 에만 적는다.
- * runDir: 테스트 영상 · 실행 기록 저장 폴더 · maxVideoMb: 한 번에 보낼 수 있는 영상 크기 (Gemini 인라인 전송 한도 20MB 이하)
+ * runDir: 테스트 영상 · 실행 기록 저장 폴더 · maxVideoMb: 올릴 수 있는 영상 크기 (14MB 이하는 인라인, 넘으면 Gemini Files API)
  */
 @ConfigurationProperties("codemove.video-analysis")
 public record VideoAnalysisProperties(String standardCsv, String runDir, Integer maxVideoMb, Integer maxDurationSec,
@@ -15,7 +15,7 @@ public record VideoAnalysisProperties(String standardCsv, String runDir, Integer
 
 	public VideoAnalysisProperties {
 		runDir = runDir == null || runDir.isBlank() ? "uploads/video-analysis" : runDir;
-		maxVideoMb = maxVideoMb == null ? 20 : maxVideoMb;
+		maxVideoMb = maxVideoMb == null ? 300 : maxVideoMb;
 		maxDurationSec = maxDurationSec == null ? 120 : maxDurationSec;
 		allowedExtensions = allowedExtensions == null || allowedExtensions.isEmpty()
 				? List.of("mp4", "mov", "webm", "3gp", "avi")
@@ -29,7 +29,7 @@ public record VideoAnalysisProperties(String standardCsv, String runDir, Integer
 
 		public Gemini {
 			apiKey = apiKey == null ? "" : apiKey.trim();
-			model = model == null || model.isBlank() ? "gemini-2.5-flash" : model.trim();
+			model = model == null || model.isBlank() ? "gemini-3.5-flash" : model.trim();
 			baseUrl = baseUrl == null || baseUrl.isBlank() ? "https://generativelanguage.googleapis.com/v1beta" : baseUrl;
 			timeoutSec = timeoutSec == null ? 180 : timeoutSec;
 			maxRetries = maxRetries == null ? 2 : maxRetries;

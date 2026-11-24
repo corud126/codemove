@@ -25,8 +25,8 @@ public record AnalysisRun(String id, String baseRunId, LocalDateTime createdAt, 
 			BigDecimal amount) {
 	}
 
-	/** 업로드(브라우저 → 서버, 브라우저가 잰 값) · 저장 · API · 매핑+계산 · 서버 전체 (밀리초, 모르면 null) */
-	public record Timings(Long uploadMs, Long saveMs, Long apiMs, Long mappingMs, Long totalMs) {
+	/** 업로드(브라우저 → 서버) · 저장 · AI 파일 전송(Files API 업로드 + 처리 대기, 인라인이면 0) · API · 매핑+계산 · 서버 전체 (밀리초, 모르면 null) */
+	public record Timings(Long uploadMs, Long saveMs, Long aiFileMs, Long apiMs, Long mappingMs, Long totalMs) {
 	}
 
 	/** 사용한 기준표 (파일 경로 · 읽은 시각 · 행 수) */

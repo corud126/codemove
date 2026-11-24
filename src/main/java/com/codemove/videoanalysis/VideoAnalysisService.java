@@ -107,7 +107,7 @@ public class VideoAnalysisService {
 	public AnalysisRun analyzeManual(String raw, String baseRunId) {
 		long started = System.currentTimeMillis();
 		String base = AnalysisRunStore.safe(baseRunId) ? baseRunId : null;
-		AnalysisRun run = finish(newId(), base, "MANUAL", null, "", "", null, 0, raw, new AnalysisRun.Timings(null, null, null,
+		AnalysisRun run = finish(newId(), base, "MANUAL", null, "", "", null, 0, raw, new AnalysisRun.Timings(null, null, null, null,
 				null, null), started, null, null);
 		store.save(run);
 		return run;
@@ -142,11 +142,11 @@ public class VideoAnalysisService {
 		try {
 			GeminiVideoClient.Response res = gemini.analyze(store.videoPath(video.storedName()), video.mimeType(), prompt());
 			run = finish(id, baseId, "GEMINI", video, gemini.model(), res.modelVersion(), res.usage(), res.retries(), res.text(),
-					new AnalysisRun.Timings(uploadMs, saveMs, res.apiMs(), null, null), started, null, null);
+					new AnalysisRun.Timings(uploadMs, saveMs, res.fileUploadMs(), res.apiMs(), null, null), started, null, null);
 		} catch (GeminiException e) {
 			log.warn("영상 분석 실패 {}: {}", id, e.getMessage());
 			run = finish(id, baseId, "GEMINI", video, gemini.model(), "", null, e.retries(), null,
-					new AnalysisRun.Timings(uploadMs, saveMs, null, null, null), started, e.code(), e.getMessage());
+					new AnalysisRun.Timings(uploadMs, saveMs, null, null, null, null), started, e.code(), e.getMessage());
 		}
 		store.save(run);
 		return run;
@@ -174,7 +174,7 @@ public class VideoAnalysisService {
 	}
 
 	private static AnalysisRun.Timings total(AnalysisRun.Timings t, Long mappingMs, long started) {
-		return new AnalysisRun.Timings(t.uploadMs(), t.saveMs(), t.apiMs(), mappingMs, System.currentTimeMillis() - started);
+		return new AnalysisRun.Timings(t.uploadMs(), t.saveMs(), t.aiFileMs(), t.apiMs(), mappingMs, System.currentTimeMillis() - started);
 	}
 
 	/** 입력 토큰 × 입력 단가 + (출력 + 생각) 토큰 × 출력 단가. 단가가 없으면 amount null */

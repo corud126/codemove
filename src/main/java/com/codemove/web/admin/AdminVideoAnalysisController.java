@@ -115,7 +115,7 @@ public class AdminVideoAnalysisController {
 	@GetMapping("/runs.csv")
 	public ResponseEntity<byte[]> export() {
 		StringBuilder sb = new StringBuilder("﻿실행ID,기준실행,시각,방식,성공,오류코드,모델,모델버전,프롬프트,영상,크기MB,길이초,"
-				+ "입력토큰,출력토큰,생각토큰,총토큰,비용,통화,단가기준일,업로드ms,저장ms,APIms,매핑ms,전체ms,재시도,품목수,매핑수,확인필요,총CBM,총kg,무게없음\n");
+				+ "입력토큰,출력토큰,생각토큰,총토큰,비용,통화,단가기준일,업로드ms,저장ms,AI파일ms,APIms,매핑ms,전체ms,재시도,품목수,매핑수,확인필요,총CBM,총kg,무게없음\n");
 		List<AnalysisRun> runs = store.recent(Integer.MAX_VALUE);
 		for (AnalysisRun r : runs) {
 			var u = r.usage();
@@ -128,7 +128,7 @@ public class AdminVideoAnalysisController {
 					v == null ? "" : String.format("%.2f", v.sizeBytes() / 1048576.0), v == null ? "" : s(v.durationSec()),
 					u == null ? "" : s(u.promptTokens()), u == null ? "" : s(u.outputTokens()), u == null ? "" : s(u.thoughtsTokens()),
 					u == null ? "" : s(u.totalTokens()), c == null ? "" : s(c.amount()), c == null ? "" : s(c.currency()),
-					c == null ? "" : s(c.asOf()), s(t == null ? null : t.uploadMs()), s(t == null ? null : t.saveMs()),
+					c == null ? "" : s(c.asOf()), s(t == null ? null : t.uploadMs()), s(t == null ? null : t.saveMs()), s(t == null ? null : t.aiFileMs()),
 					s(t == null ? null : t.apiMs()), s(t == null ? null : t.mappingMs()), s(t == null ? null : t.totalMs()),
 					s(r.retries()), s(r.itemCount()), s(r.mappedCount()), s(r.reviewCount()),
 					res == null ? "" : s(res.totalCbm()), res == null ? "" : s(res.totalKg()), res == null ? "" : s(res.kgMissing()))))
