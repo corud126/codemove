@@ -213,6 +213,61 @@ class VideoAnalysisUnitTest {
 		assertThat(new VideoAnalysisProperties.Price(null, null, null, null, null, null).set()).isFalse();
 	}
 
+	/** 판정 테스트용 실행 기록: errorCode · 영상 상태 · 공간 · 품목 */
+	static AnalysisRun run(String errorCode, AiResultParser.VideoState state, List<String> rooms, List<AiItem> items, String reject) {
+		VolumeWeightService.Result result = errorCode == null ? new VolumeWeightService().calculate(ItemMappingService.map(items, TABLE))
+				: null;
+		return new AnalysisRun("20261124-000000-000", null, null, "GEMINI", errorCode == null, errorCode, null, null, "m", "", "",
+				null, "v4", null, null, null, 0, "", new AnalysisRun.Ai(errorCode == null || !"03".equals(errorCode), reject, rooms, "",
+						state), List.of(), List.of(), result, null, null);
+	}
+
+	@Test
+	void outcomeForUnreadableVideos() {
+		AnalysisOutcomePolicy policy = new AnalysisOutcomePolicy(2, 3, 0.5);
+		var dark = new AiResultParser.VideoState(List.of("어두움"), "거의없음", List.of());
+		// 03 어두움 → 다시 찍기 + 촬영 요령, 2회까지
+		var o = policy.evaluate(run("03", dark, List.of(), List.of(), "너무 어두움"), 1);
+		assertThat(o.type()).isEqualTo(AnalysisOutcomePolicy.Type.RETAKE);
+		assertThat(o.title()).contains("어두워서");
+		assertThat(o.tips()).isNotEmpty();
+		assertThat(o.actions().get(0).key()).isEqualTo("retake");
+		assertThat(o.attemptsLeft()).isEqualTo(2);
+		// 3번째 시도까지 실패 → 다시 찍기 없음, 직접 입력 · 방문 견적만
+		var last = policy.evaluate(run("03", dark, List.of(), List.of(), ""), 3);
+		assertThat(last.attemptsLeft()).isZero();
+		assertThat(last.actions()).extracting(AnalysisOutcomePolicy.Action::key).containsExactly("manual", "visit");
+		// 흔들림 제목 · 04 집 아님
+		assertThat(AnalysisOutcomePolicy.qualityTitle(List.of("흔들림"), "")).contains("흔들려서");
+		assertThat(policy.evaluate(run("04", AiResultParser.VideoState.NONE, List.of(), List.of(), "집 안 아님"), 1).title())
+				.contains("짐이 잘 보이지");
+		// AI 쪽 문제(10 혼잡) → 잠시 후 다시, 영상은 다시 올리지 않음
+		var busy = policy.evaluate(run("10", AiResultParser.VideoState.NONE, List.of(), List.of(), ""), 1);
+		assertThat(busy.type()).isEqualTo(AnalysisOutcomePolicy.Type.RETRY_LATER);
+		assertThat(busy.actions().get(0).key()).isEqualTo("reanalyze");
+		// 업로드에서 막힘(02)
+		assertThat(policy.forUploadReject("02", "5초~5분", 1).type()).isEqualTo(AnalysisOutcomePolicy.Type.RETAKE);
+	}
+
+	@Test
+	void outcomeForPartialAndOk() {
+		AnalysisOutcomePolicy policy = new AnalysisOutcomePolicy(2, 3, 0.5);
+		List<AiItem> many = List.of(ai("냉장고", "03", 1, "", "주방"), ai("TV", "02", 1, "", "거실"), ai("이사박스", "02", 5, "", "주방"));
+		// 정상: 공간 2곳 이상 · 품목 3줄 이상 · 확인 필요 적음
+		var ok = policy.evaluate(run(null, new AiResultParser.VideoState(List.of(), "전체", List.of()), List.of("주방", "거실"), many, ""), 1);
+		assertThat(ok.type()).isEqualTo(AnalysisOutcomePolicy.Type.OK);
+		// AI 가 일부만 봤다고 답함 → 일부만 보임, 안 보인 공간 안내
+		var part = policy.evaluate(run(null, new AiResultParser.VideoState(List.of(), "일부", List.of("작은방")), List.of("주방", "거실"),
+				many, ""), 1);
+		assertThat(part.type()).isEqualTo(AnalysisOutcomePolicy.Type.PARTIAL);
+		assertThat(part.reason()).isEqualTo("P1");
+		assertThat(part.message()).contains("작은방");
+		assertThat(part.actions().get(0).key()).isEqualTo("add-video");
+		// 품목 1줄 · 공간 1곳 → P2 · P3
+		var few = policy.evaluate(run(null, AiResultParser.VideoState.NONE, List.of("거실"), List.of(ai("TV", "02", 1, "", "거실")), ""), 1);
+		assertThat(few.reason()).isEqualTo("P2,P3");
+	}
+
 	@Test
 	void runIdIsPathSafe() {
 		assertThat(AnalysisRunStore.safe("20261124-101500-123")).isTrue();

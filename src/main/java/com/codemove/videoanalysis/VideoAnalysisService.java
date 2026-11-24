@@ -232,14 +232,15 @@ public class VideoAnalysisService {
 		VolumeWeightService.Result result = volume.calculate(ItemMappingService.map(parsed.items(), table));
 		TruckLoadService.Load load = trucks.estimate(result.totalCbm(), table.trucks());
 		long mappingMs = System.currentTimeMillis() - mapStart;
-		AnalysisRun.Ai ai = new AnalysisRun.Ai(parsed.videoOk(), parsed.rejectReason(), parsed.rooms(), parsed.memo());
+		AnalysisRun.Ai ai = new AnalysisRun.Ai(parsed.videoOk(), parsed.rejectReason(), parsed.rooms(), parsed.memo(), parsed.state());
 		String code = null;
 		String message = null;
 		if (parsed.broken()) {
 			code = "07";
 			message = "AI 응답을 해석하지 못했어요.";
 		} else if (!parsed.videoOk()) {
-			code = parsed.rejectReason().matches(".*(어두|어둡|흔들|흐림|흐릿|화질|빛|밝기).*") ? "03" : "04";
+			boolean quality = !parsed.state().qualityIssues().isEmpty() || parsed.rejectReason().matches(".*(어두|어둡|흔들|흐림|흐릿|화질|빛|밝기).*");
+			code = quality ? "03" : "04";
 			message = "AI 가 판단할 수 없는 영상이라고 답했어요: " + parsed.rejectReason();
 		} else if (parsed.items().isEmpty()) {
 			code = "04";

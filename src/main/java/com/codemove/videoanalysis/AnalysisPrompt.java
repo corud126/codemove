@@ -18,9 +18,10 @@ public final class AnalysisPrompt {
 	/**
 	 * 기본 버전. v2: 대표님 견적 방식(방 순서 · 바구니 환산 · 서랍 속 짐 · 렌탈 · 고가품 · 벽걸이 TV 인치, 팀과 같은 문구)
 	 * v3: v2 + house-01 1회차에서 덜 센 것(의자 · 플라스틱 서랍 · 행거 · 선반 잔짐)을 한 개씩 세도록 보강 (우리 실험)
+	 * v4: v3 + 영상 상태(quality_issues · coverage · unseen_areas)를 받아 분석이 어려운 영상을 나눠 처리
 	 */
 	public static final String VERSION = "v2";
-	public static final List<String> VERSIONS = List.of("v2", "v3");
+	public static final List<String> VERSIONS = List.of("v2", "v3", "v4");
 
 	private static final Map<String, String> TEMPLATES = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -69,6 +70,9 @@ public final class AnalysisPrompt {
 		root.put("rooms", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")));
 		root.put("items", Map.of("type", "ARRAY", "items", item));
 		root.put("memo", str("방문 견적자에게 남길 메모"));
+		root.put("quality_issues", Map.of("type", "ARRAY", "items", Map.of("type", "STRING", "enum", List.of("어두움", "흔들림", "흐림", "너무 빠름", "가려짐"))));
+		root.put("coverage", Map.of("type", "STRING", "enum", List.of("전체", "일부", "거의없음")));
+		root.put("unseen_areas", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")));
 		return obj(root, List.of("video_ok", "rooms", "items"));
 	}
 

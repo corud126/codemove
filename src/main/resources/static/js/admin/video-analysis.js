@@ -106,7 +106,11 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
       analyzeBtn.disabled = false;
       let body = {};
       try { body = JSON.parse(xhr.responseText); } catch (_) { /* 빈 응답 */ }
-      if (xhr.status !== 200) { setStatus((body.errorCode ? body.errorCode + ' ' : '') + (body.message || `실패 (${xhr.status})`), true); return; }
+      if (xhr.status !== 200) {
+        setStatus((body.errorCode ? body.errorCode + ' ' : '') + (body.message || `실패 (${xhr.status})`), true);
+        if (body.outcome) { const box = $('[data-result]'); box.innerHTML = '<h3 class="text-[15px] font-bold">고객에게 보일 안내 (업로드에서 막힘)</h3><div class="mt-2">' + outcomeHtml(body.outcome) + '</div>'; box.hidden = false; }
+        return;
+      }
       setStatus(body.success ? '분석 완료' : `분석 실패: ${body.errorCode} ${ERRORS[body.errorCode] || ''} — ${body.errorMessage || ''}`, !body.success);
       showResult(body);
     };
@@ -233,7 +237,15 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
         </div>
         <div data-customer class="mt-2 text-[12px]"></div>
       </div>` : '';
-    box.innerHTML = head + totals + scoreBox + customerBox + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
+    const outcomeBox = `
+      <div class="mt-4 rounded-[12px] border border-[#eef0ee] p-3">
+        <div class="flex items-center justify-between gap-2 text-[13px]">
+          <b>고객에게 보일 안내</b>
+          <label class="text-[11px] text-[#888]">시도 <select data-outcome-attempt class="h-7 rounded-[6px] border border-[#dfe3df] px-1 text-[11px]"><option value="">기록대로</option><option value="1">1회째</option><option value="2">2회째</option><option value="3">3회째</option></select></label>
+        </div>
+        <div data-outcome class="mt-2"></div>
+      </div>`;
+    box.innerHTML = head + outcomeBox + totals + scoreBox + customerBox + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
     box.hidden = false;
     const edit = $('[data-edit-raw]', box);
     if (edit) edit.addEventListener('click', () => {
@@ -241,6 +253,10 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
       $('[data-base-run]').value = run.id;
       $('[data-manual]').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
+    const outcomeEl = $('[data-outcome]', box);
+    const attemptSel = $('[data-outcome-attempt]', box);
+    showOutcome(run.id, outcomeEl, '');
+    attemptSel.addEventListener('change', () => showOutcome(run.id, outcomeEl, attemptSel.value));
     const customer = $('[data-customer]', box);
     if (customer) showCustomer(run.id, customer);
     const select = $('[data-score-set]', box);
@@ -250,6 +266,29 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
       if (run.video && guess) { select.value = guess; showScore(run.id, guess, $('[data-score]', box)); }
     }
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* 고객에게 보일 안내 (AnalysisOutcomePolicy): 제목 · 설명 · 촬영 요령 · 버튼 · 관리자 표시 · 남은 횟수 */
+  const OUTCOME_COLOR = { OK: '#4a6741', PARTIAL: '#d9701a', RETAKE: '#ef5f3c', RETRY_LATER: '#ef5f3c' };
+  const OUTCOME_NAME = { OK: '정상', PARTIAL: '일부만 보임', RETAKE: '다시 찍기', RETRY_LATER: '잠시 후 다시' };
+  function outcomeHtml(o) {
+    const buttons = o.actions.map((a) => a.primary
+      ? `<span class="block h-10 rounded-full bg-[#4a6741] text-center text-[13px] font-bold leading-10 text-white">${esc(a.label)}</span>`
+      : `<span class="block py-1.5 text-center text-[12px] text-[#8a8a8a]">${esc(a.label)}</span>`).join('');
+    return `
+      <div class="rounded-[12px] bg-[#fafbfa] p-3">
+        <p class="text-[11px] font-semibold" style="color:${OUTCOME_COLOR[o.type]}">${esc(OUTCOME_NAME[o.type] || o.type)}${o.reason ? ' · ' + esc(o.reason) : ''}</p>
+        <p class="mt-1 text-[14px] font-bold">${esc(o.title)}</p>
+        <p class="mt-1 text-[12px] text-[#555]">${esc(o.message)}</p>
+        ${o.tips.length ? `<ul class="mt-2 list-disc pl-4 text-[11px] text-[#777]">${o.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+        <div class="mt-3 space-y-1">${buttons}</div>
+      </div>
+      <p class="mt-2 text-[11px] text-[#888]">관리자 표시: <b style="color:#292929">${esc(o.adminLabel)}</b> · 시도 ${o.attemptsUsed}회째 · 남은 다시 찍기/재분석 ${o.attemptsLeft}회</p>`;
+  }
+
+  async function showOutcome(id, el, attempt) {
+    const res = await fetch(`${BASE}/runs/${id}/outcome${attempt ? '?attempt=' + attempt : ''}`);
+    el.innerHTML = res.ok ? outcomeHtml(await res.json()) : '<p class="text-[12px] text-[#888]">불러오지 못했어요.</p>';
   }
 
   /* 흐름에 붙이면 고객 확인 화면 · 관리자 요청 품목으로 넘어갈 값 (부피는 기준표 기준) */

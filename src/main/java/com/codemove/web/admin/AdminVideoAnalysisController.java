@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.codemove.videoanalysis.AnalysisOutcomePolicy;
 import com.codemove.videoanalysis.AnalysisPrompt;
 import com.codemove.videoanalysis.AnalysisRun;
 import com.codemove.videoanalysis.AnalysisRunStore;
@@ -40,15 +41,18 @@ public class AdminVideoAnalysisController {
 	private final AnalysisRunStore store;
 	private final GroundTruthScorer scorer;
 	private final TruckLoadService trucks;
+	private final com.codemove.videoanalysis.AnalysisOutcomePolicy outcomePolicy;
 	private final com.codemove.request.ItemCatalog itemCatalog;
 	private final com.codemove.common.code.CodeService codeService;
 
 	public AdminVideoAnalysisController(VideoAnalysisService service, AnalysisRunStore store, GroundTruthScorer scorer,
-			TruckLoadService trucks, com.codemove.request.ItemCatalog itemCatalog, com.codemove.common.code.CodeService codeService) {
+			TruckLoadService trucks, com.codemove.request.ItemCatalog itemCatalog, com.codemove.common.code.CodeService codeService,
+			com.codemove.videoanalysis.AnalysisOutcomePolicy outcomePolicy) {
 		this.service = service;
 		this.store = store;
 		this.scorer = scorer;
 		this.trucks = trucks;
+		this.outcomePolicy = outcomePolicy;
 		this.itemCatalog = itemCatalog;
 		this.codeService = codeService;
 	}
@@ -79,7 +83,8 @@ public class AdminVideoAnalysisController {
 		try {
 			return ResponseEntity.ok(service.analyzeUpload(video, durationSec, uploadMs, new VideoAnalysisService.RunOptions(model, fps, prompt, Boolean.TRUE.equals(noFallback))));
 		} catch (VideoAnalysisService.RejectedUpload e) {
-			return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "errorCode", e.code()));
+			return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "errorCode", e.code(), "outcome",
+					outcomePolicy.forUploadReject(e.code(), e.getMessage(), 1)));
 		}
 	}
 
@@ -167,6 +172,37 @@ public class AdminVideoAnalysisController {
 		model.addAttribute("catalog", itemCatalog.forScript());
 		model.addAttribute("aiPreviewItems", items.getBody().get("items"));
 		return "user/quote/index";
+	}
+
+	/**
+	 * 이 실행 결과를 고객에게 어떻게 안내할지 (분석이 어려운 영상 처리 규칙 미리보기).
+	 * 시도 횟수는 다시 분석 · 재계산으로 이어진 기록(baseRunId)을 따라가 센다. attempt 를 주면 그 값으로 (남은 횟수 시험용)
+	 */
+	@GetMapping("/runs/{id}/outcome")
+	@ResponseBody
+	public ResponseEntity<AnalysisOutcomePolicy.Outcome> outcome(@PathVariable String id,
+			@RequestParam(required = false) Integer attempt) {
+		AnalysisRun run = store.find(id);
+		if (run == null) {
+			return ResponseEntity.notFound().build();
+		}
+		int attempts = attempt != null && attempt > 0 ? attempt : attempts(run);
+		return ResponseEntity.ok(outcomePolicy.evaluate(run, attempts));
+	}
+
+	/** 기준 실행을 따라가며 센 분석 시도 횟수 (자기 자신 포함, 순환 방지로 최대 20) */
+	private int attempts(AnalysisRun run) {
+		int n = 1;
+		String base = run.baseRunId();
+		while (base != null && n < 20) {
+			AnalysisRun prev = store.find(base);
+			if (prev == null) {
+				break;
+			}
+			n++;
+			base = prev.baseRunId();
+		}
+		return n;
 	}
 
 	@PostMapping("/runs/{id}/rerun")

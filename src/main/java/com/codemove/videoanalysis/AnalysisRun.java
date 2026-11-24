@@ -31,7 +31,7 @@ public record AnalysisRun(String id, String baseRunId, LocalDateTime createdAt, 
 	}
 
 	/** AI 가 영상 전체에 대해 답한 것: 판단 가능 여부 · 거절 이유 · 본 공간 · 방문 견적자 메모 */
-	public record Ai(boolean videoOk, String rejectReason, List<String> rooms, String memo) {
+	public record Ai(boolean videoOk, String rejectReason, List<String> rooms, String memo, AiResultParser.VideoState state) {
 	}
 
 	/** amount 가 null 이면 단가 미설정 */

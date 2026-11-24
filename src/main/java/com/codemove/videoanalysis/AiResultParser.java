@@ -29,9 +29,18 @@ public final class AiResultParser {
 			boolean needsReview, Integer inch, boolean wallMounted) {
 	}
 
+	/**
+	 * 영상 상태 (프롬프트 v4): qualityIssues 어두움 · 흔들림 · 흐림 · 너무 빠름 · 가려짐 / coverage 전체 · 일부 · 거의없음 (모르면 빈 문자열)
+	 * / unseenAreas 안 보인 공간 · 닫힌 수납장
+	 */
+	public record VideoState(List<String> qualityIssues, String coverage, List<String> unseenAreas) {
+
+		public static final VideoState NONE = new VideoState(List.of(), "", List.of());
+	}
+
 	/** videoOk 가 false 면 rejectReason 에 이유 (어두움 · 집 안 영상 아님 등) */
 	public record Parsed(boolean videoOk, String rejectReason, List<String> rooms, String memo, List<AiItem> items,
-			List<String> errors, List<String> warnings) {
+			List<String> errors, List<String> warnings, VideoState state) {
 
 		/** 형식 자체가 깨져 품목을 하나도 못 읽은 경우 */
 		public boolean broken() {
@@ -51,22 +60,24 @@ public final class AiResultParser {
 			Object value = JSON.readValue(stripFence(raw), Object.class);
 			if (!(value instanceof Map<?, ?> m)) {
 				errors.add("최상위가 객체({ })가 아니에요.");
-				return new Parsed(true, "", List.of(), "", items, errors, warnings);
+				return new Parsed(true, "", List.of(), "", items, errors, warnings, VideoState.NONE);
 			}
 			root = m;
 		} catch (JacksonException e) {
 			errors.add("JSON 형식이 아니에요: " + e.getOriginalMessage());
-			return new Parsed(true, "", List.of(), "", items, errors, warnings);
+			return new Parsed(true, "", List.of(), "", items, errors, warnings, VideoState.NONE);
 		}
 		boolean videoOk = !Boolean.FALSE.equals(root.get("video_ok"));
 		List<String> rooms = root.get("rooms") instanceof List<?> r
 				? r.stream().map(AiResultParser::text).filter(s -> !s.isEmpty()).toList()
 				: List.of();
+		VideoState state = new VideoState(strings(root.get("quality_issues")), text(root.get("coverage")),
+				strings(root.get("unseen_areas")));
 		if (!(root.get("items") instanceof List<?> list)) {
 			if (videoOk) {
 				errors.add("items 배열이 없어요.");
 			}
-			return new Parsed(videoOk, text(root.get("reject_reason")), rooms, text(root.get("memo")), items, errors, warnings);
+			return new Parsed(videoOk, text(root.get("reject_reason")), rooms, text(root.get("memo")), items, errors, warnings, state);
 		}
 		for (int i = 0; i < list.size(); i++) {
 			String at = (i + 1) + "번째 품목";
@@ -104,7 +115,7 @@ public final class AiResultParser {
 					integer(m.get("inch")), Boolean.TRUE.equals(m.get("wall_mounted"))));
 		}
 		return new Parsed(videoOk, text(root.get("reject_reason")), rooms, text(root.get("memo")), List.copyOf(items),
-				List.copyOf(errors), List.copyOf(warnings));
+				List.copyOf(errors), List.copyOf(warnings), state);
 	}
 
 	/** ```json ... ``` 로 감싼 응답이면 안쪽만 */
@@ -118,6 +129,10 @@ public final class AiResultParser {
 			}
 		}
 		return s;
+	}
+
+	private static List<String> strings(Object value) {
+		return value instanceof List<?> l ? l.stream().map(AiResultParser::text).filter(s -> !s.isEmpty()).toList() : List.of();
 	}
 
 	private static String text(Object value) {
