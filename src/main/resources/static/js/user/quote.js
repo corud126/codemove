@@ -405,14 +405,14 @@
     renderOptions();
     renderChrome();
   });
-  /* 포장 방식 안내: 회색 버튼으로 설명 펼치기 · 접기 */
-  const packHelp = $('[data-q-pack-help]', root);
-  if (packHelp) packHelp.addEventListener('click', () => {
-    const body = document.getElementById(packHelp.getAttribute('aria-controls'));
-    const open = packHelp.getAttribute('aria-expanded') !== 'true';
-    packHelp.setAttribute('aria-expanded', String(open));
+  /* 포장 방식 안내: 부제목 끝 ⓘ (일반 · 쉬운 모드에 하나씩, 같은 설명을 펼치고 접는다) */
+  const packHelps = $$('[data-q-pack-help]', root);
+  packHelps.forEach((btn) => btn.addEventListener('click', () => {
+    const body = document.getElementById(btn.getAttribute('aria-controls'));
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    packHelps.forEach((b) => b.setAttribute('aria-expanded', String(open)));
     body.hidden = !open;
-  });
+  }));
 
   /* ── 4. 주소 ── */
   const addrBlocks = $$('[data-q-addr]', root);
