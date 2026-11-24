@@ -80,6 +80,25 @@ codemove:
       range-min-rate: 0.95
       range-max-rate: 1.15
       round-unit: 10000
+  # 영상 분석 테스트 (관리자 /admin/video-analysis, 견적 흐름에는 아직 연결하지 않음)
+  #  standard-csv: 품목 기준표 CSV 경로 · run-dir: 테스트 영상 · 실행 기록 폴더 · 영상 최대 크기(MB, Gemini 인라인 20MB 이하) · 최대 길이(초)
+  #  gemini.api-key · price(100만 토큰당 단가)는 application-local.yml 에 작성 (비어 있으면 JSON 직접 입력만 · 비용 '단가 미설정')
+  video-analysis:
+    standard-csv:
+    run-dir: uploads/video-analysis
+    max-video-mb: 20
+    max-duration-sec: 120
+    allowed-extensions: [mp4, mov, webm, 3gp, avi]
+    gemini:
+      api-key:
+      model: gemini-2.5-flash
+      timeout-sec: 180
+      max-retries: 2
+    price:
+      input-per-million:
+      output-per-million:
+      currency: USD
+      as-of:
 
 ---
 # 로컬 개발: 템플릿·정적 파일을 src에서 직접 읽어 수정 즉시 반영 (재시작 불필요)
