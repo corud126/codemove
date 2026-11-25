@@ -23,15 +23,16 @@ public record VideoAnalysisProperties(String runDir, Integer maxVideoMb, Integer
 		maxDurationSec = maxDurationSec == null ? 300 : maxDurationSec;
 		allowedExtensions = allowedExtensions == null || allowedExtensions.isEmpty() ? List.of("mp4", "mov", "webm")
 				: allowedExtensions;
-		gemini = gemini == null ? new Gemini(null, null, null, null, null, null, null) : gemini;
+		gemini = gemini == null ? new Gemini(null, null, null, null, null, null, null, null) : gemini;
 		price = price == null ? new Price(null, null, null, null, null, null) : price;
 	}
 
 	/**
 	 * apiKey 가 비어 있으면 영상 분석은 막고 JSON 직접 입력만 된다.
 	 * thinkingLevel: 생각 수준 (팀 기준 low, 빈 값이면 보내지 않음) · fallbackModels: 주 모델이 혼잡(503) · 한도(429)일 때 차례로 쓸 모델
+	 * videoFps: 기본 영상 초당 프레임 (없으면 Gemini 기본 1, house-01 에서 2 가 6톤 → 7톤)
 	 */
-	public record Gemini(String apiKey, String model, List<String> fallbackModels, String thinkingLevel, String baseUrl,
+	public record Gemini(String apiKey, String model, List<String> fallbackModels, String thinkingLevel, Double videoFps, String baseUrl,
 			Integer timeoutSec, Integer maxRetries) {
 
 		public Gemini {

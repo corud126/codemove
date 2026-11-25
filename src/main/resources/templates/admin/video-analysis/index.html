@@ -72,7 +72,7 @@
           </select></label>
         <label class="block"><span class="text-[#888]">초당 프레임</span>
           <select data-opt-fps class="mt-1 h-8 w-full rounded-[8px] border border-[#dfe3df] px-1">
-            <option value="">기본(1)</option><option value="2">2</option><option value="3">3</option>
+            <option value="" th:text="${limits.gemini().videoFps() == null} ? '설정값(1)' : |설정값(${limits.gemini().videoFps()})|">설정값</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
           </select></label>
         <label class="block"><span class="text-[#888]">프롬프트</span>
           <select data-opt-prompt class="mt-1 h-8 w-full rounded-[8px] border border-[#dfe3df] px-1">

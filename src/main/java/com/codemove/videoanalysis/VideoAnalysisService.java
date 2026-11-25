@@ -256,12 +256,14 @@ public class VideoAnalysisService {
 		RunOptions opt = options == null ? RunOptions.DEFAULT : options;
 		AnalysisRun run;
 		String thinking = properties.gemini().thinkingLevel();
+		// 실행 조건에 프레임이 없으면 설정의 기본 프레임
+		Double fps = opt.fps() != null ? opt.fps() : properties.gemini().videoFps();
 		try {
 			GeminiVideoClient.Response res = gemini.analyze(store.videoPath(video.storedName()), video.mimeType(),
 					AnalysisPrompt.build(opt.prompt(), catalog.snapshot().list()), opt.model(), opt.fps(), !opt.noFallback());
 			AnalysisRun.Video sent = new AnalysisRun.Video(video.fileName(), video.sizeBytes(), video.durationSec(),
 					video.mimeType(), video.storedName(), res.transfer());
-			run = finish(id, baseId, "GEMINI", sent, res.model(), res.modelVersion(), thinking, opt.prompt(), opt.fps(), res.usage(), res.retries(),
+			run = finish(id, baseId, "GEMINI", sent, res.model(), res.modelVersion(), thinking, opt.prompt(), fps, res.usage(), res.retries(),
 					res.text(), new AnalysisRun.Timings(uploadMs, saveMs, res.fileUploadMs(), res.apiMs(), null, null), started,
 					null, null);
 			// 주 모델이 혼잡해 예비 모델로 넘어간 결과는 정확도가 크게 떨어진다 (house-01: 재현율 0.85 → 0.40) → 경고를 맨 앞에
@@ -273,7 +275,7 @@ public class VideoAnalysisService {
 		} catch (GeminiException e) {
 			log.warn("영상 분석 실패 {}: {}", id, e.getMessage());
 			run = finish(id, baseId, "GEMINI", video, opt.model() == null || opt.model().isBlank() ? gemini.model() : opt.model(), "", thinking,
-					opt.prompt(), opt.fps(), null, e.retries(), null,
+					opt.prompt(), fps, null, e.retries(), null,
 					new AnalysisRun.Timings(uploadMs, saveMs, null, null, null, null), started,
 					ERROR_CODE.getOrDefault(e.code(), "08"), e.getMessage());
 		}

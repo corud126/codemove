@@ -100,7 +100,10 @@ codemove:
     gemini:
       api-key:
       model: gemini-4-hydrogen
-      fallback-models: [gemini-3.5-flash]
+      # 기본 모델 결정 (2026-11-25): 대표님 기준 7톤에 맞은 4-hydrogen 을 주 모델로, 예비는 3.8-flash (3.5-flash 는 재현율 40%대라 뺌)
+      #  기본 프롬프트 v3 · 초당 2프레임 (house-01 실험). 3.8-flash 정확도는 아직 확인 전 — 확인 결과에 따라 다시 정함
+      fallback-models: [gemini-3.8-flash]
+      video-fps: 2
       thinking-level: low
       timeout-sec: 300
       max-retries: 2
