@@ -19,9 +19,10 @@ public final class AnalysisPrompt {
 	 * 기본 버전 v3 (house-01: v2 대비 재현율 68% → 85~88%, 2026-11-25 결정). v2: 대표님 견적 방식(방 순서 · 바구니 환산 · 서랍 속 짐 · 렌탈 · 고가품 · 벽걸이 TV 인치, 팀과 같은 문구)
 	 * v3: v2 + house-01 1회차에서 덜 센 것(의자 · 플라스틱 서랍 · 행거 · 선반 잔짐)을 한 개씩 세도록 보강 (우리 실험)
 	 * v4: v3 + 영상 상태(quality_issues · coverage · unseen_areas)를 받아 분석이 어려운 영상을 나눠 처리
+	 * v5: v4 + 방마다 확인 목록(보통 집에 있는 품목을 보임 · 없음 · 안 보임으로 짚기, 안 보임은 unseen_areas). 목록 밖 물건은 그대로 찾아 적는다
 	 */
 	public static final String VERSION = "v3";
-	public static final List<String> VERSIONS = List.of("v2", "v3", "v4");
+	public static final List<String> VERSIONS = List.of("v2", "v3", "v4", "v5");
 
 	private static final Map<String, String> TEMPLATES = new java.util.concurrent.ConcurrentHashMap<>();
 

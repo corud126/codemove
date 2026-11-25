@@ -293,4 +293,49 @@ class VideoAnalysisUnitTest {
 		assertThat(AnalysisRunStore.safe("../../etc")).isFalse();
 		assertThat(AnalysisRunStore.safe(null)).isFalse();
 	}
+
+	@Test
+	void householdCheckFlagsButNeverAddsItems() {
+		// 4인 식탁인데 의자 없음(H1) · 큰 냉장고 2대(H3) · 세탁기 없음(H4) · 안 보인 작은방(H7, 화장실은 묻지 않음) · 짐 없는 서재(H6)
+		List<AiItem> items = List.of(ai("식탁·테이블", "02", 1, "", "주방"), ai("냉장고", "02", 1, "", "주방"), ai("냉장고", "03", 1, "", "주방"),
+				ai("TV", "02", 1, "", "거실"), ai("이사박스", "02", 5, "", "거실"));
+		var mapped = ItemMappingService.map(items, TABLE);
+		var report = HouseholdCheck.check(mapped, List.of("주방", "거실", "서재"),
+				new AiResultParser.VideoState(List.of(), "전체", List.of("작은방", "화장실")));
+		assertThat(report.findings()).extracting(HouseholdCheck.Finding::code).contains("H1", "H3", "H4", "H6", "H7");
+		assertThat(report.findings()).filteredOn(x -> x.code().equals("H1")).first()
+				.satisfies(x -> assertThat(x.expected()).isEqualTo(4));
+		assertThat(report.findings()).noneMatch(x -> x.item().contains("화장실"));
+		assertThat(report.confidence().score()).isBetween(0, 100);
+		// 수량은 그대로 (점검은 표시만)
+		assertThat(mapped).extracting(m -> m.ai().quantity()).containsExactly(1, 1, 1, 1, 5);
+	}
+
+	static AnalysisRun okRun(String id, List<AiItem> items) {
+		VolumeWeightService.Result result = new VolumeWeightService().calculate(ItemMappingService.map(items, TABLE));
+		return new AnalysisRun(id, null, null, "GEMINI", true, null, null, null, "m", "", "", 2.0, "v3", null, null, null, 0, "",
+				new AnalysisRun.Ai(true, "", List.of("거실"), "", AiResultParser.VideoState.NONE), List.of(), List.of(), result, null, null);
+	}
+
+	@Test
+	void ensembleStrategies() {
+		// 바구니 5 · 8 · 6, TV 는 1회만 봄, 냉장고는 3회 모두
+		var a = okRun("20261125-000000-001", List.of(ai("이사박스", "02", 5, "", "거실"), ai("냉장고", "03", 1, "", "주방")));
+		var b = okRun("20261125-000000-002", List.of(ai("이사박스", "02", 8, "", "거실"), ai("냉장고", "03", 1, "", "주방"), ai("TV", "02", 1, "", "거실")));
+		var c = okRun("20261125-000000-003", List.of(ai("이사박스", "02", 6, "", "거실"), ai("냉장고", "03", 1, "", "주방")));
+		java.util.function.Function<RunEnsemble.Strategy, Map<String, Integer>> merged = s -> {
+			var items = AiResultParser.parse(RunEnsemble.merge(List.of(a, b, c), s)).items();
+			Map<String, Integer> q = new java.util.TreeMap<>();
+			items.forEach(i -> q.merge(i.itemName(), i.quantity(), Integer::sum));
+			return q;
+		};
+		assertThat(merged.apply(RunEnsemble.Strategy.MEDIAN)).isEqualTo(Map.of("이사박스", 6, "냉장고", 1));
+		assertThat(merged.apply(RunEnsemble.Strategy.VOTE_MAX)).isEqualTo(Map.of("이사박스", 8, "냉장고", 1));
+		assertThat(merged.apply(RunEnsemble.Strategy.MAX)).isEqualTo(Map.of("이사박스", 8, "냉장고", 1, "TV", 1));
+		// 회차별 차이가 큰 바구니는 확인 필요 + 근거에 범위
+		var box = AiResultParser.parse(RunEnsemble.merge(List.of(a, b, c), RunEnsemble.Strategy.VOTE_MAX)).items().stream()
+				.filter(i -> i.itemName().equals("이사박스")).findFirst().orElseThrow();
+		assertThat(box.needsReview()).isTrue();
+		assertThat(box.evidence()).contains("회차별 5~8개");
+	}
 }

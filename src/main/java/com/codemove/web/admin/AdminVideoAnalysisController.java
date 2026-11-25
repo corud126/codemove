@@ -23,6 +23,7 @@ import com.codemove.videoanalysis.AnalysisPrompt;
 import com.codemove.videoanalysis.AnalysisRun;
 import com.codemove.videoanalysis.AnalysisRunStore;
 import com.codemove.videoanalysis.GroundTruthScorer;
+import com.codemove.videoanalysis.HouseholdCheck;
 import com.codemove.videoanalysis.ItemStandardCatalog;
 import com.codemove.videoanalysis.RunComparison;
 import com.codemove.videoanalysis.TruckLoadService;
@@ -238,6 +239,13 @@ public class AdminVideoAnalysisController {
 		VideoAnalysisService.RunOptions options = new VideoAnalysisService.RunOptions(text(b.get("model")),
 				fps instanceof Number n && n.doubleValue() > 0 ? n.doubleValue() : null, text(b.get("prompt")),
 				Boolean.TRUE.equals(b.get("noFallback")));
+		// repeat 2~5: 같은 조건으로 여러 번 동시에 분석해 품목별 중간값 실행을 만든다 (항상 비동기)
+		int repeat = b.get("repeat") instanceof Number r ? r.intValue() : 1;
+		if (repeat >= 2) {
+			String started = service.startEnsemble(id, options, repeat, strategy(b.get("strategy")));
+			return started == null ? ResponseEntity.badRequest().body(Map.of("message", "다시 분석할 영상이 없어요."))
+					: ResponseEntity.accepted().body(Map.of("id", started, "state", "RUNNING"));
+		}
 		if (Boolean.TRUE.equals(b.get("async"))) {
 			String started = service.startRerun(id, options);
 			return started == null ? ResponseEntity.badRequest().body(Map.of("message", "다시 분석할 영상이 없어요."))
@@ -246,6 +254,39 @@ public class AdminVideoAnalysisController {
 		AnalysisRun run = service.rerun(id, options);
 		return run == null ? ResponseEntity.badRequest().body(Map.of("message", "다시 분석할 영상이 없어요."))
 				: ResponseEntity.ok(run);
+	}
+
+	/** 이미 있는 실행들(같은 영상 · 조건)을 품목별 중간값으로 합친다. API 를 다시 부르지 않는다 */
+	@PostMapping("/ensemble")
+	@ResponseBody
+	public ResponseEntity<Object> ensemble(@RequestBody Map<String, Object> body) {
+		List<String> ids = body.get("ids") instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of();
+		try {
+			return ResponseEntity.ok(service.ensemble(ids, strategy(body.get("strategy"))));
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+		}
+	}
+
+	/** MEDIAN(기본) · VOTE_MAX · MAX */
+	private static com.codemove.videoanalysis.RunEnsemble.Strategy strategy(Object value) {
+		try {
+			return value == null ? null : com.codemove.videoanalysis.RunEnsemble.Strategy.valueOf(String.valueOf(value).trim().toUpperCase(java.util.Locale.ROOT));
+		} catch (IllegalArgumentException e) {
+			return null;
+		}
+	}
+
+	/** 생활 품목 점검 (빠졌거나 잘못 셌을 수 있는 품목 · 고객 확인 질문) + 신뢰도. 수량은 바꾸지 않는다 */
+	@GetMapping("/runs/{id}/checks")
+	@ResponseBody
+	public ResponseEntity<HouseholdCheck.Report> checks(@PathVariable String id) {
+		AnalysisRun run = store.find(id);
+		if (run == null || run.result() == null) {
+			return ResponseEntity.notFound().build();
+		}
+		return ResponseEntity.ok(HouseholdCheck.check(run.result().lines().stream().map(l -> l.item()).toList(),
+				run.ai() == null ? List.of() : run.ai().rooms(), run.ai() == null ? null : run.ai().state()));
 	}
 
 	@PostMapping("/runs/{id}/delete")

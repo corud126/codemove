@@ -96,7 +96,8 @@ public class AnalysisRunStore {
 			return false;
 		}
 		try {
-			if (run.video() != null && run.video().storedName() != null) {
+			// 중간값 실행은 첫 회차의 영상을 같이 가리키므로 영상은 지우지 않는다
+			if (run.video() != null && run.video().storedName() != null && !VideoAnalysisService.ENSEMBLE.equals(run.mode())) {
 				Files.deleteIfExists(videos.resolve(run.video().storedName()));
 			}
 			return Files.deleteIfExists(runs.resolve(id + ".json"));

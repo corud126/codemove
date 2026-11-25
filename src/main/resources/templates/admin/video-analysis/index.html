@@ -79,6 +79,17 @@
             <option th:each="v : ${promptVersions}" th:value="${v}" th:text="${v}" th:selected="${v == promptVersion}">v2</option>
           </select></label>
       </div>
+      <!--/* 반복 분석: 다시 분석할 때 같은 조건으로 여러 번 동시에 돌려 품목별로 합친다 (비용은 회차 수만큼) */-->
+      <div class="mt-2 grid grid-cols-2 gap-2 text-[12px]">
+        <label class="block"><span class="text-[#888]">반복 (다시 분석)</span>
+          <select data-opt-repeat class="mt-1 h-8 w-full rounded-[8px] border border-[#dfe3df] px-1">
+            <option value="1">1회</option><option value="3">3회 합치기</option><option value="5">5회 합치기</option>
+          </select></label>
+        <label class="block"><span class="text-[#888]">합치는 방법</span>
+          <select data-opt-strategy class="mt-1 h-8 w-full rounded-[8px] border border-[#dfe3df] px-1">
+            <option value="VOTE_MAX">과반 품목 최대값</option><option value="MEDIAN">중간값</option><option value="MAX">최대값</option>
+          </select></label>
+      </div>
       <label class="mt-2 flex items-center gap-2 text-[12px] text-[#555]"><input type="checkbox" data-opt-nofallback> 예비 모델 쓰지 않기 (고른 모델 결과만 비교)</label>
       <input type="file" accept="video/*" data-video class="mt-3 block w-full text-[13px]">
       <p class="mt-2 text-[12px] text-[#555]" data-video-info hidden></p>
@@ -119,14 +130,18 @@
         <h3 class="text-[15px] font-bold">실행 기록</h3>
         <a th:href="@{/admin/video-analysis/runs.csv}" class="text-[13px] font-semibold text-[#4a6741]">CSV 내보내기</a>
       </div>
+      <!--/* 이미 있는 기록(같은 영상 · 조건)을 골라 API 를 다시 부르지 않고 합친다 */-->
+      <button type="button" data-merge-selected disabled
+              class="mt-2 h-9 w-full rounded-full border border-[#4a6741] text-[13px] font-semibold text-[#4a6741] disabled:border-[#dfe3df] disabled:text-[#c9cfc8]">고른 기록 합치기 (합치는 방법은 위 설정)</button>
       <p th:if="${#lists.isEmpty(runs)}" class="mt-3 text-[13px] text-[#888]">아직 기록이 없어요.</p>
       <ul class="mt-2 divide-y divide-[#eef0ee]">
         <li th:each="r : ${runs}" class="py-3" th:attr="data-run=${r.id()}">
           <div class="flex items-center justify-between gap-2">
-            <strong class="text-[13px]" th:text="${#temporals.format(r.createdAt(), 'MM.dd HH:mm:ss')}">11.24 10:00:00</strong>
+            <label class="flex items-center gap-2"><input type="checkbox" data-run-pick th:if="${r.success() and r.mode() == 'GEMINI'}">
+            <strong class="text-[13px]" th:text="${#temporals.format(r.createdAt(), 'MM.dd HH:mm:ss')}">11.24 10:00:00</strong></label>
             <span class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
                   th:classappend="${r.success()} ? 'bg-[#eef4ec] text-[#4a6741]' : 'bg-[#fdeee9] text-[#ef5f3c]'"
-                  th:text="${r.success()} ? (${r.mode()} == 'MANUAL' ? '직접 입력' : '분석 완료') : |${r.errorCode()} ${r.errorName()}|">분석 완료</span>
+                  th:text="${r.success()} ? (${r.mode()} == 'MANUAL' ? '직접 입력' : (${r.mode()} == 'ENSEMBLE' ? '반복 합침' : '분석 완료')) : |${r.errorCode()} ${r.errorName()}|">분석 완료</span>
           </div>
           <p class="mt-1 text-[12px] text-[#555]"
              th:text="|${r.video() != null ? r.video().fileName() : 'JSON'}${r.model() != null and !r.model().isEmpty() ? ' · ' + r.model() : ''} · 품목 ${r.itemCount()} · 매핑 ${r.mappedCount()} · 확인 ${r.reviewCount()}${r.result() != null ? ' · ' + r.result().totalCbm() + '㎥' : ''}${r.load() != null ? ' · ' + r.load().ton() + '톤' : ''}${r.usage() != null ? ' · ' + r.usage().totalTokens() + '토큰' : ''}|">영상.mp4 · 품목 6</p>

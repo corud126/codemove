@@ -37,7 +37,7 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
   function options() {
     const fps = $('[data-opt-fps]').value;
     return { model: $('[data-opt-model]').value, fps: fps ? Number(fps) : null, prompt: $('[data-opt-prompt]').value,
-      noFallback: $('[data-opt-nofallback]').checked };
+      noFallback: $('[data-opt-nofallback]').checked, repeat: Number($('[data-opt-repeat]').value), strategy: $('[data-opt-strategy]').value };
   }
 
   /* ---------- 영상 선택 · 길이 확인 ---------- */
@@ -162,6 +162,19 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
       + (res.error ? `<span class="block" style="color:#ef5f3c">${esc(res.error)}</span>` : '');
   });
 
+  /* ---------- 고른 기록 합치기 (API 를 다시 부르지 않음) ---------- */
+  const mergeBtn = $('[data-merge-selected]');
+  const picked = () => Array.from(root.querySelectorAll('[data-run-pick]:checked')).map((c) => c.closest('[data-run]').dataset.run);
+  root.addEventListener('change', (e) => {
+    if (e.target.closest('[data-run-pick]') && mergeBtn) mergeBtn.disabled = picked().length < 2;
+  });
+  if (mergeBtn) mergeBtn.addEventListener('click', async () => {
+    const res = await post(BASE + '/ensemble', { ids: picked(), strategy: $('[data-opt-strategy]').value });
+    if (!res.ok) { alert(res.message || '합치지 못했어요.'); return; }
+    showResult(res);
+    refreshCompare();
+  });
+
   /* ---------- 실행 기록: 보기 · 다시 분석 · 삭제 ---------- */
   root.addEventListener('click', async (e) => {
     const li = e.target.closest('[data-run]');
@@ -280,7 +293,12 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
         </div>
         <div data-outcome class="mt-2"></div>
       </div>`;
-    box.innerHTML = head + outcomeBox + totals + scoreBox + customerBox + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
+    const checksBox = r && lines.length ? `
+      <div class="mt-4 rounded-[12px] border border-[#eef0ee] p-3">
+        <b class="text-[13px]">생활 품목 점검 · 신뢰도</b>
+        <div data-checks class="mt-2 text-[12px]"></div>
+      </div>` : '';
+    box.innerHTML = head + outcomeBox + totals + checksBox + scoreBox + customerBox + (lines.length ? `<ul class="mt-3 divide-y divide-[#eef0ee]">${items}</ul>` : '') + meta + raw;
     box.hidden = false;
     const edit = $('[data-edit-raw]', box);
     if (edit) edit.addEventListener('click', () => {
@@ -294,6 +312,8 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
     attemptSel.addEventListener('change', () => showOutcome(run.id, outcomeEl, attemptSel.value));
     const customer = $('[data-customer]', box);
     if (customer) showCustomer(run.id, customer);
+    const checks = $('[data-checks]', box);
+    if (checks) showChecks(run.id, checks);
     const select = $('[data-score-set]', box);
     if (select) {
       select.addEventListener('change', () => showScore(run.id, select.value, $('[data-score]', box)));
@@ -377,6 +397,25 @@ const rows = c.items.map((it) => `<tr>/* 영상 분석 테스트 (templates/admi
       <details class="mt-1"><summary class="cursor-pointer text-[12px] font-semibold">품목별 (고객 확인 화면 · 관리자 요청 품목에 들어갈 값)</summary>
         <table class="mt-1 w-full text-[11px]"><thead><tr class="text-[#888]"><th class="text-left">품목</th><th class="text-left">크기</th><th class="text-right">개수</th><th class="text-right">부피㎥</th></tr></thead><tbody>${rows}</tbody></table>
       </details>`;
+  }
+
+  /* 생활 품목 점검 (HouseholdCheck): 신뢰도 · 관리자 표시 · 고객에게 물어볼 질문. 수량은 바꾸지 않는다 */
+  const GRADE_COLOR = { '높음': '#4a6741', '보통': '#d9701a', '낮음': '#ef5f3c' };
+  async function showChecks(id, el) {
+    const res = await fetch(`${BASE}/runs/${id}/checks`);
+    if (!res.ok) { el.textContent = '불러오지 못했어요.'; return; }
+    const c = await res.json();
+    const conf = c.confidence;
+    const list = c.findings.map((f) => `
+        <li class="py-1.5">
+          <span class="mr-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style="background:${f.level === 'CHECK' ? '#fff4e8' : '#f1f3f1'};color:${f.level === 'CHECK' ? '#d9701a' : '#777'}">${esc(f.code)} ${f.level === 'CHECK' ? '확인' : '질문'}</span>${esc(f.message)}
+          <p class="mt-0.5 pl-1 text-[11px] text-[#4a6741]">고객 질문: “${esc(f.question)}”</p>
+        </li>`).join('');
+    el.innerHTML = `
+      <p><b style="color:${GRADE_COLOR[conf.grade] || '#292929'}">신뢰도 ${esc(conf.grade)} ${conf.score}점</b>
+        <span class="text-[11px] text-[#888]">${conf.reasons.length ? ' · ' + conf.reasons.map(esc).join(' · ') : ''}</span></p>
+      <p class="mt-1 text-[11px] text-[#888]">관리자 표시: <b style="color:#292929">${esc(c.adminLabel)}</b> · 가중치는 견적서와 맞춰 보기 전의 가정값이에요.</p>
+      ${c.findings.length ? `<ul class="mt-1 divide-y divide-[#eef0ee]">${list}</ul>` : '<p class="mt-1 text-[11px] text-[#888]">앞뒤가 안 맞는 품목이 없어요.</p>'}`;
   }
 
   /* 정답 목록 대비: 정밀도 · 재현율 · F1 · CBM 오차, 품목별 정답/AI 개수 */

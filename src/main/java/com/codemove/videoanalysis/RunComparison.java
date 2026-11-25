@@ -53,11 +53,14 @@ public class RunComparison {
 		String expectedLabel = "";
 		Map<String, List<AnalysisRun>> groups = new TreeMap<>();
 		for (AnalysisRun r : runs) {
-			if (!"GEMINI".equals(r.mode()) || r.video() == null || !set.equals(stem(r.video().fileName()))) {
+			boolean ensemble = VideoAnalysisService.ENSEMBLE.equals(r.mode());
+			if (!("GEMINI".equals(r.mode()) || ensemble) || r.video() == null || !set.equals(stem(r.video().fileName()))) {
 				continue;
 			}
 			String fps = r.fps() == null ? "기본" : BigDecimal.valueOf(r.fps()).stripTrailingZeros().toPlainString();
-			groups.computeIfAbsent(nz(r.model()) + "|" + nz(r.promptVersion()) + "|" + fps, k -> new ArrayList<>()).add(r);
+			// 여러 번 분석 중간값은 따로 묶는다 (비용 · 토큰은 합친 회차 전체)
+			String prompt = nz(r.promptVersion()) + (ensemble ? " · " + ensembleLabel(r) : "");
+			groups.computeIfAbsent(nz(r.model()) + "|" + prompt + "|" + fps, k -> new ArrayList<>()).add(r);
 		}
 		List<Row> rows = new ArrayList<>();
 		for (Map.Entry<String, List<AnalysisRun>> g : groups.entrySet()) {
@@ -124,6 +127,23 @@ public class RunComparison {
 		return new Stat(sum.divide(BigDecimal.valueOf(values.size()), scale, RoundingMode.HALF_UP),
 				values.stream().min(BigDecimal::compareTo).orElseThrow().setScale(scale, RoundingMode.HALF_UP),
 				values.stream().max(BigDecimal::compareTo).orElseThrow().setScale(scale, RoundingMode.HALF_UP));
+	}
+
+	/** 합친 회차 수 + 방법 (예: "3회 중간값"). 합친 결과 JSON 의 ensemble_of · ensemble_strategy 에서 읽는다 */
+	static String ensembleLabel(AnalysisRun r) {
+		String raw = r.rawResponse() == null ? "" : r.rawResponse();
+		java.util.regex.Matcher s = java.util.regex.Pattern.compile("\"ensemble_strategy\"\\s*:\\s*\"(\\w+)\"").matcher(raw);
+		RunEnsemble.Strategy how = RunEnsemble.Strategy.MEDIAN;
+		if (s.find()) {
+			try {
+				how = RunEnsemble.Strategy.valueOf(s.group(1));
+			} catch (IllegalArgumentException e) {
+				// 모르는 값이면 중간값
+			}
+		}
+		java.util.regex.Matcher of = java.util.regex.Pattern.compile("\"ensemble_of\"\\s*:\\s*\\[([^\\]]*)\\]").matcher(raw);
+		int n = of.find() ? of.group(1).split(",").length : 0;
+		return (n > 0 ? n + "회 " : "") + VideoAnalysisService.STRATEGY_NAME.get(how);
 	}
 
 	/** 파일 이름에서 확장자를 뺀 것 */

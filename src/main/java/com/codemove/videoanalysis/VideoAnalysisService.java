@@ -145,6 +145,7 @@ public class VideoAnalysisService {
 	@jakarta.annotation.PreDestroy
 	void shutdown() {
 		executor.shutdownNow();
+		repeatPool.shutdownNow();
 	}
 
 	private record Prepared(String id, AnalysisRun.Video video, long saveMs, long started) {
@@ -211,6 +212,121 @@ public class VideoAnalysisService {
 		AnalysisRun.Video v = base.video();
 		AnalysisRun.Video video = new AnalysisRun.Video(v.fileName(), v.sizeBytes(), v.durationSec(), v.mimeType(), stored, null);
 		return new Prepared(id, video, System.currentTimeMillis() - started, started);
+	}
+
+	/** 여러 번 분석 중간값 실행의 mode */
+	public static final String ENSEMBLE = "ENSEMBLE";
+	/** 한 번에 합칠 수 있는 최대 회차 */
+	public static final int MAX_REPEAT = 5;
+	static final Map<RunEnsemble.Strategy, String> STRATEGY_NAME = Map.of(RunEnsemble.Strategy.MEDIAN, "중간값",
+			RunEnsemble.Strategy.VOTE_MAX, "과반 품목 최대값", RunEnsemble.Strategy.MAX, "최대값");
+	/** 중간값용 반복 분석 (요청 하나가 회차 수만큼 동시에 부른다) */
+	private final java.util.concurrent.ExecutorService repeatPool = java.util.concurrent.Executors.newFixedThreadPool(MAX_REPEAT);
+
+	/**
+	 * 같은 영상의 성공한 실행들을 품목별 중간값으로 합쳐 새 실행으로 남긴다 (RunEnsemble). API 를 다시 부르지 않는다.
+	 * 모델 · 프롬프트 · 프레임이 같은 실행만 합친다. 토큰 · 비용 · 재시도는 회차 합계, API 시간은 가장 오래 걸린 회차.
+	 */
+	public AnalysisRun ensemble(List<String> ids, RunEnsemble.Strategy strategy) {
+		return ensemble(ids, strategy, newId());
+	}
+
+	private AnalysisRun ensemble(List<String> ids, RunEnsemble.Strategy strategy, String newId) {
+		RunEnsemble.Strategy how = strategy == null ? RunEnsemble.Strategy.MEDIAN : strategy;
+		long started = System.currentTimeMillis();
+		List<AnalysisRun> runs = new java.util.ArrayList<>();
+		for (String id : ids == null ? List.<String>of() : ids) {
+			AnalysisRun r = AnalysisRunStore.safe(id) ? store.find(id) : null;
+			if (r == null || !r.success() || r.result() == null || !"GEMINI".equals(r.mode())) {
+				throw new IllegalArgumentException("성공한 영상 분석 실행만 합칠 수 있어요: " + id);
+			}
+			runs.add(r);
+		}
+		if (runs.size() < 2 || runs.size() > MAX_REPEAT) {
+			throw new IllegalArgumentException("2~" + MAX_REPEAT + "개 실행을 골라 주세요.");
+		}
+		AnalysisRun first = runs.get(0);
+		for (AnalysisRun r : runs) {
+			if (!java.util.Objects.equals(r.model(), first.model()) || !java.util.Objects.equals(r.promptVersion(), first.promptVersion())
+					|| !java.util.Objects.equals(r.fps(), first.fps())
+					|| !java.util.Objects.equals(r.video() == null ? null : r.video().fileName(), first.video() == null ? null : first.video().fileName())) {
+				throw new IllegalArgumentException("같은 영상 · 모델 · 프롬프트 · 프레임의 실행만 합칠 수 있어요.");
+			}
+		}
+		String raw = RunEnsemble.merge(runs, how);
+		Usage usage = sum(runs);
+		long api = runs.stream().map(AnalysisRun::timings).filter(java.util.Objects::nonNull).map(AnalysisRun.Timings::apiMs)
+				.filter(java.util.Objects::nonNull).mapToLong(Long::longValue).max().orElse(0);
+		int retries = runs.stream().mapToInt(AnalysisRun::retries).sum();
+		AnalysisRun run = finish(newId, first.id(), ENSEMBLE, first.video(), first.model(), first.modelVersion(), first.thinkingLevel(),
+				first.promptVersion(), first.fps(), usage, retries, raw, new AnalysisRun.Timings(null, null, null, api, null, null), started,
+				null, null);
+		run = withWarning(run, runs.size() + "회 분석 " + STRATEGY_NAME.get(how) + " (" + String.join(", ", runs.stream().map(AnalysisRun::id).toList()) + ")");
+		store.save(run);
+		return run;
+	}
+
+	/**
+	 * 비동기: 저장된 영상을 repeat 번 동시에 다시 분석하고, 성공한 회차가 2개 이상이면 중간값 실행을 만든다.
+	 * 돌려주는 ID 는 중간값 실행 ID (status 로 진행을 본다). 성공이 1개 이하면 그 회차 기록만 남고 중간값 실행은 실패 기록.
+	 */
+	public String startEnsemble(String baseId, RunOptions options, int repeat, RunEnsemble.Strategy strategy) {
+		int n = Math.max(2, Math.min(MAX_REPEAT, repeat));
+		AnalysisRun base = store.find(baseId);
+		if (base == null || base.video() == null || base.video().storedName() == null
+				|| !Files.isRegularFile(store.videoPath(base.video().storedName()))) {
+			return null;
+		}
+		String id = newId();
+		submit(id, () -> {
+			List<java.util.concurrent.Future<AnalysisRun>> jobs = new java.util.ArrayList<>();
+			for (int i = 0; i < n; i++) {
+				jobs.add(repeatPool.submit(() -> rerun(baseId, options)));
+			}
+			List<String> ok = new java.util.ArrayList<>();
+			for (java.util.concurrent.Future<AnalysisRun> j : jobs) {
+				try {
+					AnalysisRun r = j.get();
+					if (r != null && r.success()) {
+						ok.add(r.id());
+					}
+				} catch (Exception e) {
+					log.warn("반복 분석 회차 실패 {}: {}", id, e.getMessage());
+				}
+			}
+			if (ok.size() >= 2) {
+				ensemble(ok, strategy, id);
+			} else {
+				AnalysisRun failed = finish(id, baseId, ENSEMBLE, base.video(), base.model(), "", base.thinkingLevel(),
+						options == null ? AnalysisPrompt.VERSION : options.prompt(), base.fps(), null, 0, null,
+						new AnalysisRun.Timings(null, null, null, null, null, null), System.currentTimeMillis(), "08",
+						n + "회 중 성공 " + ok.size() + "회라 중간값을 낼 수 없어요.");
+				store.save(failed);
+			}
+		});
+		return id;
+	}
+
+	private static Usage sum(List<AnalysisRun> runs) {
+		int p = 0, o = 0, t = 0, total = 0, c = 0;
+		Map<String, Integer> modality = new java.util.LinkedHashMap<>();
+		boolean any = false;
+		for (AnalysisRun r : runs) {
+			Usage u = r.usage();
+			if (u == null) {
+				continue;
+			}
+			any = true;
+			p += u.promptTokens();
+			o += u.outputTokens();
+			t += u.thoughtsTokens();
+			total += u.totalTokens();
+			c += u.cachedTokens();
+			if (u.promptByModality() != null) {
+				u.promptByModality().forEach((k, v) -> modality.merge(k, v, Integer::sum));
+			}
+		}
+		return any ? new Usage(p, o, t, total, c, modality) : null;
 	}
 
 	/** AI 응답 JSON 을 직접 넣어 매핑 · 계산만 (키 없이 시험, 결과를 고친 뒤 재계산) */
